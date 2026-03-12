@@ -117,27 +117,21 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-badge{
   display:flex;align-items:center;justify-content:center;
   background:var(--amb-bg);border-right:1px solid var(--amb-bdr);
-  color:var(--amb2);font-family:var(--mono);font-size:34px;font-weight:700;
+  color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;
   width:84px;flex-shrink:0;
   text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px;
 }
-/* right column: 2 rows */
-.bus-right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:7px 0}
-/* ETAs: justify-end so largest (e1) is flush right */
-.bus-eta-row{
-  display:flex;align-items:baseline;justify-content:flex-end;
-  gap:8px;padding:0 10px 5px 8px;
-}
-.bus-info-row{
-  display:flex;align-items:center;gap:5px;
-  padding:4px 10px 0 8px;border-top:1px solid var(--bdr);
-}
-.bus-stop{font-size:12px;font-weight:500;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bus-dest{font-size:11px;color:var(--mid);white-space:nowrap;flex-shrink:0}
-.bus-dest::before{content:'→ '}
+/* single-row middle section */
+.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:10px 8px}
+.bus-stop{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.bus-dest{font-size:11px;color:var(--mid)}
+
+/* ETAs right-aligned: e3(dim) e2(mid) e1(large+color) */
+.bus-eta-wrap{display:flex;align-items:center;padding:0 8px;flex-shrink:0}
+.eta-row{display:flex;align-items:baseline;gap:7px}
 
 /* ETA display */
-.e1{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+.e1{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1}
 .e1.sc{color:var(--red)}.e1.cc{color:var(--amb2)}.e1.oc{color:var(--grn)}
 .e2{font-family:var(--mono);font-size:13px;color:var(--mid);line-height:1}
 .e3{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1}
@@ -146,8 +140,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:16px;padding:0 9px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
 .bus-rm:active{color:var(--red)}
 
-/* nearby card — same layout but no drag handle or remove */
-.nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);margin-left:auto;flex-shrink:0;padding-left:6px}
+/* nearby */
+.nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);white-space:nowrap;flex-shrink:0}
 
 .empty-state{text-align:center;padding:36px 20px;color:var(--mid)}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.25}
@@ -771,14 +765,11 @@ async function loadNearby(){
       })();
       return `<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s">
         <div class="bus-badge">${r.route}</div>
-        <div class="bus-right">
-          <div class="bus-eta-row">${etaHtml}</div>
-          <div class="bus-info-row">
-            <span class="bus-stop">${r.stopName}</span>
-            <span class="bus-dest">${r.dest}</span>
-            <span class="nearby-dist">${r.dist}m</span>
-          </div>
+        <div class="bus-info">
+          <div class="bus-stop">${r.stopName} <span class="nearby-dist">${r.dist}m</span></div>
+          <div class="bus-dest">往 ${r.dest}</div>
         </div>
+        <div class="bus-eta-wrap"><div class="eta-row">${etaHtml}</div></div>
       </div>`;
     }).join('');
 
@@ -841,13 +832,11 @@ function renderBusList(){
     return `<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s">
       <div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div>
       <div class="bus-badge">${f.route}</div>
-      <div class="bus-right">
-        <div class="bus-eta-row">${etaHtml}</div>
-        <div class="bus-info-row">
-          <span class="bus-stop">${f.stopName}</span>
-          <span class="bus-dest">${f.dest}</span>
-        </div>
+      <div class="bus-info">
+        <div class="bus-stop">${f.stopName}</div>
+        <div class="bus-dest">往 ${f.dest}</div>
       </div>
+      <div class="bus-eta-wrap"><div class="eta-row">${etaHtml}</div></div>
       <button class="bus-rm" onclick="removeFav(event,${i})">×</button>
     </div>`;
   }).join('');
