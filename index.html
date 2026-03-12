@@ -28,10 +28,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .w-panel{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:11px 14px 9px;overflow:hidden;position:relative}
 .w-panel::after{content:'';position:absolute;top:-50px;right:-20px;width:180px;height:180px;background:radial-gradient(circle,rgba(240,165,0,.07) 0%,transparent 70%);pointer-events:none}
 
-.w-r1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.w-r1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .w-left{display:flex;align-items:center;gap:10px}
 .w-icon{font-size:40px;line-height:1}
-.w-tempcol{display:flex;flex-direction:column;gap:4px}
 .w-cur{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1}
 .w-cur sup{font-size:16px;font-weight:400;color:var(--mid);vertical-align:super}
 
@@ -44,50 +43,55 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .w-btn.spinning .ico{display:inline-block;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.w-warns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.w-warns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
 .warn-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,71,87,.13);border:1px solid rgba(255,71,87,.32);color:#ff8a96}
 .warn-pill.amb{background:rgba(240,165,0,.11);border-color:rgba(240,165,0,.32);color:var(--amb2)}
 
-.w-desc-wrap{overflow:hidden;height:17px;margin-bottom:7px}
+/* desc: bigger, wraps up to 3 lines */
+.w-desc-wrap{margin-bottom:8px}
 .w-desc-wrap.hidden{display:none}
-.w-desc{font-size:11px;color:var(--bright);line-height:17px;white-space:nowrap;display:inline-block}
-.w-desc.scrolling{animation:wScroll linear infinite;padding-right:80px}
-@keyframes wScroll{from{transform:translateX(0)}to{transform:translateX(var(--sd))}}
+.w-desc{font-size:13px;color:var(--bright);line-height:1.6;display:block;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
+/* forecast strip — bigger */
 .w-fore{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
 .w-fore::-webkit-scrollbar{display:none}
-.fc{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:6px 9px;flex-shrink:0;min-width:54px}
+.fc{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:7px 10px;flex-shrink:0;min-width:60px}
 .fc.hl{background:var(--bg4);border-color:var(--amb-bdr)}
-.fc-lbl{font-size:10px;color:var(--mid);font-family:var(--mono)}
-.fc-lbl.named{font-size:11px;font-weight:700;color:var(--amb2)}
-.fc-ico{font-size:19px;margin:1px 0}
-.fc-tt{font-family:var(--mono);font-size:10px;display:flex;gap:5px}
+.fc-lbl{font-size:12px;color:var(--mid);font-family:var(--mono)}
+.fc-lbl.named{font-size:13px;font-weight:700;color:var(--amb2)}
+.fc-ico{font-size:22px;margin:2px 0}
+.fc-tt{font-family:var(--mono);font-size:12px;display:flex;gap:5px}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
 
-/* ══ PROFILES ══ */
-.profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none;min-height:42px}
+/* ══ PROFILES — 2× size ══ */
+.profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:6px 10px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:62px}
 .profiles-bar::-webkit-scrollbar{display:none}
-.profile-tab{display:flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans);user-select:none;touch-action:none}
+.profile-tab{display:flex;align-items:center;justify-content:center;height:48px;padding:0 22px;border-radius:12px;font-size:17px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans);user-select:none;touch-action:none}
 .profile-tab.active{background:var(--amb-bg);color:var(--amb2);border-color:var(--amb-bdr)}
 .profile-tab.nearby-tab{color:var(--blu);border-color:rgba(91,143,255,.3)}
 .profile-tab.nearby-tab.active{background:rgba(91,143,255,.1);color:#7ba8ff;border-color:rgba(91,143,255,.45)}
 .profile-tab.tab-ghost{opacity:.25}
 .profile-tab.tab-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04);color:transparent}
-.add-profile-btn{flex-shrink:0;height:30px;min-width:30px;border-radius:8px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.add-profile-btn{flex-shrink:0;height:48px;min-width:48px;border-radius:12px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .add-profile-btn:active{border-color:var(--amb);color:var(--amb)}
 
 /* ══ BUS SECTION ══ */
 .bus-sec{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.bus-hdr{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:8px 12px 5px}
-.bus-hdr-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono)}
-.add-btn{display:flex;align-items:center;gap:5px;background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:5px 12px;color:var(--amb);font-size:13px;font-weight:600;cursor:pointer}
+.bus-hdr{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:8px 12px 6px}
+.bus-hdr-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);flex:1}
+.add-btn{display:flex;align-items:center;gap:5px;background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:6px 13px;color:var(--amb);font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap}
 .add-btn:active{opacity:.7}
+/* ETA mode toggle button */
+.eta-mode-btn{display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:6px 10px;color:var(--mid);font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:var(--sans);transition:all .15s}
+.eta-mode-btn:active{border-color:var(--blu);color:#7ba8ff}
+.eta-mode-btn.mins{border-color:rgba(91,143,255,.35);color:#7ba8ff;background:rgba(91,143,255,.08)}
 .bus-list{flex:1;overflow-y:auto;padding:0 10px 16px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent}
 
-/* bus card — new 2-row right column layout */
+/* bus card */
 .bus-card{
   display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--bdr);
-  border-radius:13px;margin-bottom:8px;overflow:hidden;
+  border-radius:13px;margin-bottom:9px;overflow:hidden;
   animation:slideIn .2s ease both;position:relative;user-select:none;
   transition:border-color .15s,opacity .15s;
 }
@@ -100,35 +104,34 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-card.card-slot::before{background:transparent}
 @keyframes slideIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
-.drag-handle{display:flex;align-items:center;justify-content:center;padding:0 7px;color:var(--dim);font-size:16px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
+.drag-handle{display:flex;align-items:center;justify-content:center;padding:0 9px;color:var(--dim);font-size:18px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
+/* badge: fixed width, bigger gap from info */
 .bus-badge{
   display:flex;align-items:center;justify-content:center;
   background:var(--amb-bg);border-right:1px solid var(--amb-bdr);
-  color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;
-  width:84px;flex-shrink:0;
+  color:var(--amb2);font-family:var(--mono);font-size:38px;font-weight:700;
+  width:90px;flex-shrink:0;
   text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px;
 }
-/* single-row middle section */
-.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:10px 8px}
-.bus-stop{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.bus-dest{font-size:11px;color:var(--mid)}
+/* middle info */
+.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:12px 12px}
+.bus-stop{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.bus-dest{font-size:12px;color:var(--mid)}
 
-/* ETAs right-aligned: e3(dim) e2(mid) e1(large+color) */
-.bus-eta-wrap{display:flex;align-items:center;padding:0 8px;flex-shrink:0}
-.eta-row{display:flex;align-items:baseline;gap:7px}
-
-/* ETA display */
-.e1{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1}
+/* ETAs — bigger */
+.bus-eta-wrap{display:flex;align-items:center;padding:0 12px 0 4px;flex-shrink:0}
+.eta-row{display:flex;align-items:baseline;gap:9px}
+.e1{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1}
 .e1.sc{color:var(--red)}.e1.cc{color:var(--amb2)}.e1.oc{color:var(--grn)}
-.e2{font-family:var(--mono);font-size:13px;color:var(--mid);line-height:1}
-.e3{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1}
-.e-none{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.e2{font-family:var(--mono);font-size:16px;color:var(--mid);line-height:1}
+.e3{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:1}
+.e-none{font-family:var(--mono);font-size:13px;color:var(--dim)}
 
-.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:16px;padding:0 9px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
+.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:18px;padding:0 10px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
 .bus-rm:active{color:var(--red)}
 
 /* nearby */
-.nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);white-space:nowrap;flex-shrink:0}
+.nearby-dist{font-family:var(--mono);font-size:11px;color:var(--blu);white-space:nowrap;flex-shrink:0}
 
 .empty-state{text-align:center;padding:36px 20px;color:var(--mid)}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.25}
@@ -200,7 +203,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
   </div>
 
   <div class="w-warns"    id="w-warns"></div>
-  <div class="w-desc-wrap hidden" id="w-desc-wrap"><span class="w-desc" id="w-desc"></span></div>
+  <div class="w-desc-wrap hidden" id="w-desc-wrap"><div class="w-desc" id="w-desc"></div></div>
   <div class="w-fore"     id="w-fore"></div>
 </div>
 
@@ -211,6 +214,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="bus-sec">
   <div class="bus-hdr">
     <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
+    <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離時間</button>
     <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
   </div>
   <div class="bus-list" id="bus-list"></div>
@@ -329,6 +333,19 @@ function setActivePid(pid){ activePid=pid; localStorage.setItem('active_pid',pid
 let favs = loadFavs(activePid);
 let selectedStn = localStorage.getItem('hko_stn') || '香港天文台';
 let refreshing  = false;
+// 'mins' = show minutes remaining (default), 'clock' = show arrival time
+let etaMode = localStorage.getItem('eta_mode') || 'mins';
+function toggleEtaMode(){
+  etaMode = etaMode==='mins' ? 'clock' : 'mins';
+  localStorage.setItem('eta_mode', etaMode);
+  const btn = document.getElementById('eta-mode-btn');
+  if(etaMode==='mins'){
+    btn.textContent='⏱ 距離時間'; btn.classList.add('mins');
+  } else {
+    btn.textContent='🕐 到站時間'; btn.classList.remove('mins');
+  }
+  renderBusList();
+}
 
 // Nearby state
 const NEARBY_PID = '__nearby__';
@@ -400,16 +417,7 @@ function setWeatherDesc(text){
   const el   = document.getElementById('w-desc');
   if(!text){ wrap.classList.add('hidden'); return }
   wrap.classList.remove('hidden');
-  el.style.animation = 'none'; el.classList.remove('scrolling'); el.textContent = text;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    if(el.scrollWidth <= wrap.offsetWidth + 2) return;
-    el.textContent = text + '          ' + text + '          ';
-    const half = el.scrollWidth / 2;
-    el.style.setProperty('--sd', `-${half}px`);
-    el.style.animationDuration = (half / 55).toFixed(1) + 's';
-    el.style.animation = '';
-    el.classList.add('scrolling');
-  }));
+  el.textContent = text;
 }
 
 // ══════════════════════════════════════════
@@ -685,9 +693,18 @@ async function loadNearby(){
       const etas    = (r._etas||[r._firstEta]).slice(0,3);
       const etaHtml = (() => {
         const parts = [];
-        if(etas[2]){ const d=new Date(etas[2]); parts.push(`<span class="e3">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
-        if(etas[1]){ const d=new Date(etas[1]); parts.push(`<span class="e2">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
-        if(etas[0]){ const d=new Date(etas[0]); parts.push(`<span class="e1 ${cc}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+        const fmtN = (ts, cls) => {
+          if(etaMode==='mins'){
+            const m=Math.round((ts-now)/60000);
+            return `<span class="${cls}">${m<=0?'即將':m+'分'}</span>`;
+          } else {
+            const d=new Date(ts);
+            return `<span class="${cls}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`;
+          }
+        };
+        if(etas[2]) parts.push(fmtN(etas[2],'e3'));
+        if(etas[1]) parts.push(fmtN(etas[1],'e2'));
+        if(etas[0]) parts.push(fmtN(etas[0],`e1 ${cc}`));
         return parts.join('');
       })();
       return `<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s">
@@ -746,9 +763,19 @@ function renderBusList(){
     else etaHtml = (() => {
       // Left→Right: e3(dim/small) · e2(mid) · e1(large+color) — soonest on RIGHT
       const parts = [];
-      if(f._etas[2]){ const d=new Date(f._etas[2]); parts.push(`<span class="e3">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
-      if(f._etas[1]){ const d=new Date(f._etas[1]); parts.push(`<span class="e2">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
-      if(f._etas[0]){ const d=new Date(f._etas[0]); parts.push(`<span class="e1 ${cc}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+      const fmt = (ts, cls) => {
+        if(etaMode === 'mins'){
+          const m = Math.round((ts - now) / 60000);
+          const txt = m <= 0 ? '即將' : m + '分';
+          return `<span class="${cls}">${txt}</span>`;
+        } else {
+          const d = new Date(ts);
+          return `<span class="${cls}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`;
+        }
+      };
+      if(f._etas[2]) parts.push(fmt(f._etas[2], 'e3'));
+      if(f._etas[1]) parts.push(fmt(f._etas[1], 'e2'));
+      if(f._etas[0]) parts.push(fmt(f._etas[0], `e1 ${cc}`));
       return parts.join('');
     })();
 
@@ -876,6 +903,12 @@ function esc(s){ return s.replace(/'/g,"\\'") }
 //  INIT
 // ══════════════════════════════════════════
 renderProfiles();
+// sync ETA mode button
+(()=>{
+  const btn=document.getElementById('eta-mode-btn');
+  if(etaMode==='mins'){ btn.textContent='⏱ 距離時間'; btn.classList.add('mins') }
+  else { btn.textContent='🕐 到站時間'; btn.classList.remove('mins') }
+})();
 loadWeather();
 if(activePid===NEARBY_PID) loadNearby(); else refreshAllETAs();
 setInterval(loadWeather, 5*60*1000);
