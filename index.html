@@ -34,10 +34,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .w-tempcol{display:flex;flex-direction:column;gap:4px}
 .w-cur{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1}
 .w-cur sup{font-size:16px;font-weight:400;color:var(--mid);vertical-align:super}
-.w-hilo{display:flex;gap:10px}
-.w-hi-val{font-family:var(--mono);font-size:15px;font-weight:700;color:#ff8c5a}
-.w-lo-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--blu)}
-.w-hl-lbl{font-size:11px;font-weight:400;color:var(--mid)}
 
 .w-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .w-clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--amb);line-height:1}
@@ -47,15 +43,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .w-btn:active{border-color:var(--amb);color:var(--amb)}
 .w-btn.spinning .ico{display:inline-block;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* stats 3 cards */
-.w-stats{display:flex;gap:7px;margin-bottom:8px}
-.w-stat{flex:1;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:8px 10px}
-.w-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono);color:var(--mid);margin-bottom:5px}
-.w-stat-num{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--bright);line-height:1}
-.w-stat-num .unit{font-size:11px;font-weight:400;color:var(--mid);margin-left:2px}
-.w-stat-sub{font-size:11px;margin-top:3px}
-.uv0{color:var(--mid)}.uv1,.uv2{color:#2ed573}.uv3,.uv4{color:#ffc03a}.uv5,.uv6,.uv7{color:#ff8c5a}.uv8,.uv9,.uv10{color:#ff4757}.uv11{color:#c084fc}
 
 .w-warns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
 .warn-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,71,87,.13);border:1px solid rgba(255,71,87,.32);color:#ff8a96}
@@ -200,13 +187,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
   <div class="w-r1">
     <div class="w-left">
       <div class="w-icon" id="w-icon">🌡</div>
-      <div class="w-tempcol">
-        <div class="w-cur"><span id="w-temp">--</span><sup>°C</sup></div>
-        <div class="w-hilo">
-          <span class="w-hi-val"><span class="w-hl-lbl">↑</span><span id="w-hi">--</span><span class="w-hl-lbl">°</span></span>
-          <span class="w-lo-val"><span class="w-hl-lbl">↓</span><span id="w-lo">--</span><span class="w-hl-lbl">°</span></span>
-        </div>
-      </div>
+      <div class="w-cur"><span id="w-temp">--</span><sup>°C</sup></div>
     </div>
     <div class="w-right">
       <div class="w-clock" id="clock">--:--</div>
@@ -215,22 +196,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         <button class="w-btn" onclick="openLocPicker()">📍 <span id="w-loc-lbl">地點</span></button>
         <button class="w-btn" id="refresh-btn" onclick="doRefresh()"><span class="ico">↺</span> 更新</button>
       </div>
-    </div>
-  </div>
-
-  <div class="w-stats">
-    <div class="w-stat">
-      <div class="w-stat-lbl">濕度</div>
-      <div class="w-stat-num" id="w-humid-val">--<span class="unit">%</span></div>
-    </div>
-    <div class="w-stat">
-      <div class="w-stat-lbl">氣壓</div>
-      <div class="w-stat-num" id="w-pres-val">--<span class="unit">hPa</span></div>
-    </div>
-    <div class="w-stat">
-      <div class="w-stat-lbl">紫外線</div>
-      <div class="w-stat-num" id="w-uv-val">--</div>
-      <div class="w-stat-sub" id="w-uv-sub"></div>
     </div>
   </div>
 
@@ -385,12 +350,10 @@ tickClock(); setInterval(tickClock, 1000);
 // ══════════════════════════════════════════
 async function loadWeather(){
   try{
-    // Fetch rhrread, flw (forecast), warnsum, uvindex in parallel
-    const [rhr, flw, warn, uvi] = await Promise.all([
+    const [rhr, flw, warn] = await Promise.all([
       fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
-      fetch(`${HKO}?dataType=uvindex&lang=tc`).then(r=>r.json()).catch(()=>null),
     ]);
 
     // ── Current temp ──
@@ -398,45 +361,9 @@ async function loadWeather(){
     document.getElementById('w-temp').textContent = tempVal ?? '--';
     document.getElementById('w-loc-lbl').textContent = selectedStn;
 
-    // ── Weather icon (from rhrread.icon array) ──
+    // ── Weather icon ──
     const iconCode = Array.isArray(rhr.icon) ? rhr.icon[0] : rhr.icon;
     document.getElementById('w-icon').textContent = W_ICONS[iconCode] ?? '🌡';
-
-    // ── Humidity ──
-    const humVal = num(hkoFind(rhr.humidity?.data, selectedStn)?.value);
-    document.getElementById('w-humid-val').innerHTML =
-      (humVal!=null ? humVal : '--') + '<span class="unit">%</span>';
-
-    // ── Pressure ──
-    // rhrread exposes pressure.data[] for HKO station only
-    const presVal = num(hkoFind(rhr.pressure?.data ?? rhr.stationPressure?.data, selectedStn)?.value);
-    document.getElementById('w-pres-val').innerHTML =
-      (presVal!=null ? Math.round(presVal) : '--') + '<span class="unit">hPa</span>';
-
-    // ── UV index ──
-    // uvindex endpoint: {uvindex:[{place,value,desc,message}], updateTime}
-    // 京士柏 is the standard UV measurement station
-    let uvVal = null, uvDesc = '';
-    if(uvi?.uvindex && Array.isArray(uvi.uvindex)){
-      const entry = uvi.uvindex.find(u=>u.place==='京士柏') ?? uvi.uvindex[0];
-      uvVal  = num(entry?.value);
-      uvDesc = (typeof entry?.desc === 'string') ? entry.desc : '';
-    }
-    const uvIdxEl  = document.getElementById('w-uv-val');
-    const uvSubEl  = document.getElementById('w-uv-sub');
-    if(uvVal != null){
-      const lvl = UV_LEVELS[Math.min(Math.max(0, Math.round(uvVal)), UV_LEVELS.length-1)];
-      uvIdxEl.innerHTML = `<span class="${lvl.c}">${uvVal}<span class="unit"> 級</span></span>`;
-      uvSubEl.textContent = uvDesc || lvl.l;
-      uvSubEl.className   = 'w-stat-sub ' + lvl.c;
-    } else {
-      uvIdxEl.textContent = '--'; uvSubEl.textContent = '';
-    }
-
-    // ── Hi / Lo from 9-day forecast (today = index 0) ──
-    const fc0 = flw.weatherForecast?.[0];
-    document.getElementById('w-hi').textContent = num(fc0?.forecastMaxtemp) ?? '--';
-    document.getElementById('w-lo').textContent = num(fc0?.forecastMintemp) ?? '--';
 
     // ── Warnings ──
     const activeWarns = Object.entries(warn)
@@ -795,14 +722,10 @@ async function fetchOneETA(fav){
 
 async function refreshAllETAs(){
   if(activePid===NEARBY_PID){ loadNearby(); return }
+  // Load from storage (preserves user's drag order), update ETAs in-place, NO re-sort
   favs = loadFavs(activePid);
   if(!favs.length){ renderBusList(); return }
   await Promise.all(favs.map(fetchOneETA));
-  favs.sort((a,b)=>{
-    if(a._first===null&&b._first===null) return 0;
-    if(a._first===null) return 1; if(b._first===null) return -1;
-    return a._first-b._first;
-  });
   renderBusList();
 }
 
