@@ -117,14 +117,21 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-badge{
   display:flex;align-items:center;justify-content:center;
   background:var(--amb-bg);border-right:1px solid var(--amb-bdr);
-  color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;
-  min-width:80px;padding:0 6px;flex-shrink:0;
+  color:var(--amb2);font-family:var(--mono);font-size:34px;font-weight:700;
+  width:84px;flex-shrink:0;
   text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px;
 }
 /* right column: 2 rows */
-.bus-right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:8px 0}
-.bus-eta-row{display:flex;align-items:baseline;gap:7px;padding:0 8px 4px 8px}
-.bus-info-row{display:flex;align-items:center;gap:5px;padding:0 8px;border-top:1px solid var(--bdr);padding-top:5px}
+.bus-right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:7px 0}
+/* ETAs: justify-end so largest (e1) is flush right */
+.bus-eta-row{
+  display:flex;align-items:baseline;justify-content:flex-end;
+  gap:8px;padding:0 10px 5px 8px;
+}
+.bus-info-row{
+  display:flex;align-items:center;gap:5px;
+  padding:4px 10px 0 8px;border-top:1px solid var(--bdr);
+}
 .bus-stop{font-size:12px;font-weight:500;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bus-dest{font-size:11px;color:var(--mid);white-space:nowrap;flex-shrink:0}
 .bus-dest::before{content:'→ '}
@@ -755,12 +762,13 @@ async function loadNearby(){
       const urgency = m<=2?'soon':m<=8?'coming':'ok';
       const cc      = m<=2?'sc':m<=8?'cc':'oc';
       const etas    = (r._etas||[r._firstEta]).slice(0,3);
-      const etaHtml = etas.map((ts,j)=>{
-        const d=new Date(ts); const t=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        return j===0?`<span class="e1 ${cc}">${t}</span>`
-              :j===1?`<span class="e2">${t}</span>`
-                    :`<span class="e3">${t}</span>`;
-      }).join('');
+      const etaHtml = (() => {
+        const parts = [];
+        if(etas[2]){ const d=new Date(etas[2]); parts.push(`<span class="e3">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+        if(etas[1]){ const d=new Date(etas[1]); parts.push(`<span class="e2">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+        if(etas[0]){ const d=new Date(etas[0]); parts.push(`<span class="e1 ${cc}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+        return parts.join('');
+      })();
       return `<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s">
         <div class="bus-badge">${r.route}</div>
         <div class="bus-right">
@@ -821,12 +829,14 @@ function renderBusList(){
     let etaHtml = '';
     if(f._err) etaHtml=`<span class="e-none">無數據</span>`;
     else if(!f._etas?.length) etaHtml=`<span class="e-none">無班次</span>`;
-    else etaHtml = f._etas.map((ts,j)=>{
-      const d=new Date(ts), t=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      return j===0?`<span class="e1 ${cc}">${t}</span>`
-            :j===1?`<span class="e2">${t}</span>`
-                  :`<span class="e3">${t}</span>`;
-    }).join('');
+    else etaHtml = (() => {
+      // Left→Right: e3(dim/small) · e2(mid) · e1(large+color) — soonest on RIGHT
+      const parts = [];
+      if(f._etas[2]){ const d=new Date(f._etas[2]); parts.push(`<span class="e3">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+      if(f._etas[1]){ const d=new Date(f._etas[1]); parts.push(`<span class="e2">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+      if(f._etas[0]){ const d=new Date(f._etas[0]); parts.push(`<span class="e1 ${cc}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`) }
+      return parts.join('');
+    })();
 
     return `<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s">
       <div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div>
