@@ -379,6 +379,12 @@ async function loadWeather(){
       fetch(`${HKO}?dataType=uvindex&lang=tc`).then(r=>r.json()).catch(()=>null),
     ]);
 
+    // Debug: log raw API structure to console
+    console.log('[rhrread keys]',Object.keys(cur));
+    console.log('[pressure]',cur.pressure);
+    console.log('[uvindex raw]',uvData);
+    console.log('[forecast0]',fore.weatherForecast?.[0]);
+
     const stn=selectedStn;
     // Helper: find by station, fallback to 香港天文台, fallback to first entry
     const findVal=(arr,field='value')=>{
@@ -394,10 +400,15 @@ async function loadWeather(){
     const humV=findVal(cur.humidity?.data);
     document.getElementById('w-humid').textContent=humV??'--';
 
-    // Pressure — rhrread has pressure.data array
-    const presArr=cur.pressure?.data ?? cur.pressureData ?? cur.stationPressure?.data ?? null;
-    const presV=findVal(presArr);
-    document.getElementById('w-pres').textContent=presV!=null?Math.round(presV):'--';
+    // Pressure — try multiple possible field names in rhrread
+    const presArr=cur.pressure?.data
+               ?? cur.pressureData
+               ?? cur.stationPressure?.data
+               ?? (Array.isArray(cur.pressure)?cur.pressure:null)
+               ?? null;
+    const presRaw=findVal(presArr);
+    const presV=presRaw!=null ? Number(presRaw) : null;
+    document.getElementById('w-pres').textContent=(presV!=null&&!isNaN(presV))?Math.round(presV):'--';
 
     // Weather icon
     const iconCode=Array.isArray(cur.icon)?cur.icon[0]:cur.icon;
@@ -405,21 +416,26 @@ async function loadWeather(){
     document.getElementById('w-loc-lbl').textContent=stn;
 
     // UV index — uvindex endpoint returns {uvindex:[{place,value,desc,message}]}
-    // or sometimes embedded in rhrread as cur.uvindex
+    // value may sometimes be wrapped; force Number() to be safe
     let uvVal=null, uvDesc='';
     if(uvData?.uvindex && Array.isArray(uvData.uvindex)){
       const uvEntry=uvData.uvindex.find(u=>u.place===stn)
                   ?? uvData.uvindex.find(u=>u.place==='京士柏')
                   ?? uvData.uvindex[0];
-      if(uvEntry){uvVal=uvEntry.value;uvDesc=uvEntry.desc||''}
-    } else if(cur.uvindex){
-      uvVal=cur.uvindex;
+      if(uvEntry){
+        // value can be number OR string OR object — extract safely
+        const raw=uvEntry.value;
+        uvVal=(raw!=null && typeof raw==='object') ? Number(raw.value??raw.data??Object.values(raw)[0]) : Number(raw);
+        uvDesc=uvEntry.desc||uvEntry.message||'';
+      }
+    } else if(cur.uvindex!=null){
+      uvVal=Number(cur.uvindex);
     }
     const uvEl=document.getElementById('w-uv-val');
     const uvDescEl=document.getElementById('w-uv-desc');
-    if(uvVal!=null){
+    if(uvVal!=null && !isNaN(uvVal)){
       const idx=Math.min(Math.round(uvVal),UV_INFO.length-1);
-      const info=UV_INFO[idx]??{l:'',c:''};
+      const info=UV_INFO[Math.max(0,idx)]??{l:'',c:''};
       uvEl.innerHTML=`<span class="${info.c}" style="font-size:20px;font-weight:700">${uvVal}</span>`;
       uvDescEl.textContent=uvDesc||info.l;
       uvDescEl.className='w-stat-sub '+info.c;
@@ -428,10 +444,10 @@ async function loadWeather(){
       uvDescEl.textContent='';
     }
 
-    // Hi / Lo from today's forecast
-    const fc0=fore.weatherForecast?.[0];
-    document.getElementById('w-hi').textContent=fc0?.forecastMaxtemp?.value??'--';
-    document.getElementById('w-lo').textContent=fc0?.forecastMintemp?.value??'--';
+    // Hi / Lo from today's forecast — forecastMaxtemp can be {value:N} or just N
+    const getTemp=t=>t==null?'--':(typeof t==='object'?(t.value??'--'):t);
+    document.getElementById('w-hi').textContent=getTemp(fc0?.forecastMaxtemp);
+    document.getElementById('w-lo').textContent=getTemp(fc0?.forecastMintemp);
 
     // Warnings
     const active=Object.entries(warn)
@@ -453,7 +469,7 @@ async function loadWeather(){
       return `<div class="fc${hl?' hl':''}">
         <div class="fc-lbl${hl?' named':''}">${lbl}</div>
         <div class="fc-ico">${W_ICONS[f.forecastWeather]??'🌡'}</div>
-        <div class="fc-tt"><span class="fc-hi">${f.forecastMaxtemp?.value??'--'}°</span><span class="fc-lo">${f.forecastMintemp?.value??'--'}°</span></div>
+        <div class="fc-tt"><span class="fc-hi">${getTemp(f.forecastMaxtemp)}°</span><span class="fc-lo">${getTemp(f.forecastMintemp)}°</span></div>
       </div>`;
     }).join('');
 
