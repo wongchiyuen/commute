@@ -16,7 +16,7 @@
   --bdr:#1c2130;--bdr2:#262f48;
   --amb:#f0a500;--amb2:#ffc03a;
   --amb-bg:rgba(240,165,0,.09);--amb-bdr:rgba(240,165,0,.26);
-  --grn:#2ed573;--red:#ff4757;--blu:#5b8fff;--pur:#a78bfa;
+  --grn:#2ed573;--red:#ff4757;--blu:#5b8fff;
   --txt:#dce3f4;--mid:#8591b0;--dim:#35405a;--bright:#ccd4ed;
   --mono:'Azeret Mono',monospace;--sans:'Noto Sans HK',sans-serif;
 }
@@ -24,126 +24,72 @@
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;flex-direction:column}
 
-/* ══ WEATHER PANEL ══ */
-.w-panel{
-  flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);
-  padding:11px 14px 9px;position:relative;overflow:hidden;
-}
-.w-panel::after{
-  content:'';position:absolute;top:-50px;right:-20px;width:180px;height:180px;
-  background:radial-gradient(circle,rgba(240,165,0,.07) 0%,transparent 70%);
-  pointer-events:none;
-}
+/* ══ WEATHER ══ */
+.w-panel{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:11px 14px 9px;overflow:hidden;position:relative}
+.w-panel::after{content:'';position:absolute;top:-50px;right:-20px;width:180px;height:180px;background:radial-gradient(circle,rgba(240,165,0,.07) 0%,transparent 70%);pointer-events:none}
 
-/* Row 1: icon+temp | clock+btns */
 .w-r1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .w-left{display:flex;align-items:center;gap:10px}
-.w-icon{font-size:42px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
-.w-tempcol{display:flex;flex-direction:column;gap:3px}
-.w-cur{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1;color:var(--txt)}
-.w-cur sup{font-size:17px;font-weight:400;color:var(--mid);vertical-align:super}
-
-/* hi/lo inline */
+.w-icon{font-size:40px;line-height:1}
+.w-tempcol{display:flex;flex-direction:column;gap:4px}
+.w-cur{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1}
+.w-cur sup{font-size:16px;font-weight:400;color:var(--mid);vertical-align:super}
 .w-hilo{display:flex;gap:10px}
-.w-hi-val,.w-lo-val{
-  display:flex;align-items:baseline;gap:3px;
-  font-family:var(--mono);font-size:14px;font-weight:600;
-}
-.w-hi-val{color:#ff8c5a}.w-lo-val{color:var(--blu)}
-.w-hilo-lbl{font-size:10px;font-weight:400;color:var(--mid)}
+.w-hi-val{font-family:var(--mono);font-size:15px;font-weight:700;color:#ff8c5a}
+.w-lo-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--blu)}
+.w-hl-lbl{font-size:11px;font-weight:400;color:var(--mid)}
 
 .w-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.w-clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--amb);line-height:1;letter-spacing:.03em}
+.w-clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--amb);line-height:1}
 .w-date{font-size:11px;color:var(--mid)}
 .w-btns{display:flex;gap:5px;margin-top:2px}
-.w-btn{
-  display:inline-flex;align-items:center;gap:4px;
-  background:var(--bg3);border:1px solid var(--bdr2);
-  border-radius:7px;padding:5px 10px;
-  color:var(--mid);font-size:12px;cursor:pointer;
-  font-family:var(--sans);transition:all .15s;white-space:nowrap;
-}
+.w-btn{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:5px 10px;color:var(--mid);font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
 .w-btn:active{border-color:var(--amb);color:var(--amb)}
 .w-btn.spinning .ico{display:inline-block;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* stats row — 3 blocks */
-.w-stats{
-  display:flex;gap:7px;margin-bottom:8px;
-}
-.w-stat{
-  flex:1;background:var(--bg3);border:1px solid var(--bdr2);
-  border-radius:9px;padding:7px 10px;
-  display:flex;flex-direction:column;align-items:flex-start;
-}
-.w-stat-lbl{
-  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  font-family:var(--mono);color:var(--mid);margin-bottom:4px;
-}
-.w-stat-val{
-  font-family:var(--mono);font-size:20px;font-weight:700;
-  color:var(--bright);line-height:1;
-}
-.w-stat-val .unit{font-size:11px;font-weight:400;color:var(--mid);margin-left:2px}
-.w-stat-sub{font-size:11px;color:var(--mid);margin-top:2px}
+/* stats 3 cards */
+.w-stats{display:flex;gap:7px;margin-bottom:8px}
+.w-stat{flex:1;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:8px 10px}
+.w-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono);color:var(--mid);margin-bottom:5px}
+.w-stat-num{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--bright);line-height:1}
+.w-stat-num .unit{font-size:11px;font-weight:400;color:var(--mid);margin-left:2px}
+.w-stat-sub{font-size:11px;margin-top:3px}
+.uv0{color:var(--mid)}.uv1,.uv2{color:#2ed573}.uv3,.uv4{color:#ffc03a}.uv5,.uv6,.uv7{color:#ff8c5a}.uv8,.uv9,.uv10{color:#ff4757}.uv11{color:#c084fc}
 
-/* UV colour coding */
-.uv-low{color:#2ed573}.uv-mid{color:#ffc03a}.uv-high{color:#ff8c5a}.uv-xhigh{color:#ff4757}.uv-extreme{color:#c084fc}
-
-/* warnings */
 .w-warns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
 .warn-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,71,87,.13);border:1px solid rgba(255,71,87,.32);color:#ff8a96}
 .warn-pill.amb{background:rgba(240,165,0,.11);border-color:rgba(240,165,0,.32);color:var(--amb2)}
 
-/* weather desc — auto marquee */
-.w-desc-wrap{overflow:hidden;height:18px;margin-bottom:7px;position:relative}
+.w-desc-wrap{overflow:hidden;height:17px;margin-bottom:7px}
 .w-desc-wrap.hidden{display:none}
-.w-desc{font-size:11px;color:var(--bright);line-height:18px;white-space:nowrap;display:inline-block}
+.w-desc{font-size:11px;color:var(--bright);line-height:17px;white-space:nowrap;display:inline-block}
 .w-desc.scrolling{animation:wScroll linear infinite;padding-right:80px}
 @keyframes wScroll{from{transform:translateX(0)}to{transform:translateX(var(--sd))}}
 
-/* forecast strip */
 .w-fore{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
 .w-fore::-webkit-scrollbar{display:none}
-.fc{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  background:var(--bg3);border:1px solid var(--bdr);
-  border-radius:9px;padding:6px 9px;flex-shrink:0;min-width:56px;
-}
+.fc{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:6px 9px;flex-shrink:0;min-width:54px}
 .fc.hl{background:var(--bg4);border-color:var(--amb-bdr)}
 .fc-lbl{font-size:10px;color:var(--mid);font-family:var(--mono)}
 .fc-lbl.named{font-size:11px;font-weight:700;color:var(--amb2)}
-.fc-ico{font-size:20px;margin:2px 0}
+.fc-ico{font-size:19px;margin:1px 0}
 .fc-tt{font-family:var(--mono);font-size:10px;display:flex;gap:5px}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
 
 /* ══ PROFILES ══ */
-.profiles-bar{
-  flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);
-  padding:5px 10px;display:flex;align-items:center;gap:4px;
-  overflow-x:auto;scrollbar-width:none;min-height:42px;
-}
+.profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none;min-height:42px}
 .profiles-bar::-webkit-scrollbar{display:none}
-.profile-tab{
-  display:flex;align-items:center;justify-content:center;
-  height:30px;padding:0 15px;border-radius:8px;
-  font-size:13px;font-weight:500;cursor:pointer;
-  color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);
-  white-space:nowrap;flex-shrink:0;transition:all .15s;
-  font-family:var(--sans);user-select:none;touch-action:none;
-}
+.profile-tab{display:flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans);user-select:none;touch-action:none}
 .profile-tab.active{background:var(--amb-bg);color:var(--amb2);border-color:var(--amb-bdr)}
+.profile-tab.nearby-tab{color:var(--blu);border-color:rgba(91,143,255,.3)}
+.profile-tab.nearby-tab.active{background:rgba(91,143,255,.1);color:#7ba8ff;border-color:rgba(91,143,255,.45)}
 .profile-tab.tab-ghost{opacity:.25}
 .profile-tab.tab-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04);color:transparent}
-.add-profile-btn{
-  flex-shrink:0;height:30px;min-width:30px;border-radius:8px;
-  background:var(--bg3);border:1px solid var(--bdr2);
-  color:var(--mid);font-size:18px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;transition:all .15s;
-}
+.add-profile-btn{flex-shrink:0;height:30px;min-width:30px;border-radius:8px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .add-profile-btn:active{border-color:var(--amb);color:var(--amb)}
 
-/* ══ BUS ══ */
+/* ══ BUS SECTION ══ */
 .bus-sec{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .bus-hdr{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:8px 12px 5px}
 .bus-hdr-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono)}
@@ -151,11 +97,12 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .add-btn:active{opacity:.7}
 .bus-list{flex:1;overflow-y:auto;padding:0 10px 16px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent}
 
+/* bus card — new 2-row right column layout */
 .bus-card{
   display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--bdr);
   border-radius:13px;margin-bottom:8px;overflow:hidden;
   animation:slideIn .2s ease both;position:relative;user-select:none;
-  transition:border-color .15s,opacity .15s,background .15s;
+  transition:border-color .15s,opacity .15s;
 }
 .bus-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dim);border-radius:13px 0 0 13px;transition:background .25s}
 .bus-card.soon::before{background:var(--red)}
@@ -167,24 +114,38 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 @keyframes slideIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
 .drag-handle{display:flex;align-items:center;justify-content:center;padding:0 7px;color:var(--dim);font-size:16px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
-.bus-badge{display:flex;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);color:var(--amb2);font-family:var(--mono);font-size:38px;font-weight:700;min-width:82px;padding:0 6px;flex-shrink:0;text-shadow:0 0 20px rgba(240,165,0,.3);letter-spacing:-1px}
-.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:9px 7px}
-.bus-stop{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.bus-dest{font-size:11px;color:var(--mid)}
-.bus-eta-wrap{display:flex;align-items:center;padding:0 8px 0 0;flex-shrink:0}
-.eta-row{display:flex;align-items:baseline;gap:7px}
-.e1{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1}
+.bus-badge{
+  display:flex;align-items:center;justify-content:center;
+  background:var(--amb-bg);border-right:1px solid var(--amb-bdr);
+  color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;
+  min-width:80px;padding:0 6px;flex-shrink:0;
+  text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px;
+}
+/* right column: 2 rows */
+.bus-right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:8px 0}
+.bus-eta-row{display:flex;align-items:baseline;gap:7px;padding:0 8px 4px 8px}
+.bus-info-row{display:flex;align-items:center;gap:5px;padding:0 8px;border-top:1px solid var(--bdr);padding-top:5px}
+.bus-stop{font-size:12px;font-weight:500;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bus-dest{font-size:11px;color:var(--mid);white-space:nowrap;flex-shrink:0}
+.bus-dest::before{content:'→ '}
+
+/* ETA display */
+.e1{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
 .e1.sc{color:var(--red)}.e1.cc{color:var(--amb2)}.e1.oc{color:var(--grn)}
 .e2{font-family:var(--mono);font-size:13px;color:var(--mid);line-height:1}
 .e3{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1}
 .e-none{font-family:var(--mono);font-size:12px;color:var(--dim)}
-.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:16px;padding:0 9px 0 0;cursor:pointer;flex-shrink:0;transition:color .15s}
+
+.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:16px;padding:0 9px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
 .bus-rm:active{color:var(--red)}
 
-.empty-state{text-align:center;padding:40px 20px;color:var(--mid)}
+/* nearby card — same layout but no drag handle or remove */
+.nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);margin-left:auto;flex-shrink:0;padding-left:6px}
+
+.empty-state{text-align:center;padding:36px 20px;color:var(--mid)}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.25}
 .empty-text{font-size:15px;margin-bottom:5px}
-.empty-sub{font-size:13px;color:var(--dim)}
+.empty-sub{font-size:12px;color:var(--dim);line-height:1.6}
 
 /* ══ OVERLAY ══ */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.76);z-index:50;display:none;align-items:flex-end;backdrop-filter:blur(5px)}
@@ -213,25 +174,27 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .stop-seq{font-family:var(--mono);font-size:11px;color:var(--dim);min-width:24px}
 .stop-name{flex:1;font-size:14px}
 .back-link{display:inline-flex;align-items:center;gap:5px;color:var(--amb);font-size:13px;cursor:pointer;margin-bottom:12px;background:none;border:none;font-family:var(--sans);padding:0}
-.gps-note{font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6}
-.gps-note strong{color:var(--amb2)}
-.loc-gps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:10px;padding:12px;margin-bottom:10px;color:var(--amb);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.loc-note{font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6}
+.loc-note strong{color:var(--amb2)}
+.loc-gps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);border-radius:10px;padding:12px;margin-bottom:10px;color:#7ba8ff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
 .loc-gps-btn:active{opacity:.8}
 .loc-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .loc-item{background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:10px;cursor:pointer;transition:all .15s;text-align:center}
-.loc-item:active,.loc-item.active{border-color:var(--amb);background:var(--amb-bg)}
+.loc-item:active,.loc-item.sel{border-color:var(--amb);background:var(--amb-bg)}
 .loc-name{font-size:13px;font-weight:500}.loc-reg{font-size:11px;color:var(--mid);margin-top:2px}
 .rename-row{display:flex;gap:8px;margin-bottom:12px}
 .del-btn{width:100%;background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.3);color:#ff7b89;border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px}
 .del-btn:active{opacity:.8}
-.spinner{width:20px;height:20px;border:2px solid var(--bdr2);border-top-color:var(--amb);border-radius:50%;animation:spin .7s linear infinite;margin:28px auto}
-.msg{text-align:center;color:var(--mid);font-size:14px;padding:24px 0}
+.spinner{width:20px;height:20px;border:2px solid var(--bdr2);border-top-color:var(--amb);border-radius:50%;animation:spin .7s linear infinite;margin:30px auto}
+.msg{text-align:center;color:var(--mid);font-size:14px;padding:24px 0;line-height:1.7}
+
+/* floating drag clone */
 .float-clone{position:fixed;z-index:999;pointer-events:none;box-shadow:0 10px 32px rgba(0,0,0,.7);border-radius:12px;opacity:.88}
 </style>
 </head>
 <body>
 
-<!-- ══ WEATHER ══ -->
+<!-- WEATHER -->
 <div class="w-panel">
   <div class="w-r1">
     <div class="w-left">
@@ -239,8 +202,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <div class="w-tempcol">
         <div class="w-cur"><span id="w-temp">--</span><sup>°C</sup></div>
         <div class="w-hilo">
-          <div class="w-hi-val"><span class="w-hilo-lbl">↑</span><span id="w-hi">--</span><span class="w-hilo-lbl">°</span></div>
-          <div class="w-lo-val"><span class="w-hilo-lbl">↓</span><span id="w-lo">--</span><span class="w-hilo-lbl">°</span></div>
+          <span class="w-hi-val"><span class="w-hl-lbl">↑</span><span id="w-hi">--</span><span class="w-hl-lbl">°</span></span>
+          <span class="w-lo-val"><span class="w-hl-lbl">↓</span><span id="w-lo">--</span><span class="w-hl-lbl">°</span></span>
         </div>
       </div>
     </div>
@@ -254,43 +217,41 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
   </div>
 
-  <!-- stats: humidity / pressure / UV -->
   <div class="w-stats">
     <div class="w-stat">
       <div class="w-stat-lbl">濕度</div>
-      <div class="w-stat-val"><span id="w-humid">--</span><span class="unit">%</span></div>
+      <div class="w-stat-num" id="w-humid-val">--<span class="unit">%</span></div>
     </div>
     <div class="w-stat">
       <div class="w-stat-lbl">氣壓</div>
-      <div class="w-stat-val"><span id="w-pres">--</span><span class="unit">hPa</span></div>
-      <div class="w-stat-sub" id="w-pres-trend"></div>
+      <div class="w-stat-num" id="w-pres-val">--<span class="unit">hPa</span></div>
     </div>
     <div class="w-stat">
       <div class="w-stat-lbl">紫外線</div>
-      <div class="w-stat-val" id="w-uv-val">--</div>
-      <div class="w-stat-sub" id="w-uv-desc"></div>
+      <div class="w-stat-num" id="w-uv-val">--</div>
+      <div class="w-stat-sub" id="w-uv-sub"></div>
     </div>
   </div>
 
-  <div class="w-warns" id="w-warns"></div>
+  <div class="w-warns"    id="w-warns"></div>
   <div class="w-desc-wrap hidden" id="w-desc-wrap"><span class="w-desc" id="w-desc"></span></div>
-  <div class="w-fore" id="w-fore"></div>
+  <div class="w-fore"     id="w-fore"></div>
 </div>
 
-<!-- ══ PROFILE TABS ══ -->
+<!-- PROFILES -->
 <div class="profiles-bar" id="profiles-bar"></div>
 
-<!-- ══ BUS ══ -->
+<!-- BUS -->
 <div class="bus-sec">
   <div class="bus-hdr">
-    <div class="bus-hdr-lbl">到站時間</div>
-    <button class="add-btn" onclick="openSearch()">＋ 加路線</button>
+    <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
+    <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
   </div>
   <div class="bus-list" id="bus-list"></div>
 </div>
 
-<!-- ══ OVERLAY ══ -->
-<div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" onclick="overlayBgClick(event)">
   <div class="drawer">
     <div class="drawer-handle"></div>
     <div class="drawer-title">
@@ -302,22 +263,36 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 </div>
 
 <script>
-// ═══════════ CONSTANTS ═══════════
-const HKO='https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
-const W_ICONS={50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'};
-const WARN_MAP={WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'};
-const AMB_WARNS=new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
-const DAY=['日','一','二','三','四','五','六'];
-// UV: index → {label, cls}
-const UV_INFO=[
-  null,
-  {l:'低',c:'uv-low'},{l:'低',c:'uv-low'},
-  {l:'中等',c:'uv-mid'},{l:'中等',c:'uv-mid'},
-  {l:'高',c:'uv-high'},{l:'高',c:'uv-high'},{l:'高',c:'uv-high'},
-  {l:'甚高',c:'uv-xhigh'},{l:'甚高',c:'uv-xhigh'},{l:'甚高',c:'uv-xhigh'},
-  {l:'極高',c:'uv-extreme'}
+// ══════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════
+const HKO = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
+const KMB = 'https://data.etabus.gov.hk/v1/transport/kmb';
+
+const W_ICONS = {
+  50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',
+  60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',
+  70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',
+  80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',
+  90:'🌡',100:'🌫',101:'🌫'
+};
+const WARN_MAP = {
+  WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',
+  WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',
+  WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'
+};
+const AMB_WARNS = new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
+const DAY = ['日','一','二','三','四','五','六'];
+// UV level info indexed by UV value (0-11+)
+const UV_LEVELS = [
+  {l:'',c:'uv0'},
+  {l:'低',c:'uv1'},{l:'低',c:'uv2'},
+  {l:'中等',c:'uv3'},{l:'中等',c:'uv4'},
+  {l:'高',c:'uv5'},{l:'高',c:'uv6'},{l:'高',c:'uv7'},
+  {l:'甚高',c:'uv8'},{l:'甚高',c:'uv9'},{l:'甚高',c:'uv10'},
+  {l:'極高',c:'uv11'}
 ];
-const HKO_STNS=[
+const HKO_STNS = [
   {n:'香港天文台',r:'油麻地',lat:22.302,lng:114.174},
   {n:'青衣',r:'葵青',lat:22.340,lng:114.104},
   {n:'沙田',r:'沙田',lat:22.415,lng:114.210},
@@ -334,398 +309,553 @@ const HKO_STNS=[
   {n:'流浮山',r:'元朗',lat:22.469,lng:113.996},
   {n:'橫瀾島',r:'海上',lat:22.183,lng:114.303},
 ];
-const pad=n=>String(n).padStart(2,'0');
 
-// ═══════════ STATE ═══════════
-let selectedStn=localStorage.getItem('hko_stn')||'香港天文台';
-let refreshing=false;
+const pad = n => String(n).padStart(2,'0');
 
+// Haversine distance in metres
+function haverDist(lat1,lng1,lat2,lng2){
+  const R=6371000, r=Math.PI/180;
+  const dLat=(lat2-lat1)*r, dLng=(lng2-lng1)*r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+// Safe number extractor — handles number, string, or {value:...} objects
+function num(v){
+  if(v==null) return null;
+  if(typeof v==='number') return isNaN(v)?null:v;
+  if(typeof v==='string'){const n=parseFloat(v);return isNaN(n)?null:n}
+  if(typeof v==='object') return num(v.value??v.data??Object.values(v).find(x=>typeof x==='number'||typeof x==='string'));
+  return null;
+}
+
+// Find entry in HKO data array by station name
+function hkoFind(arr, stn){
+  if(!Array.isArray(arr)||!arr.length) return null;
+  return arr.find(d=>d.place===stn)
+      ?? arr.find(d=>d.place==='香港天文台')
+      ?? arr[0];
+}
+
+// ══════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════
 function loadProfiles(){
-  const raw=localStorage.getItem('profiles_v2');
+  const raw = localStorage.getItem('profiles_v2');
   if(raw) return JSON.parse(raw);
-  const def=[{id:'p_a',name:'返工'},{id:'p_b',name:'放工'},{id:'p_c',name:'日常'}];
-  localStorage.setItem('profiles_v2',JSON.stringify(def));
+  const def = [{id:'p_a',name:'返工'},{id:'p_b',name:'放工'},{id:'p_c',name:'日常'}];
+  localStorage.setItem('profiles_v2', JSON.stringify(def));
   return def;
 }
-function saveProfiles(p){localStorage.setItem('profiles_v2',JSON.stringify(p))}
-function loadFavs(pid){return JSON.parse(localStorage.getItem('favs_'+pid)||'[]')}
+function saveProfiles(p){ localStorage.setItem('profiles_v2', JSON.stringify(p)) }
+function loadFavs(pid){ return JSON.parse(localStorage.getItem('favs_'+pid)||'[]') }
 function saveFavs(pid,arr){
-  localStorage.setItem('favs_'+pid,JSON.stringify(
+  localStorage.setItem('favs_'+pid, JSON.stringify(
     arr.map(({route,stopId,stopName,dest,serviceType})=>({route,stopId,stopName,dest,serviceType}))
   ));
 }
-let profiles=loadProfiles();
-let activePid=localStorage.getItem('active_pid')||profiles[0]?.id||'';
-if(!profiles.find(p=>p.id===activePid)) activePid=profiles[0]?.id||'';
-function setActivePid(pid){activePid=pid;localStorage.setItem('active_pid',pid)}
-let favs=loadFavs(activePid);
 
-// ═══════════ CLOCK ═══════════
+let profiles  = loadProfiles();
+let activePid = localStorage.getItem('active_pid') || profiles[0]?.id || '';
+if(!profiles.find(p=>p.id===activePid)) activePid = profiles[0]?.id || '';
+function setActivePid(pid){ activePid=pid; localStorage.setItem('active_pid',pid) }
+
+let favs = loadFavs(activePid);
+let selectedStn = localStorage.getItem('hko_stn') || '香港天文台';
+let refreshing  = false;
+
+// Nearby state
+const NEARBY_PID = '__nearby__';
+let nearbyLat = null, nearbyLng = null;
+let allStops  = null; // cached KMB stops
+
+// ══════════════════════════════════════════
+//  CLOCK
+// ══════════════════════════════════════════
 function tickClock(){
-  const n=new Date();
-  document.getElementById('clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('w-date').textContent=`${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()}（${DAY[n.getDay()]}）`;
+  const n = new Date();
+  document.getElementById('clock').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  document.getElementById('w-date').textContent = `${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()}（${DAY[n.getDay()]}）`;
 }
-tickClock();setInterval(tickClock,1000);
+tickClock(); setInterval(tickClock, 1000);
 
-// ═══════════ WEATHER ═══════════
+// ══════════════════════════════════════════
+//  WEATHER
+// ══════════════════════════════════════════
 async function loadWeather(){
   try{
-    // Fetch all 4 endpoints in parallel
-    const [cur, warn, fore, uvData] = await Promise.all([
+    // Fetch rhrread, flw (forecast), warnsum, uvindex in parallel
+    const [rhr, flw, warn, uvi] = await Promise.all([
       fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json()),
-      fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
+      fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=uvindex&lang=tc`).then(r=>r.json()).catch(()=>null),
     ]);
 
-    // Debug: log raw API structure to console
-    console.log('[rhrread keys]',Object.keys(cur));
-    console.log('[pressure]',cur.pressure);
-    console.log('[uvindex raw]',uvData);
-    console.log('[forecast0]',fore.weatherForecast?.[0]);
+    // ── Current temp ──
+    const tempVal = num(hkoFind(rhr.temperature?.data, selectedStn)?.value);
+    document.getElementById('w-temp').textContent = tempVal ?? '--';
+    document.getElementById('w-loc-lbl').textContent = selectedStn;
 
-    const stn=selectedStn;
-    // Helper: find by station, fallback to 香港天文台, fallback to first entry
-    const findVal=(arr,field='value')=>{
-      if(!Array.isArray(arr)) return null;
-      return (arr.find(d=>d.place===stn) ?? arr.find(d=>d.place==='香港天文台') ?? arr[0])?.[field] ?? null;
-    };
+    // ── Weather icon (from rhrread.icon array) ──
+    const iconCode = Array.isArray(rhr.icon) ? rhr.icon[0] : rhr.icon;
+    document.getElementById('w-icon').textContent = W_ICONS[iconCode] ?? '🌡';
 
-    // Current temperature
-    const tempV=findVal(cur.temperature?.data);
-    document.getElementById('w-temp').textContent=tempV??'--';
+    // ── Humidity ──
+    const humVal = num(hkoFind(rhr.humidity?.data, selectedStn)?.value);
+    document.getElementById('w-humid-val').innerHTML =
+      (humVal!=null ? humVal : '--') + '<span class="unit">%</span>';
 
-    // Humidity
-    const humV=findVal(cur.humidity?.data);
-    document.getElementById('w-humid').textContent=humV??'--';
+    // ── Pressure ──
+    // rhrread exposes pressure.data[] for HKO station only
+    const presVal = num(hkoFind(rhr.pressure?.data ?? rhr.stationPressure?.data, selectedStn)?.value);
+    document.getElementById('w-pres-val').innerHTML =
+      (presVal!=null ? Math.round(presVal) : '--') + '<span class="unit">hPa</span>';
 
-    // Pressure — try multiple possible field names in rhrread
-    const presArr=cur.pressure?.data
-               ?? cur.pressureData
-               ?? cur.stationPressure?.data
-               ?? (Array.isArray(cur.pressure)?cur.pressure:null)
-               ?? null;
-    const presRaw=findVal(presArr);
-    const presV=presRaw!=null ? Number(presRaw) : null;
-    document.getElementById('w-pres').textContent=(presV!=null&&!isNaN(presV))?Math.round(presV):'--';
-
-    // Weather icon
-    const iconCode=Array.isArray(cur.icon)?cur.icon[0]:cur.icon;
-    document.getElementById('w-icon').textContent=iconCode?(W_ICONS[iconCode]??'🌡'):'🌡';
-    document.getElementById('w-loc-lbl').textContent=stn;
-
-    // UV index — uvindex endpoint returns {uvindex:[{place,value,desc,message}]}
-    // value may sometimes be wrapped; force Number() to be safe
-    let uvVal=null, uvDesc='';
-    if(uvData?.uvindex && Array.isArray(uvData.uvindex)){
-      const uvEntry=uvData.uvindex.find(u=>u.place===stn)
-                  ?? uvData.uvindex.find(u=>u.place==='京士柏')
-                  ?? uvData.uvindex[0];
-      if(uvEntry){
-        // value can be number OR string OR object — extract safely
-        const raw=uvEntry.value;
-        uvVal=(raw!=null && typeof raw==='object') ? Number(raw.value??raw.data??Object.values(raw)[0]) : Number(raw);
-        uvDesc=uvEntry.desc||uvEntry.message||'';
-      }
-    } else if(cur.uvindex!=null){
-      uvVal=Number(cur.uvindex);
+    // ── UV index ──
+    // uvindex endpoint: {uvindex:[{place,value,desc,message}], updateTime}
+    // 京士柏 is the standard UV measurement station
+    let uvVal = null, uvDesc = '';
+    if(uvi?.uvindex && Array.isArray(uvi.uvindex)){
+      const entry = uvi.uvindex.find(u=>u.place==='京士柏') ?? uvi.uvindex[0];
+      uvVal  = num(entry?.value);
+      uvDesc = (typeof entry?.desc === 'string') ? entry.desc : '';
     }
-    const uvEl=document.getElementById('w-uv-val');
-    const uvDescEl=document.getElementById('w-uv-desc');
-    if(uvVal!=null && !isNaN(uvVal)){
-      const idx=Math.min(Math.round(uvVal),UV_INFO.length-1);
-      const info=UV_INFO[Math.max(0,idx)]??{l:'',c:''};
-      uvEl.innerHTML=`<span class="${info.c}" style="font-size:20px;font-weight:700">${uvVal}</span>`;
-      uvDescEl.textContent=uvDesc||info.l;
-      uvDescEl.className='w-stat-sub '+info.c;
+    const uvIdxEl  = document.getElementById('w-uv-val');
+    const uvSubEl  = document.getElementById('w-uv-sub');
+    if(uvVal != null){
+      const lvl = UV_LEVELS[Math.min(Math.max(0, Math.round(uvVal)), UV_LEVELS.length-1)];
+      uvIdxEl.innerHTML = `<span class="${lvl.c}">${uvVal}<span class="unit"> 級</span></span>`;
+      uvSubEl.textContent = uvDesc || lvl.l;
+      uvSubEl.className   = 'w-stat-sub ' + lvl.c;
     } else {
-      uvEl.textContent='--';
-      uvDescEl.textContent='';
+      uvIdxEl.textContent = '--'; uvSubEl.textContent = '';
     }
 
-    // Hi / Lo from today's forecast — forecastMaxtemp can be {value:N} or just N
-    const getTemp=t=>t==null?'--':(typeof t==='object'?(t.value??'--'):t);
-    document.getElementById('w-hi').textContent=getTemp(fc0?.forecastMaxtemp);
-    document.getElementById('w-lo').textContent=getTemp(fc0?.forecastMintemp);
+    // ── Hi / Lo from 9-day forecast (today = index 0) ──
+    const fc0 = flw.weatherForecast?.[0];
+    document.getElementById('w-hi').textContent = num(fc0?.forecastMaxtemp) ?? '--';
+    document.getElementById('w-lo').textContent = num(fc0?.forecastMintemp) ?? '--';
 
-    // Warnings
-    const active=Object.entries(warn)
-      .filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
-    document.getElementById('w-warns').innerHTML=active.map(k=>
+    // ── Warnings ──
+    const activeWarns = Object.entries(warn)
+      .filter(([,v]) => v?.actionCode && v.actionCode !== 'CANCEL')
+      .map(([k]) => k);
+    document.getElementById('w-warns').innerHTML = activeWarns.map(k =>
       `<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`
     ).join('');
 
-    // Forecast description — auto marquee
-    const rawDesc=fore.forecastDesc||fore.outlook||'';
-    setWeatherDesc(rawDesc?`📋 ${rawDesc}`:'');
+    // ── Forecast description (auto-marquee if too long) ──
+    const descTxt = flw.forecastDesc || flw.outlook || '';
+    setWeatherDesc(descTxt ? `📋 ${descTxt}` : '');
 
-    // Forecast strip
-    const fcs=fore.weatherForecast||[];
-    document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
-      const ds=String(f.forecastDate);
-      const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
-      const hl=i===1||i===2;
+    // ── 7-day forecast strip ──
+    const fcs = flw.weatherForecast || [];
+    document.getElementById('w-fore').innerHTML = fcs.slice(0,7).map((f,i) => {
+      const ds  = String(f.forecastDate);
+      const lbl = i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
+      const hl  = i===1||i===2;
+      const hi  = num(f.forecastMaxtemp) ?? '--';
+      const lo  = num(f.forecastMintemp) ?? '--';
       return `<div class="fc${hl?' hl':''}">
         <div class="fc-lbl${hl?' named':''}">${lbl}</div>
-        <div class="fc-ico">${W_ICONS[f.forecastWeather]??'🌡'}</div>
-        <div class="fc-tt"><span class="fc-hi">${getTemp(f.forecastMaxtemp)}°</span><span class="fc-lo">${getTemp(f.forecastMintemp)}°</span></div>
+        <div class="fc-ico">${W_ICONS[f.forecastWeather ?? f.forecastIcon] ?? '🌡'}</div>
+        <div class="fc-tt"><span class="fc-hi">${hi}°</span><span class="fc-lo">${lo}°</span></div>
       </div>`;
     }).join('');
 
-  }catch(e){console.warn('weather err',e)}
+  } catch(e){ console.warn('[weather]', e) }
 }
 
 function setWeatherDesc(text){
-  const wrap=document.getElementById('w-desc-wrap');
-  const el=document.getElementById('w-desc');
-  if(!text){wrap.classList.add('hidden');return}
+  const wrap = document.getElementById('w-desc-wrap');
+  const el   = document.getElementById('w-desc');
+  if(!text){ wrap.classList.add('hidden'); return }
   wrap.classList.remove('hidden');
-  // reset
-  el.style.animation='none';
-  el.classList.remove('scrolling');
-  el.textContent=text;
+  el.style.animation = 'none'; el.classList.remove('scrolling'); el.textContent = text;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const textW=el.scrollWidth;
-    const wrapW=wrap.offsetWidth;
-    if(textW<=wrapW+2){return}
-    // needs scroll: duplicate content for seamless loop
-    el.textContent=text+'          '+text+'          ';
-    const half=el.scrollWidth/2;
-    const dur=(half/55).toFixed(1)+'s'; // 55px/s
-    el.style.setProperty('--sd',`-${half}px`);
-    el.style.animationDuration=dur;
-    el.style.animation='';
+    if(el.scrollWidth <= wrap.offsetWidth + 2) return;
+    el.textContent = text + '          ' + text + '          ';
+    const half = el.scrollWidth / 2;
+    el.style.setProperty('--sd', `-${half}px`);
+    el.style.animationDuration = (half / 55).toFixed(1) + 's';
+    el.style.animation = '';
     el.classList.add('scrolling');
   }));
 }
 
-// ═══════════ REFRESH ═══════════
+// ══════════════════════════════════════════
+//  REFRESH
+// ══════════════════════════════════════════
 async function doRefresh(){
-  if(refreshing)return;
-  refreshing=true;
-  const btn=document.getElementById('refresh-btn');
+  if(refreshing) return;
+  refreshing = true;
+  const btn = document.getElementById('refresh-btn');
   btn.classList.add('spinning');
-  await Promise.all([loadWeather(),refreshAllETAs()]);
+  if(activePid === NEARBY_PID) await Promise.all([loadWeather(), loadNearby()]);
+  else await Promise.all([loadWeather(), refreshAllETAs()]);
   btn.classList.remove('spinning');
-  refreshing=false;
+  refreshing = false;
 }
 
-// ═══════════ LOCATION PICKER ═══════════
+// ══════════════════════════════════════════
+//  LOCATION PICKER
+// ══════════════════════════════════════════
 function openLocPicker(){
-  setDrawerTitle('天氣地點');
-  // detect if running on file://
-  const isFile=location.protocol==='file:';
-  document.getElementById('drawer-body').innerHTML=`
-    ${isFile?`<div class="gps-note">💡 以 <strong>file://</strong> 方式開啟時，瀏覽器封鎖定位功能。<br>如需 GPS，請透過本機伺服器（如 VS Code Live Server）開啟，或直接手動選擇下方地點。</div>`
-            :`<button class="loc-gps-btn" id="gps-btn" onclick="useGPS()">📡 用我的位置自動選擇</button>`}
+  setDTitle('天氣地點');
+  const isFile = location.protocol === 'file:';
+  document.getElementById('drawer-body').innerHTML = `
+    ${isFile
+      ? `<div class="loc-note">💡 以 <strong>file://</strong> 開啟時瀏覽器封鎖定位，請手動選擇站點，或將此頁部署到網絡（如 GitHub Pages）後即可使用 GPS。</div>`
+      : `<button class="loc-gps-btn" id="gps-btn" onclick="useGPS()">📡 用我的位置自動選擇</button>`
+    }
     <div class="sec-lbl">手動選擇天文台站</div>
     <div class="loc-grid">
-      ${HKO_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' active':''}" onclick="pickStn('${s.n}')">
+      ${HKO_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')">
         <div class="loc-name">${s.n}</div><div class="loc-reg">${s.r}</div>
       </div>`).join('')}
     </div>`;
   openOverlay();
 }
-
-function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer();loadWeather()}
-
+function pickStn(n){ selectedStn=n; localStorage.setItem('hko_stn',n); closeDrawer(); loadWeather() }
 function useGPS(){
-  if(!navigator.geolocation){alert('此裝置不支援定位');return}
-  const btn=document.getElementById('gps-btn');
-  btn.textContent='📡 定位中…';btn.style.opacity='.6';
+  if(!navigator.geolocation){ alert('不支援定位'); return }
+  const btn = document.getElementById('gps-btn');
+  btn.textContent = '📡 定位中…'; btn.style.opacity = '.6';
   navigator.geolocation.getCurrentPosition(
-    pos=>{
-      const{latitude:lat,longitude:lng}=pos.coords;
-      let near=HKO_STNS[0],minD=Infinity;
-      HKO_STNS.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lng-lng);if(d<minD){minD=d;near=s}});
+    pos => {
+      const {latitude:lat, longitude:lng} = pos.coords;
+      let near = HKO_STNS[0], minD = Infinity;
+      HKO_STNS.forEach(s=>{ const d=Math.hypot(s.lat-lat,s.lng-lng); if(d<minD){minD=d;near=s} });
       pickStn(near.n);
     },
-    err=>{
-      console.warn('GPS err',err);
-      btn.textContent='❌ 定位失敗，請手動選擇';btn.style.opacity='1';
-    },
+    () => { btn.textContent = '❌ 定位失敗，請手動選擇'; btn.style.opacity = '1' },
     {timeout:10000}
   );
 }
 
-// ═══════════ PROFILES ═══════════
+// ══════════════════════════════════════════
+//  PROFILES
+// ══════════════════════════════════════════
 function renderProfiles(){
-  const bar=document.getElementById('profiles-bar');
-  bar.innerHTML=profiles.map((p,i)=>
-    `<button class="profile-tab${p.id===activePid?' active':''}" data-idx="${i}" data-pid="${p.id}"
-      onclick="switchProfile('${p.id}')">${p.name}</button>`
-  ).join('')+`<button class="add-profile-btn" onclick="addProfile()">＋</button>`;
+  const bar = document.getElementById('profiles-bar');
+  // Special "附近" tab always first
+  const nearbyActive = activePid === NEARBY_PID;
+  bar.innerHTML =
+    `<button class="profile-tab nearby-tab${nearbyActive?' active':''}" onclick="switchToNearby()">📍 附近</button>` +
+    profiles.map((p,i) =>
+      `<button class="profile-tab${p.id===activePid?' active':''}" data-idx="${i}" data-pid="${p.id}"
+        onclick="switchProfile('${p.id}')">${p.name}</button>`
+    ).join('') +
+    `<button class="add-profile-btn" onclick="addProfile()">＋</button>`;
 
-  bar.querySelectorAll('.profile-tab').forEach(tab=>{
-    let pressTimer=null;
-    const getIdx=()=>parseInt(tab.dataset.idx);
-    tab.addEventListener('touchstart',e=>{
-      pressTimer=setTimeout(()=>{pressTimer=null;renameProfile(getIdx())},600);
-      tabDragStart(e,getIdx());
-    },{passive:true});
-    tab.addEventListener('touchend',()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null}},{passive:true});
-    tab.addEventListener('touchmove',()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null}},{passive:true});
+  // Long-press = rename; drag = reorder (only on regular tabs)
+  bar.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach(tab => {
+    let pressTimer = null;
+    const idx = () => parseInt(tab.dataset.idx);
+    tab.addEventListener('touchstart', e => {
+      pressTimer = setTimeout(() => { pressTimer=null; renameProfile(idx()) }, 600);
+      tabDragStart(e, idx());
+    }, {passive:true});
+    tab.addEventListener('touchend',  () => { if(pressTimer){clearTimeout(pressTimer);pressTimer=null} }, {passive:true});
+    tab.addEventListener('touchmove', () => { if(pressTimer){clearTimeout(pressTimer);pressTimer=null} }, {passive:true});
   });
+
+  // Show/hide "加路線" button
+  document.getElementById('add-route-btn').style.display = activePid===NEARBY_PID ? 'none' : '';
+  document.getElementById('bus-hdr-lbl').textContent = activePid===NEARBY_PID ? '500米內到站時間' : '到站時間';
 }
 
 function switchProfile(pid){
-  setActivePid(pid);
-  favs=loadFavs(pid);
-  renderProfiles();
-  refreshAllETAs();
+  setActivePid(pid); favs = loadFavs(pid); renderProfiles(); refreshAllETAs();
+}
+function switchToNearby(){
+  setActivePid(NEARBY_PID); renderProfiles(); loadNearby();
 }
 
 function addProfile(){
-  setDrawerTitle('新增版面');
-  document.getElementById('drawer-body').innerHTML=`
+  setDTitle('新增版面');
+  document.getElementById('drawer-body').innerHTML = `
     <div class="sec-lbl">版面名稱</div>
     <div class="search-row">
       <input class="d-input plain" id="pname-inp" placeholder="如：上班、週末…" maxlength="10">
       <button class="d-btn" onclick="confirmAddProfile()">確定</button>
     </div>`;
   openOverlay();
-  setTimeout(()=>document.getElementById('pname-inp')?.focus(),260);
+  setTimeout(() => document.getElementById('pname-inp')?.focus(), 260);
 }
 function confirmAddProfile(){
-  const name=(document.getElementById('pname-inp')?.value||'').trim();
-  if(!name)return;
-  const id='p_'+Date.now();
-  profiles.push({id,name});saveProfiles(profiles);saveFavs(id,[]);
-  closeDrawer();switchProfile(id);
+  const name = (document.getElementById('pname-inp')?.value||'').trim();
+  if(!name) return;
+  const id = 'p_'+Date.now();
+  profiles.push({id,name}); saveProfiles(profiles); saveFavs(id,[]);
+  closeDrawer(); switchProfile(id);
 }
 
 function renameProfile(idx){
-  const p=profiles[idx];
-  setDrawerTitle('編輯版面');
-  document.getElementById('drawer-body').innerHTML=`
+  const p = profiles[idx];
+  setDTitle('編輯版面');
+  document.getElementById('drawer-body').innerHTML = `
     <div class="sec-lbl">版面名稱</div>
     <div class="rename-row">
       <input class="d-input plain" id="rename-inp" value="${p.name}" maxlength="10">
       <button class="d-btn" onclick="confirmRename(${idx})">儲存</button>
     </div>
-    ${profiles.length>1?`<button class="del-btn" onclick="deleteProfile(${idx})">🗑 刪除此版面</button>`:''}`;
+    ${profiles.length>1 ? `<button class="del-btn" onclick="deleteProfile(${idx})">🗑 刪除此版面</button>` : ''}`;
   openOverlay();
-  setTimeout(()=>{const el=document.getElementById('rename-inp');el?.focus();el?.select()},260);
+  setTimeout(() => { const el=document.getElementById('rename-inp'); el?.focus(); el?.select() }, 260);
 }
 function confirmRename(idx){
-  const name=(document.getElementById('rename-inp')?.value||'').trim();
-  if(!name)return;
-  profiles[idx].name=name;saveProfiles(profiles);closeDrawer();renderProfiles();
+  const name = (document.getElementById('rename-inp')?.value||'').trim();
+  if(!name) return;
+  profiles[idx].name = name; saveProfiles(profiles); closeDrawer(); renderProfiles();
 }
 function deleteProfile(idx){
-  if(!confirm(`確定刪除「${profiles[idx].name}」？`))return;
-  const pid=profiles[idx].id;
+  if(!confirm(`確定刪除「${profiles[idx].name}」？`)) return;
+  const pid = profiles[idx].id;
   localStorage.removeItem('favs_'+pid);
-  profiles.splice(idx,1);saveProfiles(profiles);closeDrawer();
-  if(activePid===pid){setActivePid(profiles[0]?.id||'');favs=loadFavs(activePid)}
-  renderProfiles();refreshAllETAs();
+  profiles.splice(idx,1); saveProfiles(profiles); closeDrawer();
+  if(activePid===pid){ setActivePid(profiles[0]?.id||''); favs=loadFavs(activePid) }
+  renderProfiles(); refreshAllETAs();
 }
 
 // ── Tab drag reorder ──
-let TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cloneLeft:0};
+let TD = {on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cloneLeft:0,cloneTop:0};
 function tabDragStart(e,idx){
-  const bar=document.getElementById('profiles-bar');
-  const tab=bar.querySelectorAll('.profile-tab')[idx];
-  if(!tab)return;
-  const rect=tab.getBoundingClientRect();
-  TD={on:false,idx,to:idx,clone:null,startX:e.touches[0].clientX,tabW:rect.width+4,cloneLeft:rect.left};
-  TD._pending=()=>{
-    TD.on=true;
-    const cl=tab.cloneNode(true);
-    cl.className='float-clone profile-tab active';
-    cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`;
-    document.body.appendChild(cl);TD.clone=cl;
+  const bar = document.getElementById('profiles-bar');
+  const tabs = bar.querySelectorAll('.profile-tab:not(.nearby-tab)');
+  const tab  = tabs[idx]; if(!tab) return;
+  const rect = tab.getBoundingClientRect();
+  TD = {on:false,idx,to:idx,clone:null,startX:e.touches[0].clientX,tabW:rect.width+4,cloneLeft:rect.left,cloneTop:rect.top};
+  TD._pending = () => {
+    TD.on = true;
+    const cl = tab.cloneNode(true);
+    cl.className = 'float-clone profile-tab active';
+    cl.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`;
+    document.body.appendChild(cl); TD.clone = cl;
     tab.classList.add('tab-ghost');
   };
 }
-document.addEventListener('touchmove',e=>{
-  if(TD.idx===-1)return;
-  const dx=e.touches[0].clientX-TD.startX;
-  if(!TD.on&&Math.abs(dx)>6)TD._pending?.();
-  if(!TD.on)return;
-  TD.clone.style.left=(TD.cloneLeft+dx)+'px';
-  const ni=Math.max(0,Math.min(profiles.length-1,TD.idx+Math.round(dx/TD.tabW)));
+document.addEventListener('touchmove', e => {
+  if(TD.idx===-1) return;
+  const dx = e.touches[0].clientX - TD.startX;
+  if(!TD.on && Math.abs(dx)>6) TD._pending?.();
+  if(!TD.on) return;
+  TD.clone.style.left = (TD.cloneLeft+dx)+'px';
+  const ni = Math.max(0, Math.min(profiles.length-1, TD.idx+Math.round(dx/TD.tabW)));
   if(ni!==TD.to){
-    TD.to=ni;
-    document.querySelectorAll('.profile-tab').forEach((t,i)=>t.classList.toggle('tab-slot',i===ni&&i!==TD.idx));
+    TD.to = ni;
+    document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach((t,i)=>
+      t.classList.toggle('tab-slot',i===ni && i!==TD.idx));
   }
 },{passive:true});
-document.addEventListener('touchend',()=>{
-  if(TD.idx===-1)return;
+document.addEventListener('touchend', () => {
+  if(TD.idx===-1) return;
   if(TD.on){
     TD.clone?.remove();
-    document.querySelectorAll('.profile-tab').forEach(t=>t.classList.remove('tab-ghost','tab-slot'));
+    document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach(t=>t.classList.remove('tab-ghost','tab-slot'));
     const{idx,to}=TD;
-    if(idx!==to){const item=profiles.splice(idx,1)[0];profiles.splice(to,0,item);saveProfiles(profiles);renderProfiles()}
+    if(idx!==to){ const item=profiles.splice(idx,1)[0]; profiles.splice(to,0,item); saveProfiles(profiles); renderProfiles() }
   }
-  TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cloneLeft:0};
+  TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cloneLeft:0,cloneTop:0};
 });
 
-// ═══════════ BUS ═══════════
+// ══════════════════════════════════════════
+//  NEARBY BUSES
+// ══════════════════════════════════════════
+async function fetchAllStops(){
+  if(allStops) return allStops;
+  const data = await fetch(`${KMB}/stop`).then(r=>r.json());
+  allStops = data.data || [];
+  return allStops;
+}
+
+async function loadNearby(){
+  const el = document.getElementById('bus-list');
+  el.innerHTML = `<div class="spinner"></div>`;
+
+  // Step 1: get GPS
+  if(!nearbyLat){
+    if(!navigator.geolocation){
+      el.innerHTML = `<div class="msg">此裝置不支援定位<br><small>請改用手機瀏覽器開啟</small></div>`; return;
+    }
+    if(location.protocol==='file:'){
+      el.innerHTML = `<div class="msg">⚠️ 以 <b>file://</b> 開啟無法使用定位<br><small>請將本頁部署至網絡（如 GitHub Pages）後使用</small></div>`; return;
+    }
+    try{
+      const pos = await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:10000}));
+      nearbyLat = pos.coords.latitude;
+      nearbyLng = pos.coords.longitude;
+    }catch{
+      el.innerHTML = `<div class="msg">❌ 定位失敗<br><small>請允許位置權限後重試</small></div>`; return;
+    }
+  }
+
+  // Step 2: fetch all stops, filter to within 500m
+  try{
+    const stops = await fetchAllStops();
+    const nearby = stops
+      .map(s=>({...s, dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))}))
+      .filter(s=>s.dist<=500)
+      .sort((a,b)=>a.dist-b.dist)
+      .slice(0,10); // top 10 nearest stops
+
+    if(!nearby.length){
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近找不到九巴站</div><div class="empty-sub">500米範圍內沒有九巴站點</div></div>`; return;
+    }
+
+    // Step 3: fetch stop-eta for each nearby stop in parallel
+    const etaResults = await Promise.all(
+      nearby.map(s =>
+        fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))
+      )
+    );
+
+    // Step 4: flatten, filter upcoming ETAs, deduplicate by route+dir+stop
+    const now = Date.now();
+    const rows = [];
+    etaResults.forEach((res,i)=>{
+      const stop = nearby[i];
+      const seen = new Set();
+      (res.data||[]).forEach(e=>{
+        if(!e.eta) return;
+        const ts = new Date(e.eta).getTime();
+        if(ts < now - 30000) return; // skip past
+        const key = `${e.route}_${e.dir}_${stop.stop}`;
+        if(!seen.has(key)){
+          seen.add(key);
+          rows.push({
+            route: e.route, dest: e.dest_tc||'', stopName: stop.name_tc,
+            stopId: stop.stop, dist: Math.round(stop.dist),
+            serviceType: e.service_type||'1', dir: e.dir,
+            _firstEta: ts,
+          });
+        } else {
+          // add subsequent ETAs
+          const existing = rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);
+          if(existing){
+            if(!existing._etas) existing._etas=[existing._firstEta];
+            existing._etas.push(ts);
+          }
+        }
+      });
+    });
+
+    // Finalize _etas and sort by soonest
+    rows.forEach(r=>{ if(!r._etas) r._etas=[r._firstEta] });
+    rows.sort((a,b)=>a._firstEta-b._firstEta);
+
+    if(!rows.length){
+      el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次資料</div><div class="empty-sub">附近各站暫時沒有即將到站的九巴</div></div>`; return;
+    }
+
+    // Step 5: render
+    el.innerHTML = rows.slice(0,20).map((r,i)=>{
+      const m = Math.round((r._firstEta-now)/60000);
+      const urgency = m<=2?'soon':m<=8?'coming':'ok';
+      const cc      = m<=2?'sc':m<=8?'cc':'oc';
+      const etas    = (r._etas||[r._firstEta]).slice(0,3);
+      const etaHtml = etas.map((ts,j)=>{
+        const d=new Date(ts); const t=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return j===0?`<span class="e1 ${cc}">${t}</span>`
+              :j===1?`<span class="e2">${t}</span>`
+                    :`<span class="e3">${t}</span>`;
+      }).join('');
+      return `<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s">
+        <div class="bus-badge">${r.route}</div>
+        <div class="bus-right">
+          <div class="bus-eta-row">${etaHtml}</div>
+          <div class="bus-info-row">
+            <span class="bus-stop">${r.stopName}</span>
+            <span class="bus-dest">${r.dest}</span>
+            <span class="nearby-dist">${r.dist}m</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+  }catch(e){
+    console.warn('[nearby]',e);
+    el.innerHTML=`<div class="msg">載入失敗，請重試</div>`;
+  }
+}
+
+// ══════════════════════════════════════════
+//  SAVED ROUTES (normal profiles)
+// ══════════════════════════════════════════
 async function fetchOneETA(fav){
   try{
-    const data=await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());
-    const times=(data.data||[]).filter(e=>e.eta).slice(0,3);
-    fav._etas=times.map(e=>({ts:new Date(e.eta).getTime()}));
-    fav._eta=fav._etas[0]?.ts??null;
-    fav._err=false;
-  }catch{fav._etas=[];fav._eta=null;fav._err=true}
+    const data = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());
+    fav._etas = (data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());
+    fav._first = fav._etas[0] ?? null;
+    fav._err   = false;
+  }catch{
+    fav._etas=[]; fav._first=null; fav._err=true;
+  }
 }
+
 async function refreshAllETAs(){
-  favs=loadFavs(activePid);
-  if(!favs.length){renderBusList();return}
+  if(activePid===NEARBY_PID){ loadNearby(); return }
+  favs = loadFavs(activePid);
+  if(!favs.length){ renderBusList(); return }
   await Promise.all(favs.map(fetchOneETA));
   favs.sort((a,b)=>{
-    if(a._eta===null&&b._eta===null)return 0;
-    if(a._eta===null)return 1;if(b._eta===null)return-1;
-    return a._eta-b._eta;
+    if(a._first===null&&b._first===null) return 0;
+    if(a._first===null) return 1; if(b._first===null) return -1;
+    return a._first-b._first;
   });
   renderBusList();
 }
+
 function renderBusList(){
-  const el=document.getElementById('bus-list');
+  const el  = document.getElementById('bus-list');
   if(!favs.length){
     el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">未有路線</div><div class="empty-sub">點擊「加路線」搜尋九巴班次</div></div>`;
     return;
   }
-  const now=Date.now();
-  el.innerHTML=favs.map((f,i)=>{
-    let urgency='';
-    if(f._eta!==null){const m=Math.round((f._eta-now)/60000);urgency=m<=2?'soon':m<=8?'coming':'ok'}
-    let etaHtml='';
+  const now = Date.now();
+  el.innerHTML = favs.map((f,i)=>{
+    const m = f._first!=null ? Math.round((f._first-now)/60000) : null;
+    const urgency = m===null?'':m<=2?'soon':m<=8?'coming':'ok';
+    const cc      = m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
+    let etaHtml = '';
     if(f._err) etaHtml=`<span class="e-none">無數據</span>`;
     else if(!f._etas?.length) etaHtml=`<span class="e-none">無班次</span>`;
-    else{
-      const cc=urgency==='soon'?'sc':urgency==='coming'?'cc':'oc';
-      const parts=[];
-      if(f._etas[2]){const d=new Date(f._etas[2].ts);parts.push(`<span class="e3">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`)}
-      if(f._etas[1]){const d=new Date(f._etas[1].ts);parts.push(`<span class="e2">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`)}
-      if(f._etas[0]){const d=new Date(f._etas[0].ts);parts.push(`<span class="e1 ${cc}">${pad(d.getHours())}:${pad(d.getMinutes())}</span>`)}
-      etaHtml=parts.join('');
-    }
+    else etaHtml = f._etas.map((ts,j)=>{
+      const d=new Date(ts), t=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      return j===0?`<span class="e1 ${cc}">${t}</span>`
+            :j===1?`<span class="e2">${t}</span>`
+                  :`<span class="e3">${t}</span>`;
+    }).join('');
+
     return `<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s">
       <div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div>
       <div class="bus-badge">${f.route}</div>
-      <div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div>
-      <div class="bus-eta-wrap"><div class="eta-row">${etaHtml}</div></div>
+      <div class="bus-right">
+        <div class="bus-eta-row">${etaHtml}</div>
+        <div class="bus-info-row">
+          <span class="bus-stop">${f.stopName}</span>
+          <span class="bus-dest">${f.dest}</span>
+        </div>
+      </div>
       <button class="bus-rm" onclick="removeFav(event,${i})">×</button>
     </div>`;
   }).join('');
 }
-function removeFav(e,i){e.stopPropagation();favs.splice(i,1);saveFavs(activePid,favs);renderBusList()}
 
-// ── Bus card drag ──
+function removeFav(e,i){ e.stopPropagation(); favs.splice(i,1); saveFavs(activePid,favs); renderBusList() }
+
+// ── Bus card drag reorder ──
 let BD={on:false,idx:-1,to:-1,clone:null,startY:0,startTop:0,cardH:0};
 function busDragStart(e,idx){
   e.stopPropagation();
-  const card=document.querySelectorAll('.bus-card')[idx];if(!card)return;
+  const card=document.querySelectorAll('.bus-card')[idx]; if(!card)return;
   const rect=card.getBoundingClientRect();
   BD={on:true,idx,to:idx,startY:e.touches[0].clientY,startTop:rect.top,cardH:rect.height+8,clone:null};
   const cl=card.cloneNode(true);
   cl.className='float-clone';
   cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;border-radius:13px`;
-  document.body.appendChild(cl);BD.clone=cl;
+  document.body.appendChild(cl); BD.clone=cl;
   card.classList.add('card-ghost');
 }
 document.addEventListener('touchmove',e=>{
@@ -743,48 +873,52 @@ document.addEventListener('touchend',()=>{
   else renderBusList();
 });
 
-// ═══════════ SEARCH ═══════════
+// ══════════════════════════════════════════
+//  ROUTE SEARCH
+// ══════════════════════════════════════════
 function openSearch(){
-  setDrawerTitle('搜尋路線');
+  setDTitle('搜尋路線');
   document.getElementById('drawer-body').innerHTML=`
     <div class="search-row">
-      <input class="d-input" id="route-input" placeholder="路線號碼（如 40X）"
+      <input class="d-input" id="route-inp" placeholder="路線號碼（如 40X）"
         maxlength="6" oninput="this.value=this.value.toUpperCase()"
         onkeydown="if(event.key==='Enter')searchRoute()">
       <button class="d-btn" onclick="searchRoute()">搜尋</button>
     </div>
     <div id="search-results"></div>`;
   openOverlay();
-  setTimeout(()=>document.getElementById('route-input')?.focus(),260);
+  setTimeout(()=>document.getElementById('route-inp')?.focus(),260);
 }
+
 async function searchRoute(){
-  const q=(document.getElementById('route-input')?.value||'').trim().toUpperCase();
+  const q=(document.getElementById('route-inp')?.value||'').trim().toUpperCase();
   if(!q)return;
   const el=document.getElementById('search-results');
   el.innerHTML=`<div class="spinner"></div>`;
   try{
-    const data=await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route/').then(r=>r.json());
+    const data=await fetch(`${KMB}/route/`).then(r=>r.json());
     const routes=data.data.filter(r=>r.route===q);
     if(!routes.length){el.innerHTML=`<div class="msg">找不到路線「${q}」</div>`;return}
-    el.innerHTML=`<div class="sec-lbl">選擇方向</div>`+
-      routes.map(r=>`<div class="result-item" onclick="pickRoute('${r.route}','${r.bound}','${r.service_type}','${esc(r.dest_tc)}','${esc(r.orig_tc)}')">
+    el.innerHTML=`<div class="sec-lbl">選擇方向</div>`+routes.map(r=>
+      `<div class="result-item" onclick="pickRoute('${r.route}','${r.bound}','${r.service_type}','${esc(r.dest_tc)}')">
         <div class="rn">${r.route}</div>
         <div class="ri"><div class="ri-dest">往 ${r.dest_tc}</div><div class="ri-orig">由 ${r.orig_tc}</div></div>
         <div class="chev">›</div>
       </div>`).join('');
   }catch{el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
-async function pickRoute(route,bound,svcType,dest,orig){
-  setDrawerTitle(`${route} 往 ${dest}`);
+
+async function pickRoute(route,bound,svcType,dest){
+  setDTitle(`${route} 往 ${dest}`);
   const el=document.getElementById('search-results');
   el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="spinner"></div>`;
   try{
     const dir=bound==='O'?'outbound':'inbound';
     const[sd,si]=await Promise.all([
-      fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/${dir}/${svcType}`).then(r=>r.json()),
-      fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop').then(r=>r.json()),
+      fetch(`${KMB}/route-stop/${route}/${dir}/${svcType}`).then(r=>r.json()),
+      fetch(`${KMB}/stop`).then(r=>r.json()),
     ]);
-    const sm={};si.data.forEach(s=>sm[s.stop]=s.name_tc);
+    const sm={}; si.data.forEach(s=>sm[s.stop]=s.name_tc);
     const stops=sd.data.map(s=>({seq:s.seq,stopId:s.stop,name:sm[s.stop]||s.stop}));
     el.innerHTML=`
       <button class="back-link" onclick="backToSearch()">‹ 返回</button>
@@ -794,31 +928,39 @@ async function pickRoute(route,bound,svcType,dest,orig){
           <div class="stop-seq">${s.seq}</div><div class="stop-name">${s.name}</div><div class="chev">›</div>
         </div>`).join('')}
       </div>`;
-  }catch{el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="msg">載入失敗，請重試</div>`}
+  }catch{
+    el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="msg">載入失敗，請重試</div>`;
+  }
 }
-function backToSearch(){setDrawerTitle('搜尋路線');document.getElementById('search-results').innerHTML=''}
+
+function backToSearch(){ setDTitle('搜尋路線'); document.getElementById('search-results').innerHTML='' }
+
 async function addFav(stopId,stopName,route,dest,serviceType){
   if(!favs.some(f=>f.route===route&&f.stopId===stopId&&f.dest===dest))
-    favs.push({route,stopId,stopName,dest,serviceType,_etas:[],_eta:null,_err:false});
-  saveFavs(activePid,favs);closeDrawer();await refreshAllETAs();
+    favs.push({route,stopId,stopName,dest,serviceType,_etas:[],_first:null,_err:false});
+  saveFavs(activePid,favs); closeDrawer(); await refreshAllETAs();
 }
 
-// ═══════════ HELPERS ═══════════
-function openOverlay(){document.getElementById('overlay').classList.add('open')}
-function closeDrawer(){document.getElementById('overlay').classList.remove('open')}
-function handleOverlayClick(e){if(e.target.id==='overlay')closeDrawer()}
-function setDrawerTitle(t){document.getElementById('drawer-title').textContent=t}
-function esc(s){return s.replace(/'/g,"\\'")}
+// ══════════════════════════════════════════
+//  OVERLAY HELPERS
+// ══════════════════════════════════════════
+function openOverlay(){ document.getElementById('overlay').classList.add('open') }
+function closeDrawer(){ document.getElementById('overlay').classList.remove('open') }
+function overlayBgClick(e){ if(e.target.id==='overlay') closeDrawer() }
+function setDTitle(t){ document.getElementById('drawer-title').textContent=t }
+function esc(s){ return s.replace(/'/g,"\\'") }
 
-// ═══════════ INIT ═══════════
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
 renderProfiles();
 loadWeather();
-refreshAllETAs();
-setInterval(loadWeather,5*60*1000);
-setInterval(refreshAllETAs,30*1000);
+if(activePid===NEARBY_PID) loadNearby(); else refreshAllETAs();
+setInterval(loadWeather, 5*60*1000);
+setInterval(()=>{ if(activePid===NEARBY_PID) loadNearby(); else refreshAllETAs() }, 30*1000);
 
 // PWA manifest
-const ml=document.createElement('link');ml.rel='manifest';
+const ml=document.createElement('link'); ml.rel='manifest';
 ml.href=URL.createObjectURL(new Blob([JSON.stringify({
   name:'返工幫手',short_name:'返工幫手',start_url:'.',display:'standalone',
   background_color:'#06080d',theme_color:'#06080d',
