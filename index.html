@@ -19,172 +19,168 @@
   --grn:#2ed573;--red:#ff4757;--blu:#5b8fff;
   --txt:#dce3f4;--mid:#8591b0;--dim:#35405a;--bright:#ccd4ed;
   --mono:'Azeret Mono',monospace;--sans:'Noto Sans HK',sans-serif;
-  --nav-h:58px;
+  --nav-h:60px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;flex-direction:column}
 
 /* ══ PAGES ══ */
-.page{display:none;flex:1;flex-direction:column;overflow:hidden}
+.page{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
 .page.active{display:flex}
 
 /* ══ BOTTOM NAV ══ */
 .bottom-nav{flex-shrink:0;height:var(--nav-h);background:var(--bg2);border-top:1px solid var(--bdr);display:flex;padding-bottom:env(safe-area-inset-bottom,0)}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;color:var(--mid);cursor:pointer;font-family:var(--sans);transition:color .15s;padding:6px 0}
-.nav-btn .nav-ico{font-size:22px;line-height:1}
-.nav-btn .nav-lbl{font-size:11px;font-weight:500}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;color:var(--mid);cursor:pointer;font-family:var(--sans);transition:color .15s;padding:5px 0}
+.nav-btn .nav-ico{font-size:20px;line-height:1}
+.nav-btn .nav-lbl{font-size:10px;font-weight:600;letter-spacing:.03em}
 .nav-btn.active{color:var(--amb2)}
 
 /* ══ WEATHER PANEL ══ */
 .w-panel{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:10px 14px 10px;position:relative;overflow:hidden}
 .w-panel::after{content:'';position:absolute;top:-40px;right:-20px;width:170px;height:170px;background:radial-gradient(circle,rgba(240,165,0,.07) 0%,transparent 70%);pointer-events:none}
-
-/* Row 1: icon+temp | clock */
 .w-r1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
 .w-templeft{display:flex;align-items:center;gap:10px}
 .w-icon{font-size:42px;line-height:1;flex-shrink:0}
 .w-temp-big{font-family:var(--mono);font-size:52px;font-weight:700;line-height:1}
 .w-temp-big sup{font-size:18px;font-weight:400;color:var(--mid);vertical-align:super}
 .w-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.w-clock{font-family:var(--mono);font-size:32px;font-weight:700;color:var(--amb);line-height:1}
+.w-clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--amb);line-height:1}
 .w-date{font-size:11px;color:var(--mid)}
 .w-btns{display:flex;gap:5px;margin-top:3px}
 .w-btn{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:5px 10px;color:var(--mid);font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
 .w-btn:active{border-color:var(--amb);color:var(--amb)}
 .w-btn.spinning .ico{display:inline-block;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* Row 2: warnings */
-.w-warns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;min-height:0}
+.w-warns{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
 .warn-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(255,71,87,.13);border:1px solid rgba(255,71,87,.32);color:#ff8a96}
 .warn-pill.amb{background:rgba(240,165,0,.11);border-color:rgba(240,165,0,.32);color:var(--amb2)}
-
-/* Row 3: description */
-.w-desc{font-size:13px;color:var(--bright);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px}
+.w-desc{font-size:13px;color:var(--bright);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px}
 .w-desc:empty{display:none}
-
-/* Row 4: 7-day forecast */
-.w-fore{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+/* forecast strip */
+.w-fore{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin-bottom:8px}
 .w-fore::-webkit-scrollbar{display:none}
-.fc{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:7px 10px;flex-shrink:0;min-width:60px}
+.fc{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:6px 9px;flex-shrink:0;min-width:58px}
 .fc.hl{background:var(--bg4);border-color:var(--amb-bdr)}
-.fc-lbl{font-size:12px;color:var(--mid);font-family:var(--mono)}
-.fc-lbl.named{font-size:13px;font-weight:700;color:var(--amb2)}
-.fc-ico{font-size:22px;margin:2px 0}
-.fc-tt{font-family:var(--mono);font-size:12px;display:flex;gap:5px}
+.fc-lbl{font-size:11px;color:var(--mid);font-family:var(--mono)}
+.fc-lbl.named{font-size:12px;font-weight:700;color:var(--amb2)}
+.fc-ico{font-size:20px;margin:1px 0}
+.fc-tt{font-family:var(--mono);font-size:11px;display:flex;gap:4px}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
+/* extra weather stats row */
+.w-extra{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+.w-extra::-webkit-scrollbar{display:none}
+.wx-chip{display:flex;flex-direction:column;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:7px 10px;flex-shrink:0;min-width:90px}
+.wx-chip-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:3px}
+.wx-chip-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--bright)}
+.wx-chip-sub{font-size:10px;color:var(--mid);margin-top:2px}
 
 /* ══ PROFILE TABS ══ */
-.profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:6px 10px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:62px}
+.profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:60px}
 .profiles-bar::-webkit-scrollbar{display:none}
-.profile-tab{display:flex;align-items:center;justify-content:center;height:48px;padding:0 22px;border-radius:12px;font-size:17px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans);user-select:none;touch-action:none}
+.profile-tab{display:flex;align-items:center;justify-content:center;height:46px;padding:0 20px;border-radius:12px;font-size:16px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans);user-select:none;touch-action:none}
 .profile-tab.active{background:var(--amb-bg);color:var(--amb2);border-color:var(--amb-bdr)}
 .profile-tab.nearby-tab{color:var(--blu);border-color:rgba(91,143,255,.3)}
 .profile-tab.nearby-tab.active{background:rgba(91,143,255,.1);color:#7ba8ff;border-color:rgba(91,143,255,.45)}
 .profile-tab.tab-ghost{opacity:.25}
 .profile-tab.tab-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04);color:transparent}
-.add-profile-btn{flex-shrink:0;height:48px;min-width:48px;border-radius:12px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.add-profile-btn{flex-shrink:0;height:46px;min-width:46px;border-radius:12px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .add-profile-btn:active{border-color:var(--amb);color:var(--amb)}
 
-/* ══ BUS SECTION ══ */
-.bus-sec{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.bus-hdr{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 12px 5px}
+/* ══ BUS ══ */
+.bus-sec{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.bus-hdr{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:6px 12px 5px}
 .bus-hdr-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);flex:1}
-.eta-mode-btn{display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:6px 10px;color:var(--mid);font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:var(--sans);transition:all .15s}
+.eta-mode-btn{display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:5px 9px;color:var(--mid);font-size:11px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:var(--sans);transition:all .15s}
 .eta-mode-btn.mins{border-color:rgba(91,143,255,.35);color:#7ba8ff;background:rgba(91,143,255,.08)}
-.add-btn{display:flex;align-items:center;gap:5px;background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:6px 13px;color:var(--amb);font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.add-btn{display:flex;align-items:center;gap:4px;background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:5px 12px;color:var(--amb);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap}
 .add-btn:active{opacity:.7}
-
-/* Nearby distance selector */
-.dist-row{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:3px 12px 7px;overflow-x:auto;scrollbar-width:none}
+.dist-row{flex-shrink:0;display:flex;align-items:center;gap:5px;padding:2px 12px 6px;overflow-x:auto;scrollbar-width:none}
 .dist-row::-webkit-scrollbar{display:none}
 .dist-lbl{font-size:11px;color:var(--mid);white-space:nowrap;flex-shrink:0}
-.dist-pill{flex-shrink:0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;font-family:var(--mono);background:var(--bg3);border:1px solid var(--bdr);color:var(--mid);cursor:pointer;transition:all .15s}
+.dist-pill{flex-shrink:0;padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);background:var(--bg3);border:1px solid var(--bdr);color:var(--mid);cursor:pointer;transition:all .15s}
 .dist-pill.active{background:rgba(91,143,255,.12);border-color:rgba(91,143,255,.45);color:#7ba8ff}
-
-.bus-list{flex:1;overflow-y:auto;padding:0 10px 10px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent}
-
-/* bus card — vertical ETA */
-.bus-card{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;margin-bottom:9px;overflow:hidden;animation:slideIn .2s ease both;position:relative;user-select:none;transition:border-color .15s,opacity .15s}
-.bus-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dim);border-radius:13px 0 0 13px;transition:background .25s}
-.bus-card.soon::before{background:var(--red)}
-.bus-card.coming::before{background:var(--amb)}
-.bus-card.ok::before{background:var(--grn)}
-.bus-card.card-ghost{opacity:.25}
-.bus-card.card-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04)}
-.bus-card.card-slot::before{background:transparent}
-@keyframes slideIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-
-.drag-handle{display:flex;align-items:center;justify-content:center;padding:0 9px;color:var(--dim);font-size:18px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
-.bus-badge{display:flex;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);color:var(--amb2);font-family:var(--mono);font-size:38px;font-weight:700;width:90px;flex-shrink:0;text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px}
-.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:11px 12px}
-.bus-stop{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.bus-list{flex:1;overflow-y:auto;padding:0 10px 8px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent}
+.bus-card{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden;animation:slideIn .2s ease both;position:relative;user-select:none;transition:border-color .15s,opacity .15s}
+.bus-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dim);border-radius:12px 0 0 12px;transition:background .25s}
+.bus-card.soon::before{background:var(--red)}.bus-card.coming::before{background:var(--amb)}.bus-card.ok::before{background:var(--grn)}
+.bus-card.card-ghost{opacity:.25}.bus-card.card-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04)}.bus-card.card-slot::before{background:transparent}
+@keyframes slideIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.drag-handle{display:flex;align-items:center;justify-content:center;padding:0 8px;color:var(--dim);font-size:16px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
+.bus-badge{display:flex;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;width:88px;flex-shrink:0;text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px}
+.bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:10px 11px}
+.bus-stop{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .bus-dest{font-size:12px;color:var(--mid)}
 .nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);margin-left:5px}
-
-/* Vertical ETA column */
-.bus-eta-wrap{display:flex;align-items:center;padding:0 12px 0 4px;flex-shrink:0}
+.bus-eta-wrap{display:flex;align-items:center;padding:0 11px 0 4px;flex-shrink:0}
 .eta-col{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
-.e1{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1.1}
+.e1{font-family:var(--mono);font-size:25px;font-weight:700;line-height:1.1}
 .e1.sc{color:var(--red)}.e1.cc{color:var(--amb2)}.e1.oc{color:var(--grn)}
-.e2{font-family:var(--mono);font-size:15px;color:var(--mid);line-height:1.2}
-.e3{font-family:var(--mono);font-size:12px;color:var(--dim);line-height:1.2}
-.e-none{font-family:var(--mono);font-size:13px;color:var(--dim)}
-.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:18px;padding:0 10px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
+.e2{font-family:var(--mono);font-size:14px;color:var(--mid);line-height:1.2}
+.e3{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.2}
+.e-none{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.bus-rm{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:17px;padding:0 10px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
 .bus-rm:active{color:var(--red)}
-
-.empty-state{text-align:center;padding:36px 20px;color:var(--mid)}
-.empty-icon{font-size:44px;margin-bottom:12px;opacity:.25}
-.empty-text{font-size:15px;margin-bottom:5px}
+.empty-state{text-align:center;padding:30px 20px;color:var(--mid)}
+.empty-icon{font-size:40px;margin-bottom:10px;opacity:.25}
+.empty-text{font-size:15px;margin-bottom:4px}
 .empty-sub{font-size:12px;color:var(--dim);line-height:1.6}
 
-/* ══ SETTINGS PAGE ══ */
+/* ══ NEWS & TRAFFIC PAGES ══ */
+.feed-page{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.sub-tab-bar{flex-shrink:0;display:flex;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:8px 12px;gap:7px;overflow-x:auto;scrollbar-width:none}
+.sub-tab-bar::-webkit-scrollbar{display:none}
+.sub-tab{height:36px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);white-space:nowrap;flex-shrink:0;transition:all .15s;font-family:var(--sans)}
+.sub-tab.active{background:var(--amb-bg);color:var(--amb2);border-color:var(--amb-bdr)}
+.feed-list{flex:1;overflow-y:auto;padding:8px 12px 12px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent}
+.feed-item{background:var(--bg2);border:1px solid var(--bdr);border-radius:11px;margin-bottom:8px;padding:12px 14px;cursor:pointer;transition:border-color .15s;animation:slideIn .2s ease both;text-decoration:none;display:block;color:inherit}
+.feed-item:active{border-color:var(--amb-bdr)}
+.feed-item-title{font-size:14px;font-weight:500;line-height:1.5;margin-bottom:5px;color:var(--bright)}
+.feed-item-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mid)}
+.feed-item-src{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono);color:var(--dim)}
+.feed-item-desc{font-size:12px;color:var(--mid);margin-top:6px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.feed-err{text-align:center;padding:30px 20px;color:var(--mid);font-size:13px;line-height:1.7}
+.feed-refresh-row{display:flex;justify-content:flex-end;padding:2px 0 6px;flex-shrink:0}
+.feed-refresh-btn{background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:var(--sans);padding:0 2px}
+.feed-refresh-btn:active{color:var(--amb)}
+
+/* ══ SETTINGS ══ */
 .settings-scroll{flex:1;overflow-y:auto;padding:14px 14px 20px}
-.sett-section-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:18px 0 8px;padding-left:2px}
+.sett-section-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:18px 0 8px;padding-left:2px}
 .sett-section-title:first-child{margin-top:0}
 .sett-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;overflow:hidden;margin-bottom:4px}
-.sett-row{display:flex;align-items:center;padding:14px 16px;gap:12px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--bdr)}
+.sett-row{display:flex;align-items:center;padding:13px 15px;gap:11px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--bdr)}
 .sett-row:last-child{border-bottom:none}
 .sett-row:active{background:var(--bg3)}
-.sett-ico{font-size:20px;flex-shrink:0;width:28px;text-align:center}
-.sett-lbl{flex:1}
-.sett-lbl-main{font-size:15px;font-weight:500}
-.sett-lbl-sub{font-size:12px;color:var(--mid);margin-top:2px}
-.sett-chev{color:var(--dim);font-size:18px}
-
-/* History card */
+.sett-ico{font-size:19px;flex-shrink:0;width:26px;text-align:center}
+.sett-lbl{flex:1}.sett-lbl-main{font-size:14px;font-weight:500}.sett-lbl-sub{font-size:11px;color:var(--mid);margin-top:2px}
+.sett-chev{color:var(--dim);font-size:17px}
 .history-card{background:var(--bg2);border:1px solid var(--bdr2);border-radius:13px;padding:14px 16px;margin-bottom:4px}
-.history-date{font-family:var(--mono);font-size:11px;color:var(--amb2);font-weight:600;margin-bottom:6px;letter-spacing:.05em}
-.history-year{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--amb);line-height:1;margin-bottom:6px}
+.history-date{font-family:var(--mono);font-size:11px;color:var(--amb2);font-weight:600;margin-bottom:5px;letter-spacing:.05em}
+.history-year{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--amb);line-height:1;margin-bottom:5px}
 .history-text{font-size:13px;color:var(--bright);line-height:1.65}
-.history-loading{font-size:13px;color:var(--mid);text-align:center;padding:18px 0}
-.history-src{font-size:10px;color:var(--dim);margin-top:8px;font-family:var(--mono)}
-
-/* Auto-tab settings */
+.history-loading{font-size:13px;color:var(--mid);text-align:center;padding:16px 0}
+.history-src{font-size:10px;color:var(--dim);margin-top:7px;font-family:var(--mono)}
 .auto-tab-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;margin-bottom:8px;overflow:hidden}
 .auto-tab-hdr{display:flex;align-items:center;padding:12px 14px;gap:10px;border-bottom:1px solid var(--bdr)}
-.auto-tab-name{flex:1;font-size:15px;font-weight:600}
-.toggle-wrap{display:flex;align-items:center}
+.auto-tab-name{flex:1;font-size:14px;font-weight:600}
 .toggle{position:relative;width:44px;height:26px;cursor:pointer}
 .toggle input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:var(--bdr2);border-radius:13px;transition:.2s}
 .toggle-slider::before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;background:var(--mid);border-radius:50%;transition:.2s}
 .toggle input:checked+.toggle-slider{background:var(--amb)}
 .toggle input:checked+.toggle-slider::before{left:21px;background:#000}
-.auto-tab-body{padding:10px 14px 13px}
-.days-row{display:flex;gap:5px;margin-bottom:10px}
-.day-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--bdr2);background:var(--bg3);color:var(--mid);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--sans)}
+.auto-tab-body{padding:10px 14px 12px}
+.days-row{display:flex;gap:5px;margin-bottom:9px}
+.day-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr2);background:var(--bg3);color:var(--mid);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--sans)}
 .day-btn.on{border-color:var(--amb-bdr);background:var(--amb-bg);color:var(--amb2)}
-.time-row{display:flex;align-items:center;gap:8px}
+.time-row{display:flex;align-items:center;gap:7px}
 .time-lbl{font-size:12px;color:var(--mid);white-space:nowrap}
-.time-inp{background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:7px 10px;color:var(--txt);font-family:var(--mono);font-size:15px;width:90px;outline:none;transition:border-color .15s;cursor:pointer}
+.time-inp{background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:6px 9px;color:var(--txt);font-family:var(--mono);font-size:14px;width:88px;outline:none;transition:border-color .15s}
 .time-inp:focus{border-color:var(--amb)}
-
-/* Copyright */
 .copy-block{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;padding:16px;text-align:center}
-.copy-app{font-size:20px;font-weight:700;margin-bottom:4px;color:var(--amb2)}
-.copy-ver{font-size:12px;color:var(--mid);margin-bottom:10px;font-family:var(--mono)}
+.copy-app{font-size:19px;font-weight:700;margin-bottom:3px;color:var(--amb2)}
+.copy-ver{font-size:11px;color:var(--mid);margin-bottom:9px;font-family:var(--mono)}
 .copy-line{font-size:12px;color:var(--mid);line-height:1.85}
 .copy-line a{color:var(--blu);text-decoration:none}
 
@@ -194,49 +190,47 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .drawer{background:var(--bg2);border-top:1px solid var(--bdr2);border-radius:20px 20px 0 0;width:100%;max-height:90dvh;display:flex;flex-direction:column;animation:drawerUp .24s cubic-bezier(.34,1.56,.64,1)}
 @keyframes drawerUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .drawer-handle{width:36px;height:4px;background:var(--bdr2);border-radius:2px;margin:11px auto 0;flex-shrink:0}
-.drawer-title{font-size:15px;font-weight:600;padding:12px 15px 9px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
-.drawer-close{background:var(--bg3);border:none;color:var(--mid);width:28px;height:28px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.drawer-body{flex:1;overflow-y:auto;padding:0 14px 28px}
-.search-row{display:flex;gap:8px;margin-bottom:13px}
-.d-input{flex:1;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:12px 13px;color:var(--txt);font-family:var(--mono);font-size:18px;letter-spacing:.12em;text-transform:uppercase;outline:none;transition:border-color .15s}
+.drawer-title{font-size:15px;font-weight:600;padding:11px 15px 8px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.drawer-close{background:var(--bg3);border:none;color:var(--mid);width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.drawer-body{flex:1;overflow-y:auto;padding:0 14px 26px}
+.search-row{display:flex;gap:8px;margin-bottom:12px}
+.d-input{flex:1;background:var(--bg3);border:1px solid var(--bdr2);border-radius:10px;padding:11px 13px;color:var(--txt);font-family:var(--mono);font-size:18px;letter-spacing:.12em;text-transform:uppercase;outline:none;transition:border-color .15s}
 .d-input::placeholder{color:var(--dim);font-size:13px;text-transform:none;letter-spacing:normal;font-family:var(--sans)}
 .d-input:focus{border-color:var(--amb)}
 .d-input.plain{font-size:15px;letter-spacing:normal;text-transform:none;font-family:var(--sans)}
-.d-btn{background:var(--amb);color:#000;border:none;border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--sans)}
+.d-btn{background:var(--amb);color:#000;border:none;border-radius:10px;padding:11px 14px;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--sans)}
 .d-btn:active{opacity:.8}
-.sec-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:9px}
-.result-item{display:flex;align-items:center;gap:11px;padding:12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:7px;cursor:pointer;transition:border-color .15s}
+.sec-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:8px}
+.result-item{display:flex;align-items:center;gap:10px;padding:11px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
 .result-item:active{border-color:var(--amb)}
-.rn{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--amb2);min-width:44px}
+.rn{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--amb2);min-width:42px}
 .ri{flex:1}.ri-dest{font-size:14px;font-weight:500}.ri-orig{font-size:11px;color:var(--mid);margin-top:2px}
-.chev{color:var(--dim);font-size:18px}
-.stop-item{display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
+.chev{color:var(--dim);font-size:17px}
+.stop-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:5px;cursor:pointer;transition:border-color .15s}
 .stop-item:active{border-color:var(--amb)}
-.stop-seq{font-family:var(--mono);font-size:11px;color:var(--dim);min-width:24px}
-.stop-name{flex:1;font-size:14px}
-.back-link{display:inline-flex;align-items:center;gap:5px;color:var(--amb);font-size:13px;cursor:pointer;margin-bottom:12px;background:none;border:none;font-family:var(--sans);padding:0}
-.loc-note{font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6}
-.loc-gps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);border-radius:10px;padding:12px;margin-bottom:10px;color:#7ba8ff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
-.loc-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.stop-seq{font-family:var(--mono);font-size:11px;color:var(--dim);min-width:22px}
+.stop-name{flex:1;font-size:13px}
+.back-link{display:inline-flex;align-items:center;gap:5px;color:var(--amb);font-size:13px;cursor:pointer;margin-bottom:11px;background:none;border:none;font-family:var(--sans);padding:0}
+.loc-gps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);border-radius:10px;padding:11px;margin-bottom:10px;color:#7ba8ff;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.loc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .loc-item{background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:10px;cursor:pointer;transition:all .15s;text-align:center}
 .loc-item:active,.loc-item.sel{border-color:var(--amb);background:var(--amb-bg)}
 .loc-name{font-size:13px;font-weight:500}.loc-reg{font-size:11px;color:var(--mid);margin-top:2px}
-.rename-row{display:flex;gap:8px;margin-bottom:12px}
-.del-btn{width:100%;background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.3);color:#ff7b89;border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px}
-.spinner{width:20px;height:20px;border:2px solid var(--bdr2);border-top-color:var(--amb);border-radius:50%;animation:spin .7s linear infinite;margin:30px auto}
-.msg{text-align:center;color:var(--mid);font-size:14px;padding:24px 0;line-height:1.7}
-.toast{position:fixed;bottom:calc(var(--nav-h)+14px);left:50%;transform:translateX(-50%);background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--bright);white-space:nowrap;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+.rename-row{display:flex;gap:8px;margin-bottom:11px}
+.del-btn{width:100%;background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.3);color:#ff7b89;border-radius:10px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px}
+.del-btn:active{opacity:.8}
+.spinner{width:20px;height:20px;border:2px solid var(--bdr2);border-top-color:var(--amb);border-radius:50%;animation:spin .7s linear infinite;margin:28px auto}
+.msg{text-align:center;color:var(--mid);font-size:13px;padding:22px 0;line-height:1.7}
+.toast{position:fixed;bottom:calc(var(--nav-h)+12px);left:50%;transform:translateX(-50%);background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:9px 16px;font-size:13px;color:var(--bright);white-space:nowrap;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 .float-clone{position:fixed;z-index:999;pointer-events:none;box-shadow:0 10px 32px rgba(0,0,0,.7);border-radius:12px;opacity:.88}
 </style>
 </head>
 <body>
 
-<!-- ══ HOME PAGE ══ -->
+<!-- ══ HOME ══ -->
 <div class="page active" id="page-home">
-
   <div class="w-panel">
-    <!-- Row 1: icon+temp | clock -->
     <div class="w-r1">
       <div class="w-templeft">
         <div class="w-icon" id="w-icon">🌡</div>
@@ -251,51 +245,71 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         </div>
       </div>
     </div>
-    <!-- Row 2: warnings -->
     <div class="w-warns" id="w-warns"></div>
-    <!-- Row 3: description -->
-    <div class="w-desc" id="w-desc"></div>
-    <!-- Row 4: forecast -->
-    <div class="w-fore" id="w-fore"></div>
+    <div class="w-desc"  id="w-desc"></div>
+    <div class="w-fore"  id="w-fore"></div>
+    <div class="w-extra" id="w-extra"></div>
   </div>
-
   <div class="profiles-bar" id="profiles-bar"></div>
-
   <div class="bus-sec">
     <div class="bus-hdr">
       <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
-      <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離時間</button>
+      <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離</button>
       <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
     </div>
-    <!-- nearby distance selector (hidden unless nearby tab active) -->
     <div class="dist-row" id="dist-row" style="display:none">
       <span class="dist-lbl">距離：</span>
       <button class="dist-pill" data-m="10"   onclick="setDist(10)">10m</button>
       <button class="dist-pill" data-m="50"   onclick="setDist(50)">50m</button>
       <button class="dist-pill" data-m="100"  onclick="setDist(100)">100m</button>
       <button class="dist-pill" data-m="200"  onclick="setDist(200)">200m</button>
-      <button class="dist-pill active" data-m="500" onclick="setDist(500)">500m</button>
+      <button class="dist-pill active" data-m="500"  onclick="setDist(500)">500m</button>
       <button class="dist-pill" data-m="1000" onclick="setDist(1000)">1000m</button>
     </div>
     <div class="bus-list" id="bus-list"></div>
   </div>
 </div>
 
-<!-- ══ SETTINGS PAGE ══ -->
+<!-- ══ NEWS ══ -->
+<div class="page" id="page-news">
+  <div class="feed-page">
+    <div class="sub-tab-bar">
+      <button class="sub-tab active" id="ntab-all"   onclick="switchNewsFeed('all')">📋 全部</button>
+      <button class="sub-tab"        id="ntab-local" onclick="switchNewsFeed('local')">📻 RTHK 本地</button>
+      <button class="sub-tab"        id="ntab-world" onclick="switchNewsFeed('world')">🌍 RTHK 國際</button>
+      <button class="sub-tab"        id="ntab-yahoo" onclick="switchNewsFeed('yahoo')">🔶 Yahoo 香港</button>
+    </div>
+    <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
+      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 重新載入</button>
+    </div>
+    <div class="feed-list" id="news-list"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ══ TRAFFIC ══ -->
+<div class="page" id="page-traffic">
+  <div class="feed-page">
+    <div class="sub-tab-bar">
+      <button class="sub-tab active" id="ttab-all"  onclick="switchTrafficFeed('all')">📋 全部</button>
+      <button class="sub-tab"        id="ttab-td"   onclick="switchTrafficFeed('td')">🚦 運輸署</button>
+      <button class="sub-tab"        id="ttab-rthk" onclick="switchTrafficFeed('rthk')">📻 RTHK 交通</button>
+    </div>
+    <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
+      <button class="feed-refresh-btn" onclick="reloadTrafficFeed()">↺ 重新載入</button>
+    </div>
+    <div class="feed-list" id="traffic-list"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
 <div class="page" id="page-settings">
   <div class="settings-scroll">
-
-    <!-- Today in History -->
     <div class="sett-section-title">📅 歷史上的今天</div>
-    <div class="history-card" id="history-card">
-      <div class="history-loading">載入中…</div>
-    </div>
+    <div class="history-card" id="history-card"><div class="history-loading">載入中…</div></div>
 
-    <!-- Auto tab switching -->
     <div class="sett-section-title">⏰ 自動跳轉版面</div>
     <div id="auto-tab-list"></div>
 
-    <!-- Bus data -->
     <div class="sett-section-title">🚌 巴士資料</div>
     <div class="sett-card">
       <div class="sett-row" onclick="exportBusData()">
@@ -311,7 +325,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBusData(event)">
 
-    <!-- Weather -->
     <div class="sett-section-title">🌤 天氣</div>
     <div class="sett-card">
       <div class="sett-row" onclick="openLocPicker()">
@@ -321,16 +334,17 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
     </div>
 
-    <!-- About -->
     <div class="sett-section-title">ℹ️ 關於</div>
     <div class="copy-block">
-      <div style="font-size:36px;margin-bottom:6px">🌿</div>
+      <div style="font-size:34px;margin-bottom:5px">🌿</div>
       <div class="copy-app">生活日常</div>
-      <div class="copy-ver">v1.1 · 2026</div>
+      <div class="copy-ver">v1.2 · 2026</div>
       <div class="copy-line">
-        天氣數據：<a href="https://www.hko.gov.hk" target="_blank">香港天文台</a><br>
-        巴士到站：<a href="https://data.etabus.gov.hk" target="_blank">九巴開放數據</a><br>
-        歷史資料：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
+        天氣：<a href="https://www.hko.gov.hk" target="_blank">香港天文台開放數據</a><br>
+        巴士：<a href="https://data.etabus.gov.hk" target="_blank">九巴開放數據 API</a><br>
+        新聞：<a href="https://news.rthk.hk" target="_blank">香港電台</a>、<a href="https://hk.news.yahoo.com" target="_blank">Yahoo 香港</a><br>
+        交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a>、香港電台<br>
+        歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
         © 2026 生活日常。保留所有權利。
       </div>
     </div>
@@ -339,22 +353,17 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
-  <button class="nav-btn active" id="nav-home" onclick="switchPage('home')">
-    <span class="nav-ico">🌿</span><span class="nav-lbl">主頁</span>
-  </button>
-  <button class="nav-btn" id="nav-settings" onclick="switchPage('settings')">
-    <span class="nav-ico">⚙️</span><span class="nav-lbl">設定</span>
-  </button>
+  <button class="nav-btn active" id="nav-home"     onclick="switchPage('home')">    <span class="nav-ico">🌿</span><span class="nav-lbl">主頁</span></button>
+  <button class="nav-btn"        id="nav-news"     onclick="switchPage('news')">    <span class="nav-ico">📰</span><span class="nav-lbl">新聞</span></button>
+  <button class="nav-btn"        id="nav-traffic"  onclick="switchPage('traffic')"> <span class="nav-ico">🚦</span><span class="nav-lbl">交通</span></button>
+  <button class="nav-btn"        id="nav-settings" onclick="switchPage('settings')"><span class="nav-ico">⚙️</span><span class="nav-lbl">設定</span></button>
 </nav>
 
 <!-- OVERLAY -->
 <div class="overlay" id="overlay" onclick="overlayBgClick(event)">
   <div class="drawer">
     <div class="drawer-handle"></div>
-    <div class="drawer-title">
-      <span id="drawer-title">搜尋路線</span>
-      <button class="drawer-close" onclick="closeDrawer()">✕</button>
-    </div>
+    <div class="drawer-title"><span id="drawer-title">搜尋路線</span><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
     <div class="drawer-body" id="drawer-body"></div>
   </div>
 </div>
@@ -364,47 +373,111 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 // ═══════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════
-const HKO='https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
-const KMB='https://data.etabus.gov.hk/v1/transport/kmb';
-const WIKI='https://zh.wikipedia.org/api/rest_v1/feed/onthisday/selected';
+const HKO   = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
+const HKO_C = 'https://data.weather.gov.hk/weatherAPI/opendata/climate.php';
+const HKO_T = 'https://data.weather.gov.hk/weatherAPI/opendata/tide.php';
+const KMB   = 'https://data.etabus.gov.hk/v1/transport/kmb';
+const PROXY = url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
 
-const W_ICONS={
-  50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',
-  60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',
-  70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',
-  80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'
+// Correct rhrread station list with approx coordinates
+const RHRREAD_STNS = [
+  {n:'香港國際機場',lat:22.308,lng:113.920},
+  {n:'大澳',        lat:22.254,lng:113.858},
+  {n:'赤柱',        lat:22.218,lng:114.213},
+  {n:'長洲',        lat:22.210,lng:114.028},
+  {n:'啟德',        lat:22.328,lng:114.209},
+  {n:'九龍城',      lat:22.330,lng:114.188},
+  {n:'京士柏',      lat:22.312,lng:114.172},
+  {n:'坪洲',        lat:22.285,lng:114.058},
+  {n:'沙田',        lat:22.415,lng:114.210},
+  {n:'石崗',        lat:22.437,lng:114.079},
+  {n:'西貢',        lat:22.382,lng:114.274},
+  {n:'荃灣',        lat:22.371,lng:114.114},
+  {n:'屯門',        lat:22.391,lng:113.977},
+  {n:'黃竹坑',      lat:22.247,lng:114.175},
+  {n:'筲箕灣',      lat:22.278,lng:114.228},
+  {n:'鰂魚涌',      lat:22.288,lng:114.209},
+  {n:'黃大仙',      lat:22.342,lng:114.194},
+];
+
+// Tidal stations
+const TIDE_STNS = [
+  {n:'長洲',  code:'CCH',lat:22.210,lng:114.028},
+  {n:'赤鱲角',code:'CLK',lat:22.308,lng:113.920},
+  {n:'芝麻灣',code:'CMW',lat:22.265,lng:114.001},
+  {n:'葵涌',  code:'KCT',lat:22.352,lng:114.128},
+  {n:'高流灣',code:'KLW',lat:22.335,lng:114.335},
+  {n:'樂安排',code:'LOP',lat:22.450,lng:114.300},
+  {n:'馬灣',  code:'MWC',lat:22.355,lng:114.048},
+  {n:'鰂魚涌',code:'QUB',lat:22.288,lng:114.209},
+  {n:'石壁',  code:'SPW',lat:22.225,lng:114.003},
+  {n:'大澳',  code:'TAO',lat:22.254,lng:113.858},
+  {n:'尖鼻咀',code:'TBT',lat:22.467,lng:113.989},
+  {n:'大廟灣',code:'TMW',lat:22.198,lng:114.273},
+  {n:'大埔滘',code:'TPK',lat:22.445,lng:114.180},
+  {n:'橫瀾島',code:'WAG',lat:22.183,lng:114.303},
+];
+
+// Climate / radiation stations
+const CLIMATE_STNS = [
+  {n:'香港天文台',code:'HKO',lat:22.302,lng:114.174},
+  {n:'京士柏',    code:'KP', lat:22.312,lng:114.172},
+  {n:'九龍城',    code:'KLT',lat:22.330,lng:114.188},
+  {n:'觀塘',      code:'KTG',lat:22.313,lng:114.228},
+  {n:'流浮山',    code:'LFS',lat:22.469,lng:113.996},
+  {n:'將軍澳',    code:'JKB',lat:22.310,lng:114.257},
+  {n:'上水',      code:'SSH',lat:22.501,lng:114.129},
+  {n:'深水埗',    code:'SSP',lat:22.330,lng:114.163},
+  {n:'元朗公園',  code:'YLP',lat:22.445,lng:114.023},
+  {n:'清水灣',    code:'CWB',lat:22.320,lng:114.277},
+];
+
+// News RSS feeds
+const NEWS_FEEDS = {
+  local: {
+    name:'RTHK 本地新聞',
+    url:'https://rthk9.hk/rthk/ch/component/k2/1456456/latest100.rss',
+    fallback:'https://news.rthk.hk/rthk/ch/latest-news.rss'
+  },
+  world: {
+    name:'RTHK 國際新聞',
+    url:'https://rthk9.hk/rthk/ch/component/k2/1456459/latest100.rss',
+    fallback:'https://news.rthk.hk/rthk/ch/world-news.rss'
+  },
+  yahoo: {
+    name:'Yahoo 香港新聞',
+    url:'https://hk.news.yahoo.com/rss/',
+    fallback:'https://hk.news.yahoo.com/rss/hongkong'
+  }
 };
-const WARN_MAP={
-  WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',
-  WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'
+const TRAFFIC_FEEDS = {
+  td: {
+    name:'運輸署交通快訊',
+    url:'https://www.td.gov.hk/tc/transport_in_hong_kong/road_traffic_management/traffic_news/traffic_news_rss/rss.xml',
+    fallback:'https://resource.data.one.gov.hk/td/traffic-news/traffic-news-xml.xml'
+  },
+  rthk: {
+    name:'RTHK 交通消息',
+    url:'https://rthk9.hk/rthk/ch/component/k2/1456460/latest100.rss',
+    fallback:'https://news.rthk.hk/rthk/ch/traffic-news.rss'
+  }
 };
+
+const W_ICONS={50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'};
+const WARN_MAP={WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'};
 const AMB_WARNS=new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
 const DAY=['日','一','二','三','四','五','六'];
-const DAY_SHORT=['日','一','二','三','四','五','六'];
-const HKO_STNS=[
-  {n:'香港天文台',r:'油麻地',lat:22.302,lng:114.174},
-  {n:'青衣',r:'葵青',lat:22.340,lng:114.104},
-  {n:'沙田',r:'沙田',lat:22.415,lng:114.210},
-  {n:'大埔',r:'大埔',lat:22.451,lng:114.171},
-  {n:'西貢',r:'西貢',lat:22.382,lng:114.274},
-  {n:'將軍澳',r:'西貢',lat:22.310,lng:114.257},
-  {n:'屯門',r:'屯門',lat:22.391,lng:113.977},
-  {n:'元朗',r:'元朗',lat:22.445,lng:114.023},
-  {n:'石崗',r:'元朗',lat:22.437,lng:114.079},
-  {n:'上水',r:'北區',lat:22.501,lng:114.129},
-  {n:'打鼓嶺',r:'北區',lat:22.535,lng:114.148},
-  {n:'長洲',r:'離島',lat:22.210,lng:114.028},
-  {n:'赤鱲角',r:'離島',lat:22.308,lng:113.920},
-  {n:'流浮山',r:'元朗',lat:22.469,lng:113.996},
-  {n:'橫瀾島',r:'海上',lat:22.183,lng:114.303},
-];
 const NEARBY_PID='__nearby__';
-const DIST_OPTIONS=[10,50,100,200,500,1000];
 const pad=n=>String(n).padStart(2,'0');
 
 function haverDist(la1,ln1,la2,ln2){
   const R=6371000,r=Math.PI/180,dLa=(la2-la1)*r,dLn=(ln2-ln1)*r;
   return 2*R*Math.asin(Math.sqrt(Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLn/2)**2));
+}
+function nearestOf(list,lat,lng){
+  let best=list[0],minD=Infinity;
+  list.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lng-lng);if(d<minD){minD=d;best=s}});
+  return best;
 }
 function num(v){
   if(v==null)return null;
@@ -415,9 +488,17 @@ function num(v){
 }
 function hkoFind(arr,stn){
   if(!Array.isArray(arr)||!arr.length)return null;
-  return arr.find(d=>d.place===stn)??arr.find(d=>d.place==='香港天文台')??arr[0];
+  return arr.find(d=>d.place===stn)??arr[0];
 }
 function esc(s){return(s||'').replace(/'/g,"\\'")}
+function relTime(dateStr){
+  if(!dateStr)return'';
+  const d=new Date(dateStr);if(isNaN(d))return'';
+  const diff=Math.round((Date.now()-d)/60000);
+  if(diff<1)return'剛才';if(diff<60)return diff+'分鐘前';
+  if(diff<1440)return Math.round(diff/60)+'小時前';
+  return Math.round(diff/1440)+'天前';
+}
 
 // ═══════════════════════════════════
 //  STORAGE
@@ -430,11 +511,7 @@ function loadProfiles(){
 }
 function saveProfiles(p){localStorage.setItem('profiles_v2',JSON.stringify(p))}
 function loadFavs(pid){return JSON.parse(localStorage.getItem('favs_'+pid)||'[]')}
-function saveFavs(pid,arr){
-  localStorage.setItem('favs_'+pid,JSON.stringify(
-    arr.map(({route,stopId,stopName,dest,serviceType})=>({route,stopId,stopName,dest,serviceType}))
-  ));
-}
+function saveFavs(pid,arr){localStorage.setItem('favs_'+pid,JSON.stringify(arr.map(({route,stopId,stopName,dest,serviceType})=>({route,stopId,stopName,dest,serviceType}))))}
 function loadAutoTabs(){return JSON.parse(localStorage.getItem('auto_tabs')||'{}')}
 function saveAutoTabs(o){localStorage.setItem('auto_tabs',JSON.stringify(o))}
 
@@ -444,12 +521,18 @@ if(!profiles.find(p=>p.id===activePid))activePid=profiles[0]?.id||'';
 function setActivePid(pid){activePid=pid;localStorage.setItem('active_pid',pid)}
 
 let favs=loadFavs(activePid);
-let selectedStn=localStorage.getItem('hko_stn')||'香港天文台';
+let selectedStn=localStorage.getItem('hko_stn')||'京士柏'; // default to central station
 let refreshing=false;
 let etaMode=localStorage.getItem('eta_mode')||'mins';
 let allStops=null;
 let nearbyLat=null,nearbyLng=null;
 let nearbyDist=parseInt(localStorage.getItem('nearby_dist')||'500');
+
+let currentNewsFeed='all';
+let currentTrafficFeed='all';
+let newsCache={};
+let trafficCache={};
+let historyLoaded=false;
 
 // ═══════════════════════════════════
 //  PAGE NAVIGATION
@@ -459,11 +542,9 @@ function switchPage(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
-  if(name==='settings'){
-    document.getElementById('sett-stn-sub').textContent=selectedStn;
-    renderAutoTabSettings();
-    loadTodayHistory();
-  }
+  if(name==='news'){ensureNewsFeedLoaded(currentNewsFeed).then(renderNewsFeed)}
+  if(name==='traffic'){ensureTrafficFeedLoaded(currentTrafficFeed).then(renderTrafficFeed)}
+  if(name==='settings'){document.getElementById('sett-stn-sub').textContent=selectedStn;renderAutoTabSettings();loadTodayHistory()}
 }
 
 // ═══════════════════════════════════
@@ -477,52 +558,37 @@ function tickClock(){
 tickClock();setInterval(tickClock,1000);
 
 // ═══════════════════════════════════
-//  AUTO-TAB SWITCHING
-// ═══════════════════════════════════
-function checkAutoTab(){
-  const cfg=loadAutoTabs();
-  const now=new Date();
-  const dow=now.getDay(); // 0=Sun
-  const hhmm=now.getHours()*60+now.getMinutes();
-  for(const p of profiles){
-    const c=cfg[p.id];
-    if(!c||!c.enabled)continue;
-    const days=c.days||[];
-    if(!days[dow])continue;
-    const [fh,fm]=(c.from||'00:00').split(':').map(Number);
-    const [th,tm]=(c.to||'23:59').split(':').map(Number);
-    const from=fh*60+fm, to=th*60+tm;
-    if(hhmm>=from&&hhmm<=to){
-      setActivePid(p.id);
-      favs=loadFavs(p.id);
-      return;
-    }
-  }
-}
-
-// ═══════════════════════════════════
-//  AUTO LOCATE
+//  AUTO LOCATE → nearest rhrread station
 // ═══════════════════════════════════
 function autoLocate(){
-  if(location.protocol==='file:')return;
+  if(location.protocol==='file:'){document.getElementById('w-loc-lbl').textContent=selectedStn;return}
   if(!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(pos=>{
     const{latitude:lat,longitude:lng}=pos.coords;
     nearbyLat=lat;nearbyLng=lng;
-    let near=HKO_STNS[0],minD=Infinity;
-    HKO_STNS.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lng-lng);if(d<minD){minD=d;near=s}});
-    if(near.n!==selectedStn){
-      selectedStn=near.n;localStorage.setItem('hko_stn',near.n);
-      loadWeather();
-    }
+    const near=nearestOf(RHRREAD_STNS,lat,lng);
+    if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather()}
     document.getElementById('w-loc-lbl').textContent=selectedStn;
-  },()=>{
-    document.getElementById('w-loc-lbl').textContent=selectedStn;
-  },{timeout:8000,maximumAge:60000});
+  },()=>{document.getElementById('w-loc-lbl').textContent=selectedStn},{timeout:8000,maximumAge:60000});
 }
 
 // ═══════════════════════════════════
-//  WEATHER
+//  AUTO-TAB CHECK
+// ═══════════════════════════════════
+function checkAutoTab(){
+  const cfg=loadAutoTabs();const now=new Date();
+  const dow=now.getDay(),hhmm=now.getHours()*60+now.getMinutes();
+  for(const p of profiles){
+    const c=cfg[p.id];if(!c||!c.enabled)continue;
+    if(!c.days[dow])continue;
+    const[fh,fm]=(c.from||'00:00').split(':').map(Number);
+    const[th,tm]=(c.to||'23:59').split(':').map(Number);
+    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm){setActivePid(p.id);favs=loadFavs(p.id);return}
+  }
+}
+
+// ═══════════════════════════════════
+//  WEATHER (enhanced)
 // ═══════════════════════════════════
 async function loadWeather(){
   try{
@@ -531,65 +597,294 @@ async function loadWeather(){
       fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
     ]);
-    const tv=num(hkoFind(rhr.temperature?.data,selectedStn)?.value);
-    document.getElementById('w-temp').textContent=tv??'--';
+    // Temp from nearest rhrread station
+    const te=hkoFind(rhr.temperature?.data,selectedStn);
+    document.getElementById('w-temp').textContent=num(te?.value)??'--';
     document.getElementById('w-loc-lbl').textContent=selectedStn;
     document.getElementById('sett-stn-sub').textContent=selectedStn;
-    const iconCode=Array.isArray(rhr.icon)?rhr.icon[0]:rhr.icon;
-    document.getElementById('w-icon').textContent=W_ICONS[iconCode]??'🌡';
+    // Icon
+    const ic=Array.isArray(rhr.icon)?rhr.icon[0]:rhr.icon;
+    document.getElementById('w-icon').textContent=W_ICONS[ic]??'🌡';
+    // Warnings
     const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
-    document.getElementById('w-warns').innerHTML=aw.map(k=>
-      `<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`
-    ).join('');
+    document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
+    // Description
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
+    // Forecast strip
     const fcs=flw.weatherForecast||[];
     document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
       const ds=String(f.forecastDate);
       const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
       const hl=i===1||i===2;
-      return`<div class="fc${hl?' hl':''}">
-        <div class="fc-lbl${hl?' named':''}">${lbl}</div>
-        <div class="fc-ico">${W_ICONS[f.forecastWeather??f.forecastIcon]??'🌡'}</div>
-        <div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div>
-      </div>`;
+      return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
     }).join('');
+    // Load extra weather data in background
+    loadExtraWeather();
   }catch(e){console.warn('[weather]',e)}
 }
 
+async function loadExtraWeather(){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth()+1,d=now.getDate();
+  const chips=[];
+
+  // 1. Humidity from rhrread (same call we already have, just read it)
+  try{
+    const rhr=await fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json());
+    const he=hkoFind(rhr.humidity?.data,selectedStn);
+    const hv=num(he?.value);
+    if(hv!=null)chips.push({lbl:'濕度',val:`${hv}<span style="font-size:10px">%</span>`,sub:selectedStn});
+  }catch{}
+
+  // 2. Tidal high/low times for today
+  if(nearbyLat){
+    try{
+      const tstn=nearestOf(TIDE_STNS,nearbyLat,nearbyLng);
+      const tdata=await fetch(`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json());
+      // HLT returns array of {date, time, height, type} — filter today
+      const today=tdata.data?.filter(t=>parseInt(t.date)===d)||[];
+      if(today.length){
+        const highs=today.filter(t=>t.type==='H'||t.type==='高');
+        const lows=today.filter(t=>t.type==='L'||t.type==='低');
+        const tStr=[...highs.slice(0,2).map(t=>`↑${t.time}`), ...lows.slice(0,2).map(t=>`↓${t.time}`)].join(' ');
+        if(tStr)chips.push({lbl:`潮汐 (${tstn.n})`,val:tStr,sub:`高 ${highs[0]?.height??'--'}m`});
+      }
+    }catch{}
+  }
+
+  // 3. Monthly climate normals (avg/max/min) from nearest station
+  if(nearbyLat){
+    try{
+      const cstn=nearestOf(CLIMATE_STNS,nearbyLat,nearbyLng);
+      const[avgD,maxD,minD]=await Promise.all([
+        fetch(`${HKO_C}?dataType=CLMTEMP&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
+        fetch(`${HKO_C}?dataType=CLMMAXT&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
+        fetch(`${HKO_C}?dataType=CLMMINT&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
+      ]);
+      // Each returns {data:[{year,month,value}]} or similar
+      const getV=obj=>{
+        if(!obj)return null;
+        const arr=obj.data||obj.ClimateData||[];
+        if(Array.isArray(arr)&&arr.length)return num(arr[arr.length-1]?.value??arr[arr.length-1]?.meanTemp??arr[0]?.value);
+        return num(obj.value);
+      };
+      const avg=getV(avgD),maxt=getV(maxD),mint=getV(minD);
+      if(avg!=null||maxt!=null){
+        chips.push({
+          lbl:`月均氣溫 (${cstn.n})`,
+          val:avg!=null?`${avg}°`:'--°',
+          sub:`↑${maxt??'--'}° ↓${mint??'--'}°`
+        });
+      }
+    }catch{}
+  }
+
+  // 4. Radiation (RYES - yesterday's)
+  if(nearbyLat){
+    try{
+      const cstn=nearestOf(CLIMATE_STNS,nearbyLat,nearbyLng);
+      const rdata=await fetch(`${HKO_C}?dataType=RYES&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null);
+      if(rdata){
+        const arr=rdata.data||[];
+        const latest=arr[arr.length-1];
+        const rv=num(latest?.value??latest?.radiation);
+        if(rv!=null)chips.push({lbl:`輻射 昨日 (${cstn.n})`,val:`${rv}<span style="font-size:9px"> MJ/m²</span>`,sub:'日總輻射量'});
+      }
+    }catch{}
+  }
+
+  // Render chips
+  const el=document.getElementById('w-extra');
+  if(!chips.length){el.innerHTML='';return}
+  el.innerHTML=chips.map(c=>`<div class="wx-chip"><div class="wx-chip-lbl">${c.lbl}</div><div class="wx-chip-val">${c.val}</div><div class="wx-chip-sub">${c.sub}</div></div>`).join('');
+}
+
 // ═══════════════════════════════════
-//  TODAY IN HISTORY (Wikipedia)
+//  RSS FETCHING
 // ═══════════════════════════════════
-let historyLoaded=false;
+async function fetchRSS(feedCfg){
+  // Try primary URL first, then fallback
+  for(const url of [feedCfg.url, feedCfg.fallback]){
+    try{
+      const res=await fetch(PROXY(url),{signal:AbortSignal.timeout(8000)});
+      const text=await res.text();
+      if(!text||text.startsWith('{')){continue} // allorigins error
+      const parser=new DOMParser();
+      const xml=parser.parseFromString(text,'text/xml');
+      if(xml.querySelector('parsererror'))continue;
+      const items=[...xml.querySelectorAll('item,entry')];
+      if(!items.length)continue;
+      return items.slice(0,40).map(item=>{
+        const gs=t=>item.querySelector(t)?.textContent?.trim()||'';
+        const link=gs('link')||item.querySelector('link')?.getAttribute('href')||'';
+        const desc=gs('description')||gs('summary');
+        return{title:gs('title'),link,pubDate:gs('pubDate')||gs('published')||gs('updated'),description:desc.replace(/<[^>]+>/g,'').slice(0,120)};
+      }).filter(i=>i.title);
+    }catch(e){continue}
+  }
+  return null;
+}
+
+function renderFeedItems(items,el){
+  if(!items||!items.length){el.innerHTML=`<div class="feed-err">⚠️ 無法載入資料<br><small style="color:var(--dim)">請檢查網絡連線，或 RSS 來源暫時不可用</small></div>`;return}
+  el.innerHTML=items.map((item,i)=>`
+    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.02}s">
+      <div class="feed-item-title">${item.title}</div>
+      ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
+      <div class="feed-item-meta">
+        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
+      </div>
+    </a>`).join('');
+}
+
+// ═══════════════════════════════════
+//  NEWS
+// ═══════════════════════════════════
+function switchNewsFeed(key){
+  currentNewsFeed=key;
+  document.querySelectorAll('[id^=ntab-]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ntab-'+key).classList.add('active');
+  renderNewsFeed();
+}
+async function loadNewsFeed(key){
+  if(key==='all'){
+    // load all three in parallel
+    await Promise.all(['local','world','yahoo'].map(k=>loadNewsFeed(k)));
+    return;
+  }
+  const items=await fetchRSS(NEWS_FEEDS[key]);
+  if(items)newsCache[key]=items.map(i=>({...i,_src:key}));
+}
+async function ensureNewsFeedLoaded(key){
+  if(key==='all'){
+    const missing=['local','world','yahoo'].filter(k=>!newsCache[k]);
+    if(missing.length)await Promise.all(missing.map(k=>loadNewsFeed(k)));
+  } else {
+    if(!newsCache[key])await loadNewsFeed(key);
+  }
+}
+function getMergedNews(){
+  const all=[];
+  ['local','world','yahoo'].forEach(k=>{
+    (newsCache[k]||[]).forEach(i=>all.push(i));
+  });
+  return all.sort((a,b)=>{
+    const ta=a.pubDate?new Date(a.pubDate).getTime():0;
+    const tb=b.pubDate?new Date(b.pubDate).getTime():0;
+    return tb-ta;
+  });
+}
+const SRC_LABEL={'local':'RTHK本地','world':'RTHK國際','yahoo':'Yahoo'};
+const SRC_COLOR={'local':'#5b8fff','world':'#2ed573','yahoo':'#ff6b35'};
+function renderNewsFeed(){
+  const el=document.getElementById('news-list');
+  const key=currentNewsFeed;
+  const items=key==='all'?getMergedNews():newsCache[key];
+  if(!items){el.innerHTML=`<div class="spinner"></div>`;return}
+  if(!items.length){el.innerHTML=`<div class="feed-err">⚠️ 無法載入資料<br><small style="color:var(--dim)">請檢查網絡連線，或 RSS 來源暫時不可用</small></div>`;return}
+  el.innerHTML=items.slice(0,60).map((item,i)=>`
+    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.015}s">
+      <div class="feed-item-title">${item.title}</div>
+      ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
+      <div class="feed-item-meta">
+        ${item._src&&key==='all'?`<span style="font-size:10px;font-weight:700;color:${SRC_COLOR[item._src]};font-family:var(--mono);letter-spacing:.04em">${SRC_LABEL[item._src]}</span>`:''}
+        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
+      </div>
+    </a>`).join('');
+}
+async function reloadNewsFeed(){
+  if(currentNewsFeed==='all'){['local','world','yahoo'].forEach(k=>delete newsCache[k])}
+  else delete newsCache[currentNewsFeed];
+  document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
+  await ensureNewsFeedLoaded(currentNewsFeed);
+  renderNewsFeed();
+}
+
+// ═══════════════════════════════════
+//  TRAFFIC
+// ═══════════════════════════════════
+function switchTrafficFeed(key){
+  currentTrafficFeed=key;
+  document.querySelectorAll('[id^=ttab-]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ttab-'+key).classList.add('active');
+  renderTrafficFeed();
+}
+async function loadTrafficFeed(key){
+  if(key==='all'){
+    await Promise.all(['td','rthk'].map(k=>loadTrafficFeed(k)));
+    return;
+  }
+  const items=await fetchRSS(TRAFFIC_FEEDS[key]);
+  if(items)trafficCache[key]=items.map(i=>({...i,_src:key}));
+}
+async function ensureTrafficFeedLoaded(key){
+  if(key==='all'){
+    const missing=['td','rthk'].filter(k=>!trafficCache[k]);
+    if(missing.length)await Promise.all(missing.map(k=>loadTrafficFeed(k)));
+  } else {
+    if(!trafficCache[key])await loadTrafficFeed(key);
+  }
+}
+function getMergedTraffic(){
+  const all=[];
+  ['td','rthk'].forEach(k=>{(trafficCache[k]||[]).forEach(i=>all.push(i))});
+  return all.sort((a,b)=>{
+    const ta=a.pubDate?new Date(a.pubDate).getTime():0;
+    const tb=b.pubDate?new Date(b.pubDate).getTime():0;
+    return tb-ta;
+  });
+}
+const TSRC_LABEL={'td':'運輸署','rthk':'RTHK'};
+const TSRC_COLOR={'td':'#f0a500','rthk':'#5b8fff'};
+function renderTrafficFeed(){
+  const el=document.getElementById('traffic-list');
+  const key=currentTrafficFeed;
+  const items=key==='all'?getMergedTraffic():trafficCache[key];
+  if(!items){el.innerHTML=`<div class="spinner"></div>`;return}
+  if(!items.length){el.innerHTML=`<div class="feed-err">⚠️ 無法載入資料<br><small style="color:var(--dim)">請檢查網絡連線，或來源暫時不可用</small></div>`;return}
+  el.innerHTML=items.slice(0,60).map((item,i)=>`
+    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.015}s">
+      <div class="feed-item-title">${item.title}</div>
+      ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
+      <div class="feed-item-meta">
+        ${item._src&&key==='all'?`<span style="font-size:10px;font-weight:700;color:${TSRC_COLOR[item._src]};font-family:var(--mono);letter-spacing:.04em">${TSRC_LABEL[item._src]}</span>`:''}
+        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
+      </div>
+    </a>`).join('');
+}
+async function reloadTrafficFeed(){
+  if(currentTrafficFeed==='all'){['td','rthk'].forEach(k=>delete trafficCache[k])}
+  else delete trafficCache[currentTrafficFeed];
+  document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
+  await ensureTrafficFeedLoaded(currentTrafficFeed);
+  renderTrafficFeed();
+}
+
+// ═══════════════════════════════════
+//  TODAY IN HISTORY
+// ═══════════════════════════════════
 async function loadTodayHistory(){
   if(historyLoaded)return;
   const el=document.getElementById('history-card');
-  const now=new Date();
-  const month=now.getMonth()+1, day=now.getDate();
-  const monthNames=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-  const dateStr=`${monthNames[month-1]}${day}日`;
+  const now=new Date(),mo=now.getMonth()+1,d=now.getDate();
+  const mNames=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  const dateStr=`${mNames[mo-1]}${d}日`;
   try{
-    // Try Chinese Wikipedia selected events
-    const r=await fetch(`${WIKI}/${month}/${day}`).then(x=>x.json()).catch(()=>null);
-    let events=(r?.selected||r?.events||[]);
+    let events=[];
+    // Try Chinese Wikipedia first
+    const r=await fetch(`https://zh.wikipedia.org/api/rest_v1/feed/onthisday/selected/${mo}/${d}`,{signal:AbortSignal.timeout(6000)}).then(x=>x.json()).catch(()=>null);
+    events=r?.selected||r?.events||[];
     if(!events.length){
-      // fallback to English Wikipedia
-      const r2=await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/${month}/${day}`).then(x=>x.json()).catch(()=>null);
+      const r2=await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/${mo}/${d}`,{signal:AbortSignal.timeout(6000)}).then(x=>x.json()).catch(()=>null);
       events=r2?.selected||r2?.events||[];
     }
     if(!events.length){el.innerHTML=`<div class="history-date">${dateStr}</div><div class="history-text" style="color:var(--mid)">暫無資料</div>`;return}
-    // pick one with interesting year (prefer older events for historical feel)
     const sorted=[...events].sort((a,b)=>a.year-b.year);
     const pick=sorted[Math.floor(Math.random()*Math.min(5,sorted.length))];
     const text=pick.text||pick.pages?.[0]?.description||'';
     historyLoaded=true;
-    el.innerHTML=`
-      <div class="history-date">${dateStr} · 歷史上的今天</div>
-      <div class="history-year">${pick.year}</div>
-      <div class="history-text">${text}</div>
-      <div class="history-src">資料來源：維基百科</div>`;
-  }catch(e){
-    el.innerHTML=`<div class="history-date">${dateStr}</div><div class="history-text" style="color:var(--mid)">無法載入歷史資料</div>`;
-  }
+    el.innerHTML=`<div class="history-date">${dateStr} · 歷史上的今天</div><div class="history-year">${pick.year}</div><div class="history-text">${text}</div><div class="history-src">資料來源：維基百科</div>`;
+  }catch{el.innerHTML=`<div class="history-date">${dateStr}</div><div class="history-text" style="color:var(--mid)">無法載入歷史資料</div>`}
 }
 
 // ═══════════════════════════════════
@@ -597,20 +892,16 @@ async function loadTodayHistory(){
 // ═══════════════════════════════════
 function renderAutoTabSettings(){
   const cfg=loadAutoTabs();
-  const container=document.getElementById('auto-tab-list');
-  container.innerHTML=profiles.map(p=>{
+  document.getElementById('auto-tab-list').innerHTML=profiles.map(p=>{
     const c=cfg[p.id]||{enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};
-    const daysHtml=DAY_SHORT.map((d,i)=>
-      `<button class="day-btn${c.days[i]?' on':''}" onclick="toggleAutoDay('${p.id}',${i},this)">${d}</button>`
-    ).join('');
-    return`<div class="auto-tab-card" id="atc-${p.id}">
+    return`<div class="auto-tab-card">
       <div class="auto-tab-hdr">
         <div class="auto-tab-name">${p.name}</div>
         <label class="toggle"><input type="checkbox" ${c.enabled?'checked':''} onchange="toggleAutoEnable('${p.id}',this)"><span class="toggle-slider"></span></label>
       </div>
       <div class="auto-tab-body" id="atb-${p.id}" style="${c.enabled?'':'opacity:.4;pointer-events:none'}">
-        <div style="font-size:11px;color:var(--mid);margin-bottom:7px">啟用日子</div>
-        <div class="days-row">${daysHtml}</div>
+        <div style="font-size:10px;color:var(--mid);margin-bottom:7px;letter-spacing:.05em">啟用日子</div>
+        <div class="days-row">${DAY.map((d,i)=>`<button class="day-btn${c.days[i]?' on':''}" onclick="toggleAutoDay('${p.id}',${i},this)">${d}</button>`).join('')}</div>
         <div class="time-row">
           <span class="time-lbl">時間：</span>
           <input class="time-inp" type="time" value="${c.from}" onchange="updateAutoTime('${p.id}','from',this.value)">
@@ -621,102 +912,57 @@ function renderAutoTabSettings(){
     </div>`;
   }).join('');
 }
-
-function toggleAutoEnable(pid,el){
-  const cfg=loadAutoTabs();
-  if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};
-  cfg[pid].enabled=el.checked;
-  saveAutoTabs(cfg);
-  const body=document.getElementById('atb-'+pid);
-  if(body)body.style.cssText=el.checked?'':'opacity:.4;pointer-events:none';
-}
-function toggleAutoDay(pid,idx,el){
-  const cfg=loadAutoTabs();
-  if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};
-  cfg[pid].days[idx]=!cfg[pid].days[idx];
-  el.classList.toggle('on',cfg[pid].days[idx]);
-  saveAutoTabs(cfg);
-}
-function updateAutoTime(pid,field,val){
-  const cfg=loadAutoTabs();
-  if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};
-  cfg[pid][field]=val;
-  saveAutoTabs(cfg);
-}
+function toggleAutoEnable(pid,el){const cfg=loadAutoTabs();if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};cfg[pid].enabled=el.checked;saveAutoTabs(cfg);const b=document.getElementById('atb-'+pid);if(b)b.style.cssText=el.checked?'':'opacity:.4;pointer-events:none'}
+function toggleAutoDay(pid,idx,el){const cfg=loadAutoTabs();if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};cfg[pid].days[idx]=!cfg[pid].days[idx];el.classList.toggle('on',cfg[pid].days[idx]);saveAutoTabs(cfg)}
+function updateAutoTime(pid,field,val){const cfg=loadAutoTabs();if(!cfg[pid])cfg[pid]={enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};cfg[pid][field]=val;saveAutoTabs(cfg)}
 
 // ═══════════════════════════════════
 //  REFRESH
 // ═══════════════════════════════════
 async function doRefresh(){
-  if(refreshing)return;
-  refreshing=true;
-  const btn=document.getElementById('refresh-btn');
-  btn.classList.add('spinning');
+  if(refreshing)return;refreshing=true;
+  const btn=document.getElementById('refresh-btn');btn.classList.add('spinning');
   if(activePid===NEARBY_PID)await Promise.all([loadWeather(),loadNearby()]);
   else await Promise.all([loadWeather(),refreshAllETAs()]);
-  btn.classList.remove('spinning');
-  refreshing=false;
+  btn.classList.remove('spinning');refreshing=false;
 }
 
 // ═══════════════════════════════════
 //  ETA MODE
 // ═══════════════════════════════════
 function toggleEtaMode(){
-  etaMode=etaMode==='mins'?'clock':'mins';
-  localStorage.setItem('eta_mode',etaMode);
+  etaMode=etaMode==='mins'?'clock':'mins';localStorage.setItem('eta_mode',etaMode);
   const btn=document.getElementById('eta-mode-btn');
-  if(etaMode==='mins'){btn.textContent='⏱ 距離時間';btn.classList.add('mins')}
-  else{btn.textContent='🕐 到站時間';btn.classList.remove('mins')}
+  if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}
   if(activePid===NEARBY_PID)loadNearby();else renderBusList();
 }
 
 // ═══════════════════════════════════
 //  DISTANCE SELECTOR
 // ═══════════════════════════════════
-function setDist(m){
-  nearbyDist=m;
-  localStorage.setItem('nearby_dist',m);
-  document.querySelectorAll('.dist-pill').forEach(p=>{
-    p.classList.toggle('active',parseInt(p.dataset.m)===m);
-  });
-  loadNearby();
-}
-function syncDistPills(){
-  document.querySelectorAll('.dist-pill').forEach(p=>{
-    p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist);
-  });
-}
+function setDist(m){nearbyDist=m;localStorage.setItem('nearby_dist',m);document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===m));loadNearby()}
+function syncDistPills(){document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist))}
 
 // ═══════════════════════════════════
-//  LOCATION PICKER
+//  LOCATION PICKER (uses rhrread station list)
 // ═══════════════════════════════════
 function openLocPicker(){
   setDTitle('天氣地點');
   const isFile=location.protocol==='file:';
   document.getElementById('drawer-body').innerHTML=`
-    ${isFile
-      ?`<div class="loc-note" style="font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6">💡 以 <strong style="color:var(--amb2)">file://</strong> 開啟時瀏覽器封鎖定位，請手動選擇，或部署至網絡後可自動定位。</div>`
-      :`<button class="loc-gps-btn" id="gps-btn" onclick="useGPS()">📡 用我的位置自動選擇</button>`
-    }
-    <div class="sec-lbl">手動選擇天文台站</div>
-    <div class="loc-grid">
-      ${HKO_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')">
-        <div class="loc-name">${s.n}</div><div class="loc-reg">${s.r}</div>
-      </div>`).join('')}
-    </div>`;
+    ${isFile?`<div style="font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6">💡 以 <strong style="color:var(--amb2)">file://</strong> 開啟時瀏覽器封鎖定位，請手動選擇。</div>`:
+      `<button class="loc-gps-btn" id="gps-btn" onclick="useGPS()">📡 用我的位置自動選擇</button>`}
+    <div class="sec-lbl">香港天文台即時測站（rhrread）</div>
+    <div class="loc-grid">${RHRREAD_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')"><div class="loc-name">${s.n}</div></div>`).join('')}</div>`;
   openOverlay();
 }
 function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer();loadWeather();document.getElementById('sett-stn-sub').textContent=n}
 function useGPS(){
   if(!navigator.geolocation){alert('不支援定位');return}
-  const btn=document.getElementById('gps-btn');
-  btn.textContent='📡 定位中…';btn.style.opacity='.6';
+  const btn=document.getElementById('gps-btn');btn.textContent='📡 定位中…';btn.style.opacity='.6';
   navigator.geolocation.getCurrentPosition(pos=>{
-    const{latitude:lat,longitude:lng}=pos.coords;
-    nearbyLat=lat;nearbyLng=lng;
-    let near=HKO_STNS[0],minD=Infinity;
-    HKO_STNS.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lng-lng);if(d<minD){minD=d;near=s}});
-    pickStn(near.n);
+    const{latitude:lat,longitude:lng}=pos.coords;nearbyLat=lat;nearbyLng=lng;
+    const near=nearestOf(RHRREAD_STNS,lat,lng);pickStn(near.n);
   },()=>{btn.textContent='❌ 定位失敗，請手動選擇';btn.style.opacity='1'},{timeout:10000});
 }
 
@@ -725,62 +971,35 @@ function useGPS(){
 // ═══════════════════════════════════
 function renderProfiles(){
   const bar=document.getElementById('profiles-bar');
-  const nb=activePid===NEARBY_PID;
   bar.innerHTML=
-    `<button class="profile-tab nearby-tab${nb?' active':''}" onclick="switchToNearby()">📍 附近</button>`+
-    profiles.map((p,i)=>
-      `<button class="profile-tab${p.id===activePid?' active':''}" data-idx="${i}" data-pid="${p.id}"
-        onclick="switchProfile('${p.id}')">${p.name}</button>`
-    ).join('')+
+    `<button class="profile-tab nearby-tab${activePid===NEARBY_PID?' active':''}" onclick="switchToNearby()">📍 附近</button>`+
+    profiles.map((p,i)=>`<button class="profile-tab${p.id===activePid?' active':''}" data-idx="${i}" data-pid="${p.id}" onclick="switchProfile('${p.id}')">${p.name}</button>`).join('')+
     `<button class="add-profile-btn" onclick="addProfile()">＋</button>`;
-
   bar.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach(tab=>{
-    let pt=null;
-    const idx=()=>parseInt(tab.dataset.idx);
+    let pt=null;const idx=()=>parseInt(tab.dataset.idx);
     tab.addEventListener('touchstart',e=>{pt=setTimeout(()=>{pt=null;renameProfile(idx())},600);tabDragStart(e,idx())},{passive:true});
     tab.addEventListener('touchend',()=>{if(pt){clearTimeout(pt);pt=null}},{passive:true});
     tab.addEventListener('touchmove',()=>{if(pt){clearTimeout(pt);pt=null}},{passive:true});
   });
-
-  const isNearby=activePid===NEARBY_PID;
-  document.getElementById('add-route-btn').style.display=isNearby?'none':'';
-  document.getElementById('dist-row').style.display=isNearby?'':'none';
-  document.getElementById('bus-hdr-lbl').textContent=isNearby?`${nearbyDist}米內到站時間`:'到站時間';
+  const nb=activePid===NEARBY_PID;
+  document.getElementById('add-route-btn').style.display=nb?'none':'';
+  document.getElementById('dist-row').style.display=nb?'':'none';
+  document.getElementById('bus-hdr-lbl').textContent=nb?`${nearbyDist}米內到站時間`:'到站時間';
 }
-
 function switchProfile(pid){setActivePid(pid);favs=loadFavs(pid);renderProfiles();refreshAllETAs()}
 function switchToNearby(){setActivePid(NEARBY_PID);renderProfiles();syncDistPills();loadNearby()}
-
 function addProfile(){
   setDTitle('新增版面');
-  document.getElementById('drawer-body').innerHTML=`
-    <div class="sec-lbl">版面名稱</div>
-    <div class="search-row">
-      <input class="d-input plain" id="pname-inp" placeholder="如：上班、週末…" maxlength="10">
-      <button class="d-btn" onclick="confirmAddProfile()">確定</button>
-    </div>`;
+  document.getElementById('drawer-body').innerHTML=`<div class="sec-lbl">版面名稱</div><div class="search-row"><input class="d-input plain" id="pname-inp" placeholder="如：上班、週末…" maxlength="10"><button class="d-btn" onclick="confirmAddProfile()">確定</button></div>`;
   openOverlay();setTimeout(()=>document.getElementById('pname-inp')?.focus(),260);
 }
-function confirmAddProfile(){
-  const name=(document.getElementById('pname-inp')?.value||'').trim();if(!name)return;
-  const id='p_'+Date.now();profiles.push({id,name});saveProfiles(profiles);saveFavs(id,[]);
-  closeDrawer();switchProfile(id);
-}
+function confirmAddProfile(){const name=(document.getElementById('pname-inp')?.value||'').trim();if(!name)return;const id='p_'+Date.now();profiles.push({id,name});saveProfiles(profiles);saveFavs(id,[]);closeDrawer();switchProfile(id)}
 function renameProfile(idx){
   const p=profiles[idx];setDTitle('編輯版面');
-  document.getElementById('drawer-body').innerHTML=`
-    <div class="sec-lbl">版面名稱</div>
-    <div class="rename-row" style="display:flex;gap:8px;margin-bottom:12px">
-      <input class="d-input plain" id="rename-inp" value="${p.name}" maxlength="10">
-      <button class="d-btn" onclick="confirmRename(${idx})">儲存</button>
-    </div>
-    ${profiles.length>1?`<button class="del-btn" onclick="deleteProfile(${idx})">🗑 刪除此版面</button>`:''}`;
+  document.getElementById('drawer-body').innerHTML=`<div class="sec-lbl">版面名稱</div><div class="rename-row"><input class="d-input plain" id="rename-inp" value="${p.name}" maxlength="10"><button class="d-btn" onclick="confirmRename(${idx})">儲存</button></div>${profiles.length>1?`<button class="del-btn" onclick="deleteProfile(${idx})">🗑 刪除此版面</button>`:''}`;
   openOverlay();setTimeout(()=>{const el=document.getElementById('rename-inp');el?.focus();el?.select()},260);
 }
-function confirmRename(idx){
-  const name=(document.getElementById('rename-inp')?.value||'').trim();if(!name)return;
-  profiles[idx].name=name;saveProfiles(profiles);closeDrawer();renderProfiles();
-}
+function confirmRename(idx){const name=(document.getElementById('rename-inp')?.value||'').trim();if(!name)return;profiles[idx].name=name;saveProfiles(profiles);closeDrawer();renderProfiles()}
 function deleteProfile(idx){
   if(!confirm(`確定刪除「${profiles[idx].name}」？`))return;
   const pid=profiles[idx].id;localStorage.removeItem('favs_'+pid);
@@ -789,29 +1008,11 @@ function deleteProfile(idx){
   if(activePid===pid){setActivePid(profiles[0]?.id||'');favs=loadFavs(activePid)}
   renderProfiles();refreshAllETAs();
 }
-
 // Tab drag
 let TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cL:0,cT:0};
-function tabDragStart(e,idx){
-  const bar=document.getElementById('profiles-bar');
-  const tabs=bar.querySelectorAll('.profile-tab:not(.nearby-tab)');
-  const tab=tabs[idx];if(!tab)return;
-  const r=tab.getBoundingClientRect();
-  TD={on:false,idx,to:idx,clone:null,startX:e.touches[0].clientX,tabW:r.width+6,cL:r.left,cT:r.top};
-  TD._p=()=>{TD.on=true;const cl=tab.cloneNode(true);cl.className='float-clone profile-tab active';cl.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;document.body.appendChild(cl);TD.clone=cl;tab.classList.add('tab-ghost')};
-}
-document.addEventListener('touchmove',e=>{
-  if(TD.idx===-1)return;const dx=e.touches[0].clientX-TD.startX;
-  if(!TD.on&&Math.abs(dx)>6)TD._p?.();if(!TD.on)return;
-  TD.clone.style.left=(TD.cL+dx)+'px';
-  const ni=Math.max(0,Math.min(profiles.length-1,TD.idx+Math.round(dx/TD.tabW)));
-  if(ni!==TD.to){TD.to=ni;document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach((t,i)=>t.classList.toggle('tab-slot',i===ni&&i!==TD.idx))}
-},{passive:true});
-document.addEventListener('touchend',()=>{
-  if(TD.idx===-1)return;
-  if(TD.on){TD.clone?.remove();document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach(t=>t.classList.remove('tab-ghost','tab-slot'));const{idx,to}=TD;if(idx!==to){const item=profiles.splice(idx,1)[0];profiles.splice(to,0,item);saveProfiles(profiles);renderProfiles()}}
-  TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cL:0,cT:0};
-});
+function tabDragStart(e,idx){const bar=document.getElementById('profiles-bar');const tabs=bar.querySelectorAll('.profile-tab:not(.nearby-tab)');const tab=tabs[idx];if(!tab)return;const r=tab.getBoundingClientRect();TD={on:false,idx,to:idx,clone:null,startX:e.touches[0].clientX,tabW:r.width+6,cL:r.left,cT:r.top};TD._p=()=>{TD.on=true;const cl=tab.cloneNode(true);cl.className='float-clone profile-tab active';cl.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;document.body.appendChild(cl);TD.clone=cl;tab.classList.add('tab-ghost')}}
+document.addEventListener('touchmove',e=>{if(TD.idx===-1)return;const dx=e.touches[0].clientX-TD.startX;if(!TD.on&&Math.abs(dx)>6)TD._p?.();if(!TD.on)return;TD.clone.style.left=(TD.cL+dx)+'px';const ni=Math.max(0,Math.min(profiles.length-1,TD.idx+Math.round(dx/TD.tabW)));if(ni!==TD.to){TD.to=ni;document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach((t,i)=>t.classList.toggle('tab-slot',i===ni&&i!==TD.idx))}},{passive:true});
+document.addEventListener('touchend',()=>{if(TD.idx===-1)return;if(TD.on){TD.clone?.remove();document.querySelectorAll('.profile-tab:not(.nearby-tab)').forEach(t=>t.classList.remove('tab-ghost','tab-slot'));const{idx,to}=TD;if(idx!==to){const item=profiles.splice(idx,1)[0];profiles.splice(to,0,item);saveProfiles(profiles);renderProfiles()}}TD={on:false,idx:-1,to:-1,clone:null,startX:0,tabW:72,cL:0,cT:0}});
 
 // ═══════════════════════════════════
 //  ETA FORMATTING (vertical)
@@ -819,71 +1020,36 @@ document.addEventListener('touchend',()=>{
 function fmtEtas(etas,cc,now){
   const fmt=(ts,cls)=>{
     if(etaMode==='mins'){const m=Math.round((ts-now)/60000);return`<div class="${cls}">${m<=0?'即將':m+'分'}</div>`}
-    const d=new Date(ts);return`<div class="${cls}">${pad(d.getHours())}:${pad(d.getMinutes())}</div>`;
+    const dv=new Date(ts);return`<div class="${cls}">${pad(dv.getHours())}:${pad(dv.getMinutes())}</div>`;
   };
-  // vertical: e1 top (soonest), e2 mid, e3 bottom
-  let html='';
-  if(etas[0])html+=fmt(etas[0],`e1 ${cc}`);
-  if(etas[1])html+=fmt(etas[1],'e2');
-  if(etas[2])html+=fmt(etas[2],'e3');
-  return html;
+  return(etas[0]?fmt(etas[0],`e1 ${cc}`):'')+(etas[1]?fmt(etas[1],'e2'):'')+(etas[2]?fmt(etas[2],'e3'):'');
 }
 
 // ═══════════════════════════════════
 //  NEARBY
 // ═══════════════════════════════════
-async function fetchAllStops(){
-  if(allStops)return allStops;
-  const data=await fetch(`${KMB}/stop`).then(r=>r.json());
-  allStops=data.data||[];return allStops;
-}
+async function fetchAllStops(){if(allStops)return allStops;const data=await fetch(`${KMB}/stop`).then(r=>r.json());allStops=data.data||[];return allStops}
 async function loadNearby(){
-  const el=document.getElementById('bus-list');
-  el.innerHTML=`<div class="spinner"></div>`;
+  const el=document.getElementById('bus-list');el.innerHTML=`<div class="spinner"></div>`;
   if(!nearbyLat){
     if(!navigator.geolocation){el.innerHTML=`<div class="msg">此裝置不支援定位</div>`;return}
     if(location.protocol==='file:'){el.innerHTML=`<div class="msg">⚠️ file:// 開啟無法定位<br><small>請部署至網絡後使用</small></div>`;return}
-    try{
-      const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:10000}));
-      nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude;
-    }catch{el.innerHTML=`<div class="msg">❌ 定位失敗，請允許位置權限</div>`;return}
+    try{const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:10000}));nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude}
+    catch{el.innerHTML=`<div class="msg">❌ 定位失敗，請允許位置權限</div>`;return}
   }
-  // update header label with current distance
   document.getElementById('bus-hdr-lbl').textContent=`${nearbyDist}米內到站時間`;
   try{
     const stops=await fetchAllStops();
-    const nearby=stops
-      .map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))}))
-      .filter(s=>s.dist<=nearbyDist)
-      .sort((a,b)=>a.dist-b.dist)
-      .slice(0,12);
-    if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有九巴站點</div></div>`;return}
+    const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,12);
+    if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();const rows=[];
-    etaResults.forEach((res,i)=>{
-      const stop=nearby[i];const seen=new Set();
-      (res.data||[]).forEach(e=>{
-        if(!e.eta)return;const ts=new Date(e.eta).getTime();if(ts<now-30000)return;
-        const key=`${e.route}_${e.dir}_${stop.stop}`;
-        if(!seen.has(key)){seen.add(key);rows.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,_etas:[ts]})}
-        else{const ex=rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);if(ex&&ex._etas.length<3)ex._etas.push(ts)}
-      });
-    });
+    etaResults.forEach((res,i)=>{const stop=nearby[i];const seen=new Set();(res.data||[]).forEach(e=>{if(!e.eta)return;const ts=new Date(e.eta).getTime();if(ts<now-30000)return;const key=`${e.route}_${e.dir}_${stop.stop}`;if(!seen.has(key)){seen.add(key);rows.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,_etas:[ts]})}else{const ex=rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);if(ex&&ex._etas.length<3)ex._etas.push(ts)}})});
     rows.sort((a,b)=>a._etas[0]-b._etas[0]);
     if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
     const now2=Date.now();
-    el.innerHTML=rows.slice(0,20).map((r,i)=>{
-      const m=Math.round((r._etas[0]-now2)/60000);
-      const urgency=m<=2?'soon':m<=8?'coming':'ok';
-      const cc=m<=2?'sc':m<=8?'cc':'oc';
-      return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s">
-        <div class="bus-badge">${r.route}</div>
-        <div class="bus-info">
-          <div class="bus-stop">${r.stopName}<span class="nearby-dist">${r.dist}m</span></div>
-          <div class="bus-dest">往 ${r.dest}</div>
-        </div>
-        <div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div>
-      </div>`;
+    el.innerHTML=rows.slice(0,20).map((r,i)=>{const m=Math.round((r._etas[0]-now2)/60000);const urgency=m<=2?'soon':m<=8?'coming':'ok';const cc=m<=2?'sc':m<=8?'cc':'oc';
+      return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s"><div class="bus-badge">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
     }).join('');
   }catch(e){console.warn('[nearby]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
@@ -891,168 +1057,46 @@ async function loadNearby(){
 // ═══════════════════════════════════
 //  SAVED ROUTES
 // ═══════════════════════════════════
-async function fetchOneETA(fav){
-  try{
-    const data=await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());
-    fav._etas=(data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());
-    fav._first=fav._etas[0]??null;fav._err=false;
-  }catch{fav._etas=[];fav._first=null;fav._err=true}
-}
-async function refreshAllETAs(){
-  if(activePid===NEARBY_PID){loadNearby();return}
-  favs=loadFavs(activePid);
-  if(!favs.length){renderBusList();return}
-  await Promise.all(favs.map(fetchOneETA));
-  renderBusList();
-}
+async function fetchOneETA(fav){try{const data=await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());fav._etas=(data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());fav._first=fav._etas[0]??null;fav._err=false}catch{fav._etas=[];fav._first=null;fav._err=true}}
+async function refreshAllETAs(){if(activePid===NEARBY_PID){loadNearby();return}favs=loadFavs(activePid);if(!favs.length){renderBusList();return}await Promise.all(favs.map(fetchOneETA));renderBusList()}
 function renderBusList(){
   const el=document.getElementById('bus-list');
-  if(!favs.length){
-    el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">未有路線</div><div class="empty-sub">點擊「加路線」搜尋九巴班次</div></div>`;return;
-  }
+  if(!favs.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">未有路線</div><div class="empty-sub">點擊「加路線」搜尋九巴班次</div></div>`;return}
   const now=Date.now();
   el.innerHTML=favs.map((f,i)=>{
     const m=f._first!=null?Math.round((f._first-now)/60000):null;
     const urgency=m===null?'':m<=2?'soon':m<=8?'coming':'ok';
     const cc=m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
-    let etaContent='';
-    if(f._err)etaContent=`<div class="e-none">無數據</div>`;
-    else if(!f._etas?.length)etaContent=`<div class="e-none">無班次</div>`;
-    else etaContent=fmtEtas(f._etas,cc,now);
-    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s">
-      <div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div>
-      <div class="bus-badge">${f.route}</div>
-      <div class="bus-info">
-        <div class="bus-stop">${f.stopName}</div>
-        <div class="bus-dest">往 ${f.dest}</div>
-      </div>
-      <div class="bus-eta-wrap"><div class="eta-col">${etaContent}</div></div>
-      <button class="bus-rm" onclick="removeFav(event,${i})">×</button>
-    </div>`;
+    let ec='';if(f._err)ec=`<div class="e-none">無數據</div>`;else if(!f._etas?.length)ec=`<div class="e-none">無班次</div>`;else ec=fmtEtas(f._etas,cc,now);
+    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}</div><div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
   }).join('');
 }
 function removeFav(e,i){e.stopPropagation();favs.splice(i,1);saveFavs(activePid,favs);renderBusList()}
-
-// Bus drag
 let BD={on:false,idx:-1,to:-1,clone:null,startY:0,startTop:0,cardH:0};
-function busDragStart(e,idx){
-  e.stopPropagation();
-  const card=document.querySelectorAll('.bus-card')[idx];if(!card)return;
-  const rect=card.getBoundingClientRect();
-  BD={on:true,idx,to:idx,startY:e.touches[0].clientY,startTop:rect.top,cardH:rect.height+9,clone:null};
-  const cl=card.cloneNode(true);cl.className='float-clone';
-  cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;border-radius:13px`;
-  document.body.appendChild(cl);BD.clone=cl;card.classList.add('card-ghost');
-}
-document.addEventListener('touchmove',e=>{
-  if(!BD.on)return;const dy=e.touches[0].clientY-BD.startY;BD.clone.style.top=(BD.startTop+dy)+'px';
-  const ni=Math.max(0,Math.min(favs.length-1,BD.idx+Math.round(dy/BD.cardH)));
-  if(ni!==BD.to){BD.to=ni;document.querySelectorAll('.bus-card').forEach((c,i)=>c.classList.toggle('card-slot',i===ni&&i!==BD.idx))}
-},{passive:true});
-document.addEventListener('touchend',()=>{
-  if(!BD.on)return;BD.clone?.remove();BD.on=false;
-  const{idx,to}=BD;BD.idx=-1;BD.to=-1;
-  if(idx!==to){const item=favs.splice(idx,1)[0];favs.splice(to,0,item);saveFavs(activePid,favs);fetchOneETA(favs[to]).then(renderBusList)}
-  else renderBusList();
-});
+function busDragStart(e,idx){e.stopPropagation();const card=document.querySelectorAll('.bus-card')[idx];if(!card)return;const rect=card.getBoundingClientRect();BD={on:true,idx,to:idx,startY:e.touches[0].clientY,startTop:rect.top,cardH:rect.height+9,clone:null};const cl=card.cloneNode(true);cl.className='float-clone';cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;border-radius:12px`;document.body.appendChild(cl);BD.clone=cl;card.classList.add('card-ghost')}
+document.addEventListener('touchmove',e=>{if(!BD.on)return;const dy=e.touches[0].clientY-BD.startY;BD.clone.style.top=(BD.startTop+dy)+'px';const ni=Math.max(0,Math.min(favs.length-1,BD.idx+Math.round(dy/BD.cardH)));if(ni!==BD.to){BD.to=ni;document.querySelectorAll('.bus-card').forEach((c,i)=>c.classList.toggle('card-slot',i===ni&&i!==BD.idx))}},{passive:true});
+document.addEventListener('touchend',()=>{if(!BD.on)return;BD.clone?.remove();BD.on=false;const{idx,to}=BD;BD.idx=-1;BD.to=-1;if(idx!==to){const item=favs.splice(idx,1)[0];favs.splice(to,0,item);saveFavs(activePid,favs);fetchOneETA(favs[to]).then(renderBusList)}else renderBusList()});
 
 // ═══════════════════════════════════
 //  ROUTE SEARCH
 // ═══════════════════════════════════
-function openSearch(){
-  setDTitle('搜尋路線');
-  document.getElementById('drawer-body').innerHTML=`
-    <div class="search-row">
-      <input class="d-input" id="route-inp" placeholder="路線號碼（如 40X）"
-        maxlength="6" oninput="this.value=this.value.toUpperCase()"
-        onkeydown="if(event.key==='Enter')searchRoute()">
-      <button class="d-btn" onclick="searchRoute()">搜尋</button>
-    </div><div id="search-results"></div>`;
-  openOverlay();setTimeout(()=>document.getElementById('route-inp')?.focus(),260);
-}
-async function searchRoute(){
-  const q=(document.getElementById('route-inp')?.value||'').trim().toUpperCase();if(!q)return;
-  const el=document.getElementById('search-results');el.innerHTML=`<div class="spinner"></div>`;
-  try{
-    const data=await fetch(`${KMB}/route/`).then(r=>r.json());
-    const routes=data.data.filter(r=>r.route===q);
-    if(!routes.length){el.innerHTML=`<div class="msg">找不到路線「${q}」</div>`;return}
-    el.innerHTML=`<div class="sec-lbl">選擇方向</div>`+routes.map(r=>
-      `<div class="result-item" onclick="pickRoute('${r.route}','${r.bound}','${r.service_type}','${esc(r.dest_tc)}')">
-        <div class="rn">${r.route}</div>
-        <div class="ri"><div class="ri-dest">往 ${r.dest_tc}</div><div class="ri-orig">由 ${r.orig_tc}</div></div>
-        <div class="chev">›</div>
-      </div>`).join('');
-  }catch{el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
-}
-async function pickRoute(route,bound,svcType,dest){
-  setDTitle(`${route} 往 ${dest}`);
-  const el=document.getElementById('search-results');
-  el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="spinner"></div>`;
-  try{
-    const dir=bound==='O'?'outbound':'inbound';
-    const[sd,si]=await Promise.all([
-      fetch(`${KMB}/route-stop/${route}/${dir}/${svcType}`).then(r=>r.json()),
-      fetch(`${KMB}/stop`).then(r=>r.json()),
-    ]);
-    const sm={};si.data.forEach(s=>sm[s.stop]=s.name_tc);
-    const stops=sd.data.map(s=>({seq:s.seq,stopId:s.stop,name:sm[s.stop]||s.stop}));
-    el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button>
-      <div class="sec-lbl">選擇巴士站（${stops.length} 站）</div>
-      <div style="max-height:55dvh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent">
-        ${stops.map(s=>`<div class="stop-item" onclick="addFav('${s.stopId}','${esc(s.name)}','${route}','${esc(dest)}','${svcType}')">
-          <div class="stop-seq">${s.seq}</div><div class="stop-name">${s.name}</div><div class="chev">›</div>
-        </div>`).join('')}
-      </div>`;
-  }catch{el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="msg">載入失敗，請重試</div>`}
-}
+function openSearch(){setDTitle('搜尋路線');document.getElementById('drawer-body').innerHTML=`<div class="search-row"><input class="d-input" id="route-inp" placeholder="路線號碼（如 40X）" maxlength="6" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')searchRoute()"><button class="d-btn" onclick="searchRoute()">搜尋</button></div><div id="search-results"></div>`;openOverlay();setTimeout(()=>document.getElementById('route-inp')?.focus(),260)}
+async function searchRoute(){const q=(document.getElementById('route-inp')?.value||'').trim().toUpperCase();if(!q)return;const el=document.getElementById('search-results');el.innerHTML=`<div class="spinner"></div>`;try{const data=await fetch(`${KMB}/route/`).then(r=>r.json());const routes=data.data.filter(r=>r.route===q);if(!routes.length){el.innerHTML=`<div class="msg">找不到路線「${q}」</div>`;return}el.innerHTML=`<div class="sec-lbl">選擇方向</div>`+routes.map(r=>`<div class="result-item" onclick="pickRoute('${r.route}','${r.bound}','${r.service_type}','${esc(r.dest_tc)}')"><div class="rn">${r.route}</div><div class="ri"><div class="ri-dest">往 ${r.dest_tc}</div><div class="ri-orig">由 ${r.orig_tc}</div></div><div class="chev">›</div></div>`).join('')}catch{el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}}
+async function pickRoute(route,bound,svcType,dest){setDTitle(`${route} 往 ${dest}`);const el=document.getElementById('search-results');el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="spinner"></div>`;try{const dir=bound==='O'?'outbound':'inbound';const[sd,si]=await Promise.all([fetch(`${KMB}/route-stop/${route}/${dir}/${svcType}`).then(r=>r.json()),fetch(`${KMB}/stop`).then(r=>r.json())]);const sm={};si.data.forEach(s=>sm[s.stop]=s.name_tc);const stops=sd.data.map(s=>({seq:s.seq,stopId:s.stop,name:sm[s.stop]||s.stop}));el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="sec-lbl">選擇巴士站（${stops.length} 站）</div><div style="max-height:55dvh;overflow-y:auto;scrollbar-width:thin">${stops.map(s=>`<div class="stop-item" onclick="addFav('${s.stopId}','${esc(s.name)}','${route}','${esc(dest)}','${svcType}')"><div class="stop-seq">${s.seq}</div><div class="stop-name">${s.name}</div><div class="chev">›</div></div>`).join('')}</div>`}catch{el.innerHTML=`<button class="back-link" onclick="backToSearch()">‹ 返回</button><div class="msg">載入失敗</div>`}}
 function backToSearch(){setDTitle('搜尋路線');document.getElementById('search-results').innerHTML=''}
-async function addFav(stopId,stopName,route,dest,serviceType){
-  if(!favs.some(f=>f.route===route&&f.stopId===stopId&&f.dest===dest))
-    favs.push({route,stopId,stopName,dest,serviceType,_etas:[],_first:null,_err:false});
-  saveFavs(activePid,favs);closeDrawer();await refreshAllETAs();
-}
+async function addFav(stopId,stopName,route,dest,serviceType){if(!favs.some(f=>f.route===route&&f.stopId===stopId&&f.dest===dest))favs.push({route,stopId,stopName,dest,serviceType,_etas:[],_first:null,_err:false});saveFavs(activePid,favs);closeDrawer();await refreshAllETAs()}
 
 // ═══════════════════════════════════
 //  IMPORT / EXPORT
 // ═══════════════════════════════════
-function exportBusData(){
-  const data={profiles,favsByProfile:{}};
-  profiles.forEach(p=>{data.favsByProfile[p.id]=loadFavs(p.id)});
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`swd-bus-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);
-  showToast('✅ 已匯出巴士資料');
-}
-function importBusData(event){
-  const file=event.target.files?.[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const data=JSON.parse(e.target.result);
-      if(!data.profiles||!data.favsByProfile)throw new Error();
-      if(!confirm(`確定匯入？這將覆蓋現有 ${data.profiles.length} 個版面的路線資料。`))return;
-      profiles=data.profiles;saveProfiles(profiles);
-      Object.entries(data.favsByProfile).forEach(([pid,arr])=>saveFavs(pid,arr));
-      activePid=profiles[0]?.id||'';setActivePid(activePid);favs=loadFavs(activePid);
-      renderProfiles();refreshAllETAs();showToast('✅ 匯入成功');
-    }catch{showToast('❌ 檔案格式不正確')}
-  };
-  reader.readAsText(file);event.target.value='';
-}
+function exportBusData(){const data={profiles,favsByProfile:{}};profiles.forEach(p=>{data.favsByProfile[p.id]=loadFavs(p.id)});const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`swd-bus-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);showToast('✅ 已匯出巴士資料')}
+function importBusData(event){const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!data.profiles||!data.favsByProfile)throw new Error();if(!confirm(`確定匯入？覆蓋現有 ${data.profiles.length} 個版面。`))return;profiles=data.profiles;saveProfiles(profiles);Object.entries(data.favsByProfile).forEach(([pid,arr])=>saveFavs(pid,arr));activePid=profiles[0]?.id||'';setActivePid(activePid);favs=loadFavs(activePid);renderProfiles();refreshAllETAs();showToast('✅ 匯入成功')}catch{showToast('❌ 檔案格式不正確')}};reader.readAsText(file);event.target.value=''}
 
 // ═══════════════════════════════════
-//  TOAST
+//  UTILS
 // ═══════════════════════════════════
 let toastTimer=null;
-function showToast(msg){
-  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
-  if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2500);
-}
-
-// ═══════════════════════════════════
-//  OVERLAY
-// ═══════════════════════════════════
+function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2500)}
 function openOverlay(){document.getElementById('overlay').classList.add('open')}
 function closeDrawer(){document.getElementById('overlay').classList.remove('open')}
 function overlayBgClick(e){if(e.target.id==='overlay')closeDrawer()}
@@ -1061,35 +1105,20 @@ function setDTitle(t){document.getElementById('drawer-title').textContent=t}
 // ═══════════════════════════════════
 //  INIT
 // ═══════════════════════════════════
-// Sync ETA button
-(()=>{const btn=document.getElementById('eta-mode-btn');
-  if(etaMode==='mins'){btn.textContent='⏱ 距離時間';btn.classList.add('mins')}
-  else{btn.textContent='🕐 到站時間';btn.classList.remove('mins')}
-})();
-// Sync dist pills
+(()=>{const btn=document.getElementById('eta-mode-btn');if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}})();
 syncDistPills();
-// Auto-tab: check on open
 checkAutoTab();
-// Render
 renderProfiles();
-// Locate + weather
 document.getElementById('w-loc-lbl').textContent=selectedStn;
 autoLocate();
 loadWeather();
 if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs();
-// Periodic refresh
 setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
 
-// PWA manifest
+// PWA
 const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
-const ml=document.createElement('link');ml.rel='manifest';
-ml.href=URL.createObjectURL(new Blob([JSON.stringify({
-  name:'生活日常',short_name:'生活日常',start_url:'.',display:'standalone',
-  background_color:'#06080d',theme_color:'#06080d',
-  icons:[{src:'data:image/svg+xml,'+ICON_SVG,sizes:'512x512',type:'image/svg+xml'}]
-})],{type:'application/json'}));
-document.head.appendChild(ml);
+const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(new Blob([JSON.stringify({name:'生活日常',short_name:'生活日常',start_url:'.',display:'standalone',background_color:'#06080d',theme_color:'#06080d',icons:[{src:'data:image/svg+xml,'+ICON_SVG,sizes:'512x512',type:'image/svg+xml'}]})],{type:'application/json'}));document.head.appendChild(ml);
 </script>
 </body>
 </html>
