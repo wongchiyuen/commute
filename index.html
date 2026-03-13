@@ -551,21 +551,17 @@ tickClock();setInterval(tickClock,1000);
 //  AUTO LOCATE → nearest rhrread station
 // ═══════════════════════════════════
 // ═══════════════════════════════════
-//  IP-BASED LOCATE (no GPS prompt)
+//  GEOLOCATION (GPS primary, IP fallback for weather only)
 // ═══════════════════════════════════
 async function autoLocate(){
   document.getElementById('w-loc-lbl').textContent=selectedStn;
-  // Try multiple free IP geolocation services
-  const services=[
-    ()=>fetch('https://ip-api.com/json/?fields=lat,lon,status',{signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>d.status==='success'?{lat:d.lat,lng:d.lon}:null),
-    ()=>fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>d.latitude?{lat:d.latitude,lng:d.longitude}:null),
-    ()=>fetch('https://freeipapi.com/api/json',{signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>d.latitude?{lat:d.latitude,lng:d.longitude}:null),
-  ];
-  for(const svc of services){
-    try{
-      const pos=await svc();
-      if(pos&&pos.lat&&pos.lng){
-        nearbyLat=pos.lat; nearbyLng=pos.lng;
+
+  // GPS — accurate, works on all modern browsers/PWA, permission asked once
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        nearbyLat=pos.coords.latitude;
+        nearbyLng=pos.coords.longitude;
         const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
         if(near.n!==selectedStn){
           selectedStn=near.n;
@@ -573,11 +569,30 @@ async function autoLocate(){
           loadWeather();
         }
         document.getElementById('w-loc-lbl').textContent=selectedStn;
-        return;
-      }
-    }catch{}
+        // If nearby tab is active, reload with accurate position
+        if(activePid===NEARBY_PID) loadNearby();
+      },
+      async ()=>{
+        // Permission denied / unavailable — fall back to IP for weather station only
+        // (IP is too inaccurate for bus stop distance, so nearby tab will show message)
+        try{
+          const d=await fetch('https://ip-api.com/json/?fields=lat,lon,status',
+            {signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+          if(d.status==='success'){
+            // Only use IP loc for HKO station selection, not for bus nearby
+            const near=nearestOf(RHRREAD_STNS,d.lat,d.lon);
+            if(near.n!==selectedStn){
+              selectedStn=near.n;
+              localStorage.setItem('hko_stn',near.n);
+              loadWeather();
+            }
+            document.getElementById('w-loc-lbl').textContent=selectedStn;
+          }
+        }catch{}
+      },
+      {timeout:10000, maximumAge:60000, enableHighAccuracy:false}
+    );
   }
-  // All failed — use saved station silently
 }
 
 // ═══════════════════════════════════
@@ -996,6 +1011,34 @@ function renderProfiles(){
 }
 function switchProfile(pid){setActivePid(pid);favs=loadFavs(pid);renderProfiles();refreshAllETAs()}
 function switchToNearby(){setActivePid(NEARBY_PID);renderProfiles();syncDistPills();loadNearby()}
+
+function requestGPS(){
+  if(!navigator.geolocation)return;
+  const el=document.getElementById('bus-list');
+  el.innerHTML=`<div class="spinner"></div>`;
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      nearbyLat=pos.coords.latitude;
+      nearbyLng=pos.coords.longitude;
+      // Also update weather station to nearest
+      const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
+      if(near.n!==selectedStn){
+        selectedStn=near.n;
+        localStorage.setItem('hko_stn',near.n);
+        loadWeather();
+      }
+      document.getElementById('w-loc-lbl').textContent=selectedStn;
+      loadNearby();
+    },
+    err=>{
+      let msg='❌ 定位失敗';
+      if(err.code===1) msg='⚠️ 位置權限被拒絕<br><small style="color:var(--dim)">請到瀏覽器設定中允許位置存取，然後重新整理頁面</small>';
+      else if(err.code===2) msg='⚠️ 無法取得位置信號<br><small style="color:var(--dim)">請移至室外或開啟 WiFi 後重試</small>';
+      el.innerHTML=`<div class="msg">${msg}</div>`;
+    },
+    {timeout:15000, maximumAge:30000, enableHighAccuracy:true}
+  );
+}
 function addProfile(){
   setDTitle('新增版面');
   document.getElementById('drawer-body').innerHTML=`<div class="sec-lbl">版面名稱</div><div class="search-row"><input class="d-input plain" id="pname-inp" placeholder="如：上班、週末…" maxlength="10"><button class="d-btn" onclick="confirmAddProfile()">確定</button></div>`;
@@ -1040,13 +1083,17 @@ async function fetchAllStops(){if(allStops)return allStops;const data=await fetc
 async function loadNearby(){
   const el=document.getElementById('bus-list');el.innerHTML=`<div class="spinner"></div>`;
   if(!nearbyLat){
-    // autoLocate should have set this; try IP geolocation one more time
-    el.innerHTML=`<div class="spinner"></div>`;
-    try{
-      const d=await fetch('https://ip-api.com/json/?fields=lat,lon,status',{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-      if(d.status==='success'){nearbyLat=d.lat;nearbyLng=d.lon}
-    }catch{}
-    if(!nearbyLat){el.innerHTML=`<div class="msg">⚠️ 無法取得位置<br><small>請在天氣詳情中選擇地點</small></div>`;return}
+    if(!navigator.geolocation){
+      el.innerHTML=`<div class="msg">此裝置不支援定位</div>`;return
+    }
+    // Show a friendly prompt explaining why location is needed
+    el.innerHTML=`<div class="msg" style="padding:30px 20px">
+      <div style="font-size:32px;margin-bottom:12px">📍</div>
+      <div style="font-size:15px;color:var(--bright);margin-bottom:8px">需要位置權限</div>
+      <div style="font-size:13px;line-height:1.7;margin-bottom:16px">為搜尋附近九巴站，需要使用你的精確位置。<br>瀏覽器只需授權一次。</div>
+      <button onclick="requestGPS()" style="background:var(--blu);color:#fff;border:none;border-radius:10px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)">📡 允許位置使用</button>
+    </div>`;
+    return;
   }
   document.getElementById('bus-hdr-lbl').textContent=`${nearbyDist}米內到站時間`;
   try{
