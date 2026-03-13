@@ -606,10 +606,40 @@ function checkAutoTab(){
     if(!c.days[dow])continue;
     const[fh,fm]=(c.from||'00:00').split(':').map(Number);
     const[th,tm]=(c.to||'23:59').split(':').map(Number);
-    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm){setActivePid(p.id);favs=loadFavs(p.id);return}
+    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm){
+      setActivePid(p.id);favs=loadFavs(p.id);
+      console.log('[AutoTab] matched profile:',p.name,'at',now.getHours()+':'+now.getMinutes());
+      return;
+    }
   }
   // No rule matched — default to 附近 tab
+  console.log('[AutoTab] no rule matched at',now.getHours()+':'+now.getMinutes(),'→ 附近');
   setActivePid(NEARBY_PID);
+}
+
+// Returns a human-readable description of current auto-tab status for settings UI
+function getAutoTabStatus(){
+  const cfg=loadAutoTabs();const now=new Date();
+  const dow=now.getDay(),hhmm=now.getHours()*60+now.getMinutes();
+  const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  for(const p of profiles){
+    const c=cfg[p.id];if(!c||!c.enabled)continue;
+    if(!c.days[dow])continue;
+    const[fh,fm]=(c.from||'00:00').split(':').map(Number);
+    const[th,tm]=(c.to||'23:59').split(':').map(Number);
+    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm)
+      return{matched:true,name:p.name,msg:`✅ 現在 ${timeStr}，正在「${p.name}」時間內`};
+  }
+  // Show next upcoming window
+  const upcoming=[];
+  for(const p of profiles){
+    const c=cfg[p.id];if(!c||!c.enabled)continue;
+    const activeDays=c.days.map((on,i)=>on?DAY[i]:null).filter(Boolean).join('');
+    if(activeDays) upcoming.push(`「${p.name}」${activeDays} ${c.from}–${c.to}`);
+  }
+  if(upcoming.length)
+    return{matched:false,msg:`現在 ${timeStr} 不在任何時間段（${upcoming.join('；')}）→ 顯示附近`};
+  return{matched:false,msg:`現在 ${timeStr}，未設定任何自動跳轉規則`};
 }
 
 // ═══════════════════════════════════
@@ -674,8 +704,12 @@ async function loadExtraWeather(){
     if(num(minE?.value)!=null) wxDetails.todayMinT=num(minE.value);
   }catch{}
 
-  // 2. Tide - nearest station to GPS position
-  const lat=nearbyLat, lng=nearbyLng;
+  // Use GPS if available, else fall back to selected weather station coords
+  const stnCoords = RHRREAD_STNS.find(s=>s.n===selectedStn);
+  const lat = nearbyLat ?? stnCoords?.lat;
+  const lng = nearbyLng ?? stnCoords?.lng;
+
+  // 2. Tide - nearest tide station
   if(lat){
     try{
       const tstn=nearestOf(TIDE_STNS,lat,lng);
@@ -711,8 +745,9 @@ async function loadExtraWeather(){
 // ═══════════════════════════════════
 //  WEATHER DETAILS DRAWER
 // ═══════════════════════════════════
-function openWeatherDetails(){
-  setDTitle('天氣詳情');
+function renderWeatherDetailsContent(){
+  const el=document.getElementById('drawer-body');
+  if(!el)return;
   const hum=wxDetails.humidity, humStn=wxDetails.humidityStn||selectedStn;
   const maxT=wxDetails.todayMaxT, minT=wxDetails.todayMinT;
   const tide=wxDetails.tide||[], tideStn=wxDetails.tideStn||'';
@@ -722,8 +757,8 @@ function openWeatherDetails(){
         const isH=String(t.type||t.tideType||'').match(/H|高/i);
         return`<div class="tide-item"><div class="tide-type">${isH?'⬆ 高潮':'⬇ 低潮'}</div><div class="tide-time">${t.time||t.Time||'--'}</div><div class="tide-ht">${t.height||t.Height||'--'} m</div></div>`;
       }).join('')}</div>`
-    :`<div style="color:var(--mid);font-size:12px;padding:6px 0">暫無今日潮汐數據（需要 GPS 定位）</div>`;
-  document.getElementById('drawer-body').innerHTML=`
+    :`<div style="color:var(--mid);font-size:12px;padding:6px 0">載入潮汐數據中，或此站附近暫無今日數據</div>`;
+  el.innerHTML=`
     <div class="wdet-grid">
       <div class="wdet-card">
         <div class="wdet-lbl">濕度</div>
@@ -748,7 +783,16 @@ function openWeatherDetails(){
     <button class="loc-gps-btn" id="gps-btn2" onclick="useGPS2()">📡 用 GPS 精確定位（可選）</button>
     <div class="sec-lbl">香港天文台即時測站</div>
     <div class="loc-grid">${RHRREAD_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')"><div class="loc-name">${s.n}</div></div>`).join('')}</div>`;
+}
+
+function openWeatherDetails(){
+  setDTitle('天氣詳情');
+  renderWeatherDetailsContent();
   openOverlay();
+  loadExtraWeather().then(()=>{
+    if(document.getElementById('overlay').classList.contains('open'))
+      renderWeatherDetailsContent();
+  });
 }
 function useGPS2(){
   if(!navigator.geolocation){alert('不支援定位');return}
@@ -763,31 +807,46 @@ function useGPS2(){
 // ═══════════════════════════════════
 //  RSS FETCHING
 // ═══════════════════════════════════
-const PROXIES = [
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-];
+// ── RSS helpers ─────────────────────────────────────────────────────────────
 async function fetchRSS(feedCfg){
   const url = feedCfg.url;
+
+  // Strategy 1: rss2json.com (best for Google/Yahoo, returns clean JSON)
+  try{
+    const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=60`;
+    const res = await fetch(api, {signal: AbortSignal.timeout(10000)});
+    const j = await res.json();
+    if(j.status === 'ok' && j.items?.length){
+      return j.items.map(i=>({
+        title: i.title||'',
+        link:  i.link||i.guid||'',
+        pubDate: i.pubDate||'',
+        description: (i.description||i.content||'').replace(/<[^>]+>/g,'').slice(0,180),
+      })).filter(i=>i.title);
+    }
+  }catch{}
+
+  // Strategy 2: allorigins raw proxy → parse XML
+  const PROXIES = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
   for(const mkProxy of PROXIES){
     try{
-      const res = await fetch(mkProxy(url), {signal: AbortSignal.timeout(9000)});
+      const res = await fetch(mkProxy(url), {signal: AbortSignal.timeout(10000)});
       const text = await res.text();
-      if(!text || text.length < 100) continue;
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
+      if(!text || text.length < 200 || text.startsWith('{')) continue;
+      const xml = new DOMParser().parseFromString(text,'text/xml');
       if(xml.querySelector('parsererror')) continue;
-      const items = [...xml.querySelectorAll('item, entry')];
+      const items = [...xml.querySelectorAll('item,entry')];
       if(!items.length) continue;
-      return items.slice(0,50).map(item => {
-        const gs = t => item.querySelector(t)?.textContent?.trim() || '';
-        const linkEl = item.querySelector('link');
-        const link = gs('link') || linkEl?.getAttribute('href') || '';
-        const desc = (gs('description') || gs('summary')).replace(/<[^>]+>/g,'').slice(0,160);
-        return { title: gs('title'), link, pubDate: gs('pubDate')||gs('published')||gs('updated'), description: desc };
-      }).filter(i => i.title);
-    }catch(e){ continue }
+      return items.slice(0,60).map(item=>{
+        const gs = t => item.querySelector(t)?.textContent?.trim()||'';
+        const link = gs('link')||item.querySelector('link')?.getAttribute('href')||'';
+        const desc = (gs('description')||gs('summary')).replace(/<[^>]+>/g,'').slice(0,180);
+        return {title:gs('title'), link, pubDate:gs('pubDate')||gs('published')||gs('updated'), description:desc};
+      }).filter(i=>i.title);
+    }catch{}
   }
   return null;
 }
@@ -936,7 +995,9 @@ async function loadTodayHistory(){
 // ═══════════════════════════════════
 function renderAutoTabSettings(){
   const cfg=loadAutoTabs();
-  document.getElementById('auto-tab-list').innerHTML=profiles.map(p=>{
+  const status=getAutoTabStatus();
+  const banner=`<div style="background:${status.matched?'rgba(46,213,115,.1)':'rgba(91,143,255,.08)'};border:1px solid ${status.matched?'rgba(46,213,115,.3)':'rgba(91,143,255,.2)'};border-radius:10px;padding:9px 13px;margin-bottom:12px;font-size:12px;color:${status.matched?'#2ed573':'#7ba8ff'};line-height:1.6">${status.msg}</div>`;
+  document.getElementById('auto-tab-list').innerHTML=banner+profiles.map(p=>{
     const c=cfg[p.id]||{enabled:false,days:[false,false,false,false,false,false,false],from:'07:00',to:'09:00'};
     return`<div class="auto-tab-card">
       <div class="auto-tab-hdr">
@@ -1165,7 +1226,8 @@ function setDTitle(t){document.getElementById('drawer-title').textContent=t}
 // ═══════════════════════════════════
 (()=>{const btn=document.getElementById('eta-mode-btn');if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}})();
 syncDistPills();
-checkAutoTab();
+checkAutoTab();   // sets activePid based on time rules (or NEARBY_PID)
+favs=loadFavs(activePid); // reload favs for whichever pid was chosen
 renderProfiles();
 document.getElementById('w-loc-lbl').textContent=selectedStn;
 autoLocate();
