@@ -68,12 +68,21 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .fc-tt{font-family:var(--mono);font-size:11px;display:flex;gap:4px}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
 /* extra weather stats row */
-.w-extra{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
-.w-extra::-webkit-scrollbar{display:none}
-.wx-chip{display:flex;flex-direction:column;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:7px 10px;flex-shrink:0;min-width:90px}
-.wx-chip-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:3px}
-.wx-chip-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--bright)}
-.wx-chip-sub{font-size:10px;color:var(--mid);margin-top:2px}
+.w-hum-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.28);border-radius:6px;padding:3px 8px;margin-top:4px;cursor:pointer}
+.w-hum-val{font-family:var(--mono);font-size:16px;font-weight:700;color:#7ba8ff;line-height:1}
+.w-hum-lbl{font-size:10px;color:var(--mid);line-height:1}
+.wdet-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+.wdet-card{background:var(--bg3);border:1px solid var(--bdr2);border-radius:11px;padding:13px 14px}
+.wdet-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:5px}
+.wdet-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--bright);line-height:1;margin-bottom:3px}
+.wdet-sub{font-size:11px;color:var(--mid);line-height:1.5}
+.wdet-full{grid-column:1/-1}
+.wdet-tide-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.tide-item{display:flex;flex-direction:column;align-items:center;background:rgba(91,143,255,.08);border:1px solid rgba(91,143,255,.2);border-radius:8px;padding:6px 10px;flex:1;min-width:70px}
+.tide-type{font-size:10px;color:var(--mid);margin-bottom:2px}
+.tide-time{font-family:var(--mono);font-size:14px;font-weight:700;color:#7ba8ff}
+.tide-ht{font-family:var(--mono);font-size:11px;color:var(--mid);margin-top:1px}
+.loc-section-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:14px 0 8px;padding-left:1px}
 
 /* ══ PROFILE TABS ══ */
 .profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:60px}
@@ -234,13 +243,16 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     <div class="w-r1">
       <div class="w-templeft">
         <div class="w-icon" id="w-icon">🌡</div>
-        <div class="w-temp-big"><span id="w-temp">--</span><sup>°C</sup></div>
+        <div>
+          <div class="w-temp-big"><span id="w-temp">--</span><sup>°C</sup></div>
+          <div class="w-hum-badge" id="w-hum-badge"></div>
+        </div>
       </div>
       <div class="w-right">
         <div class="w-clock" id="clock">--:--</div>
         <div class="w-date"  id="w-date">—</div>
         <div class="w-btns">
-          <button class="w-btn" onclick="openLocPicker()">📍 <span id="w-loc-lbl">定位中</span></button>
+          <button class="w-btn" onclick="openWeatherDetails()">📍 <span id="w-loc-lbl">定位中</span></button>
           <button class="w-btn" id="refresh-btn" onclick="doRefresh()"><span class="ico">↺</span> 更新</button>
         </div>
       </div>
@@ -248,14 +260,13 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     <div class="w-warns" id="w-warns"></div>
     <div class="w-desc"  id="w-desc"></div>
     <div class="w-fore"  id="w-fore"></div>
-    <div class="w-extra" id="w-extra"></div>
   </div>
   <div class="profiles-bar" id="profiles-bar"></div>
   <div class="bus-sec">
     <div class="bus-hdr">
       <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
-      <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離</button>
       <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
+      <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離</button>
     </div>
     <div class="dist-row" id="dist-row" style="display:none">
       <span class="dist-lbl">距離：</span>
@@ -327,7 +338,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 
     <div class="sett-section-title">🌤 天氣</div>
     <div class="sett-card">
-      <div class="sett-row" onclick="openLocPicker()">
+      <div class="sett-row" onclick="openWeatherDetails()">
         <div class="sett-ico">📍</div>
         <div class="sett-lbl"><div class="sett-lbl-main">天氣地點</div><div class="sett-lbl-sub" id="sett-stn-sub">--</div></div>
         <div class="sett-chev">›</div>
@@ -377,7 +388,7 @@ const HKO   = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
 const HKO_C = 'https://data.weather.gov.hk/weatherAPI/opendata/climate.php';
 const HKO_T = 'https://data.weather.gov.hk/weatherAPI/opendata/tide.php';
 const KMB   = 'https://data.etabus.gov.hk/v1/transport/kmb';
-const PROXY = url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+// (proxy defined in PROXIES array below)
 
 // Correct rhrread station list with approx coordinates
 const RHRREAD_STNS = [
@@ -434,33 +445,13 @@ const CLIMATE_STNS = [
 
 // News RSS feeds
 const NEWS_FEEDS = {
-  local: {
-    name:'RTHK 本地新聞',
-    url:'https://rthk9.hk/rthk/ch/component/k2/1456456/latest100.rss',
-    fallback:'https://news.rthk.hk/rthk/ch/latest-news.rss'
-  },
-  world: {
-    name:'RTHK 國際新聞',
-    url:'https://rthk9.hk/rthk/ch/component/k2/1456459/latest100.rss',
-    fallback:'https://news.rthk.hk/rthk/ch/world-news.rss'
-  },
-  yahoo: {
-    name:'Yahoo 香港新聞',
-    url:'https://hk.news.yahoo.com/rss/',
-    fallback:'https://hk.news.yahoo.com/rss/hongkong'
-  }
+  local: { name:'RTHK 本地新聞', url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
+  world: { name:'RTHK 國際新聞', url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
+  yahoo: { name:'Yahoo 香港新聞', url:'http://hk.news.yahoo.com/rss/hong-kong' }
 };
 const TRAFFIC_FEEDS = {
-  td: {
-    name:'運輸署交通快訊',
-    url:'https://www.td.gov.hk/tc/transport_in_hong_kong/road_traffic_management/traffic_news/traffic_news_rss/rss.xml',
-    fallback:'https://resource.data.one.gov.hk/td/traffic-news/traffic-news-xml.xml'
-  },
-  rthk: {
-    name:'RTHK 交通消息',
-    url:'https://rthk9.hk/rthk/ch/component/k2/1456460/latest100.rss',
-    fallback:'https://news.rthk.hk/rthk/ch/traffic-news.rss'
-  }
+  td:   { name:'運輸署交通快訊', url:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml' },
+  rthk: { name:'RTHK 交通消息', url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml' }
 };
 
 const W_ICONS={50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'};
@@ -597,20 +588,29 @@ async function loadWeather(){
       fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
     ]);
-    // Temp from nearest rhrread station
     const te=hkoFind(rhr.temperature?.data,selectedStn);
     document.getElementById('w-temp').textContent=num(te?.value)??'--';
     document.getElementById('w-loc-lbl').textContent=selectedStn;
     document.getElementById('sett-stn-sub').textContent=selectedStn;
-    // Icon
     const ic=Array.isArray(rhr.icon)?rhr.icon[0]:rhr.icon;
     document.getElementById('w-icon').textContent=W_ICONS[ic]??'🌡';
+    // Humidity inline badge
+    const he=hkoFind(rhr.humidity?.data,selectedStn);
+    const hv=num(he?.value);
+    wxDetails.humidity=hv; wxDetails.humidityStn=he?.place||selectedStn;
+    const humBadge=document.getElementById('w-hum-badge');
+    if(hv!=null){
+      humBadge.innerHTML=`<span class="w-hum-val">${hv}%</span><span class="w-hum-lbl">濕度</span>`;
+      humBadge.onclick=openWeatherDetails;
+      humBadge.style.display='';
+    } else { humBadge.style.display='none' }
+    // Today max/min from forecast
+    wxDetails.todayMaxT=num(flw.weatherForecast?.[0]?.forecastMaxtemp);
+    wxDetails.todayMinT=num(flw.weatherForecast?.[0]?.forecastMintemp);
     // Warnings
     const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
     document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
-    // Description
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
-    // Forecast strip
     const fcs=flw.weatherForecast||[];
     document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
       const ds=String(f.forecastDate);
@@ -618,109 +618,142 @@ async function loadWeather(){
       const hl=i===1||i===2;
       return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
     }).join('');
-    // Load extra weather data in background
     loadExtraWeather();
   }catch(e){console.warn('[weather]',e)}
 }
 
+// Extra weather data cache for details drawer
+let wxDetails = {};
+
 async function loadExtraWeather(){
   const now=new Date();
-  const y=now.getFullYear(),m=now.getMonth()+1,d=now.getDate();
-  const chips=[];
+  const y=now.getFullYear(),mo=now.getMonth()+1,d=now.getDate();
 
-  // 1. Humidity from rhrread (same call we already have, just read it)
+  // 1. Today max/min from rhrread (overrides forecast value if available)
   try{
     const rhr=await fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json());
-    const he=hkoFind(rhr.humidity?.data,selectedStn);
-    const hv=num(he?.value);
-    if(hv!=null)chips.push({lbl:'濕度',val:`${hv}<span style="font-size:10px">%</span>`,sub:selectedStn});
+    const maxArr=rhr.maximumTemperature?.data||rhr.maxTemp?.data||[];
+    const minArr=rhr.minimumTemperature?.data||rhr.minTemp?.data||[];
+    const maxE=hkoFind(maxArr,selectedStn);
+    const minE=hkoFind(minArr,selectedStn);
+    if(num(maxE?.value)!=null) wxDetails.todayMaxT=num(maxE.value);
+    if(num(minE?.value)!=null) wxDetails.todayMinT=num(minE.value);
   }catch{}
 
-  // 2. Tidal high/low times for today
-  if(nearbyLat){
+  // 2. Tide - nearest station to GPS position
+  const lat=nearbyLat, lng=nearbyLng;
+  if(lat){
     try{
-      const tstn=nearestOf(TIDE_STNS,nearbyLat,nearbyLng);
-      const tdata=await fetch(`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json());
-      // HLT returns array of {date, time, height, type} — filter today
-      const today=tdata.data?.filter(t=>parseInt(t.date)===d)||[];
-      if(today.length){
-        const highs=today.filter(t=>t.type==='H'||t.type==='高');
-        const lows=today.filter(t=>t.type==='L'||t.type==='低');
-        const tStr=[...highs.slice(0,2).map(t=>`↑${t.time}`), ...lows.slice(0,2).map(t=>`↓${t.time}`)].join(' ');
-        if(tStr)chips.push({lbl:`潮汐 (${tstn.n})`,val:tStr,sub:`高 ${highs[0]?.height??'--'}m`});
-      }
-    }catch{}
+      const tstn=nearestOf(TIDE_STNS,lat,lng);
+      const url=`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${String(mo).padStart(2,'0')}`;
+      const tdata=await fetch(url).then(r=>r.json());
+      const arr=tdata.data||tdata.HLT||[];
+      const today=arr.filter(t=>parseInt(t.date??t.day??t.Date??0)===d);
+      if(today.length){ wxDetails.tide=today; wxDetails.tideStn=tstn.n }
+    }catch(e){console.warn('[tide]',e)}
   }
 
-  // 3. Monthly climate normals (avg/max/min) from nearest station
-  if(nearbyLat){
+  // 3. Radiation (RYES) - try current month then previous
+  if(lat){
     try{
-      const cstn=nearestOf(CLIMATE_STNS,nearbyLat,nearbyLng);
-      const[avgD,maxD,minD]=await Promise.all([
-        fetch(`${HKO_C}?dataType=CLMTEMP&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
-        fetch(`${HKO_C}?dataType=CLMMAXT&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
-        fetch(`${HKO_C}?dataType=CLMMINT&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null),
-      ]);
-      // Each returns {data:[{year,month,value}]} or similar
-      const getV=obj=>{
-        if(!obj)return null;
-        const arr=obj.data||obj.ClimateData||[];
-        if(Array.isArray(arr)&&arr.length)return num(arr[arr.length-1]?.value??arr[arr.length-1]?.meanTemp??arr[0]?.value);
-        return num(obj.value);
-      };
-      const avg=getV(avgD),maxt=getV(maxD),mint=getV(minD);
-      if(avg!=null||maxt!=null){
-        chips.push({
-          lbl:`月均氣溫 (${cstn.n})`,
-          val:avg!=null?`${avg}°`:'--°',
-          sub:`↑${maxt??'--'}° ↓${mint??'--'}°`
-        });
+      const cstn=nearestOf(CLIMATE_STNS,lat,lng);
+      let rdata=null;
+      for(const [yr,mn] of [[y,mo],[y,mo===1?12:mo-1],[y,mo<=2?12:mo-2]]){
+        try{
+          rdata=await fetch(`${HKO_C}?dataType=RYES&lang=tc&station=${cstn.code}&year=${yr}&month=${String(mn).padStart(2,'0')}`).then(r=>r.json());
+          if(rdata?.data?.length) break;
+        }catch{}
+        rdata=null;
       }
-    }catch{}
-  }
-
-  // 4. Radiation (RYES - yesterday's)
-  if(nearbyLat){
-    try{
-      const cstn=nearestOf(CLIMATE_STNS,nearbyLat,nearbyLng);
-      const rdata=await fetch(`${HKO_C}?dataType=RYES&lang=tc&station=${cstn.code}&year=${y}&month=${pad(m)}`).then(r=>r.json()).catch(()=>null);
-      if(rdata){
-        const arr=rdata.data||[];
-        const latest=arr[arr.length-1];
-        const rv=num(latest?.value??latest?.radiation);
-        if(rv!=null)chips.push({lbl:`輻射 昨日 (${cstn.n})`,val:`${rv}<span style="font-size:9px"> MJ/m²</span>`,sub:'日總輻射量'});
+      if(rdata?.data?.length){
+        const latest=rdata.data[rdata.data.length-1];
+        const rv=num(latest?.value??latest?.radiation??latest?.MJm2??latest?.globalSolarRadiation);
+        if(rv!=null){ wxDetails.radiation=rv; wxDetails.radiationStn=cstn.n }
       }
-    }catch{}
+    }catch(e){console.warn('[radiation]',e)}
   }
+}
 
-  // Render chips
-  const el=document.getElementById('w-extra');
-  if(!chips.length){el.innerHTML='';return}
-  el.innerHTML=chips.map(c=>`<div class="wx-chip"><div class="wx-chip-lbl">${c.lbl}</div><div class="wx-chip-val">${c.val}</div><div class="wx-chip-sub">${c.sub}</div></div>`).join('');
+// ═══════════════════════════════════
+//  WEATHER DETAILS DRAWER
+// ═══════════════════════════════════
+function openWeatherDetails(){
+  setDTitle('天氣詳情');
+  const hum=wxDetails.humidity, humStn=wxDetails.humidityStn||selectedStn;
+  const maxT=wxDetails.todayMaxT, minT=wxDetails.todayMinT;
+  const tide=wxDetails.tide||[], tideStn=wxDetails.tideStn||'';
+  const rad=wxDetails.radiation, radStn=wxDetails.radiationStn||'';
+  const tideHtml=tide.length
+    ?`<div class="wdet-tide-row">${tide.map(t=>{
+        const isH=String(t.type||t.tideType||'').match(/H|高/i);
+        return`<div class="tide-item"><div class="tide-type">${isH?'⬆ 高潮':'⬇ 低潮'}</div><div class="tide-time">${t.time||t.Time||'--'}</div><div class="tide-ht">${t.height||t.Height||'--'} m</div></div>`;
+      }).join('')}</div>`
+    :`<div style="color:var(--mid);font-size:12px;padding:6px 0">暫無今日潮汐數據（需要 GPS 定位）</div>`;
+  document.getElementById('drawer-body').innerHTML=`
+    <div class="wdet-grid">
+      <div class="wdet-card">
+        <div class="wdet-lbl">濕度</div>
+        <div class="wdet-val">${hum!=null?hum+'%':'--'}</div>
+        <div class="wdet-sub">${humStn}</div>
+      </div>
+      <div class="wdet-card">
+        <div class="wdet-lbl">今日氣溫</div>
+        <div class="wdet-val" style="color:#ff8c5a">${maxT!=null?maxT+'°':'--'}<span style="font-size:12px;color:var(--mid)"> / ${minT!=null?minT+'°':'--'}</span></div>
+        <div class="wdet-sub">最高 / 最低　${selectedStn}</div>
+      </div>
+      ${rad!=null?`<div class="wdet-card wdet-full">
+        <div class="wdet-lbl">昨日輻射量 · ${radStn}</div>
+        <div class="wdet-val">${rad} <span style="font-size:12px;font-weight:400;color:var(--mid)">MJ/m²</span></div>
+        <div class="wdet-sub">日總太陽輻射</div>
+      </div>`:''}
+    </div>
+    <div class="loc-section-title">🌊 潮汐高度${tideStn?' · '+tideStn:''}</div>
+    ${tideHtml}
+    <div style="height:14px"></div>
+    <div class="loc-section-title">📍 更改天氣地點</div>
+    <button class="loc-gps-btn" id="gps-btn2" onclick="useGPS2()">📡 用我的位置自動選擇</button>
+    <div class="sec-lbl">香港天文台即時測站</div>
+    <div class="loc-grid">${RHRREAD_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')"><div class="loc-name">${s.n}</div></div>`).join('')}</div>`;
+  openOverlay();
+}
+function useGPS2(){
+  if(!navigator.geolocation){alert('不支援定位');return}
+  const btn=document.getElementById('gps-btn2');if(!btn)return;
+  btn.textContent='📡 定位中…';btn.style.opacity='.6';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat,longitude:lng}=pos.coords;nearbyLat=lat;nearbyLng=lng;
+    const near=nearestOf(RHRREAD_STNS,lat,lng);pickStn(near.n);
+  },()=>{if(btn){btn.textContent='❌ 定位失敗，請手動選擇';btn.style.opacity='1'}},{timeout:10000});
 }
 
 // ═══════════════════════════════════
 //  RSS FETCHING
 // ═══════════════════════════════════
+const PROXIES = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
 async function fetchRSS(feedCfg){
-  // Try primary URL first, then fallback
-  for(const url of [feedCfg.url, feedCfg.fallback]){
+  const url = feedCfg.url;
+  for(const mkProxy of PROXIES){
     try{
-      const res=await fetch(PROXY(url),{signal:AbortSignal.timeout(8000)});
-      const text=await res.text();
-      if(!text||text.startsWith('{')){continue} // allorigins error
-      const parser=new DOMParser();
-      const xml=parser.parseFromString(text,'text/xml');
-      if(xml.querySelector('parsererror'))continue;
-      const items=[...xml.querySelectorAll('item,entry')];
-      if(!items.length)continue;
-      return items.slice(0,40).map(item=>{
-        const gs=t=>item.querySelector(t)?.textContent?.trim()||'';
-        const link=gs('link')||item.querySelector('link')?.getAttribute('href')||'';
-        const desc=gs('description')||gs('summary');
-        return{title:gs('title'),link,pubDate:gs('pubDate')||gs('published')||gs('updated'),description:desc.replace(/<[^>]+>/g,'').slice(0,120)};
-      }).filter(i=>i.title);
-    }catch(e){continue}
+      const res = await fetch(mkProxy(url), {signal: AbortSignal.timeout(9000)});
+      const text = await res.text();
+      if(!text || text.length < 100) continue;
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      if(xml.querySelector('parsererror')) continue;
+      const items = [...xml.querySelectorAll('item, entry')];
+      if(!items.length) continue;
+      return items.slice(0,50).map(item => {
+        const gs = t => item.querySelector(t)?.textContent?.trim() || '';
+        const linkEl = item.querySelector('link');
+        const link = gs('link') || linkEl?.getAttribute('href') || '';
+        const desc = (gs('description') || gs('summary')).replace(/<[^>]+>/g,'').slice(0,160);
+        return { title: gs('title'), link, pubDate: gs('pubDate')||gs('published')||gs('updated'), description: desc };
+      }).filter(i => i.title);
+    }catch(e){ continue }
   }
   return null;
 }
@@ -943,28 +976,7 @@ function toggleEtaMode(){
 function setDist(m){nearbyDist=m;localStorage.setItem('nearby_dist',m);document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===m));loadNearby()}
 function syncDistPills(){document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist))}
 
-// ═══════════════════════════════════
-//  LOCATION PICKER (uses rhrread station list)
-// ═══════════════════════════════════
-function openLocPicker(){
-  setDTitle('天氣地點');
-  const isFile=location.protocol==='file:';
-  document.getElementById('drawer-body').innerHTML=`
-    ${isFile?`<div style="font-size:11px;color:var(--mid);background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.6">💡 以 <strong style="color:var(--amb2)">file://</strong> 開啟時瀏覽器封鎖定位，請手動選擇。</div>`:
-      `<button class="loc-gps-btn" id="gps-btn" onclick="useGPS()">📡 用我的位置自動選擇</button>`}
-    <div class="sec-lbl">香港天文台即時測站（rhrread）</div>
-    <div class="loc-grid">${RHRREAD_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')"><div class="loc-name">${s.n}</div></div>`).join('')}</div>`;
-  openOverlay();
-}
 function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer();loadWeather();document.getElementById('sett-stn-sub').textContent=n}
-function useGPS(){
-  if(!navigator.geolocation){alert('不支援定位');return}
-  const btn=document.getElementById('gps-btn');btn.textContent='📡 定位中…';btn.style.opacity='.6';
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const{latitude:lat,longitude:lng}=pos.coords;nearbyLat=lat;nearbyLng=lng;
-    const near=nearestOf(RHRREAD_STNS,lat,lng);pickStn(near.n);
-  },()=>{btn.textContent='❌ 定位失敗，請手動選擇';btn.style.opacity='1'},{timeout:10000});
-}
 
 // ═══════════════════════════════════
 //  PROFILES
