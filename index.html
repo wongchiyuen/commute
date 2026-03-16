@@ -124,6 +124,11 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-stop{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .bus-dest{font-size:12px;color:var(--mid)}
 .nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);margin-left:5px}
+.tp{display:inline-flex;align-items:center;font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;border:1px solid}
+.tp-kmb{color:var(--amb2);background:var(--amb-bg);border-color:var(--amb-bdr)}
+.tp-ctb{color:#2ed573;background:rgba(46,213,115,.1);border-color:rgba(46,213,115,.3)}
+.tp-mtr{color:#ff8a96;background:rgba(255,71,87,.12);border-color:rgba(255,71,87,.3)}
+.tp-lrt{color:#ffaa33;background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.3)}
 .bus-eta-wrap{display:flex;align-items:center;padding:0 11px 0 4px;flex-shrink:0}
 .eta-col{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
 .e1{font-family:var(--mono);font-size:25px;font-weight:700;line-height:1.1}
@@ -861,12 +866,39 @@ function parseXML(text){
 
 async function fetchFeed(url){
   const enc=encodeURIComponent(url);
+
+  // Strategy 0: Anthropic API as reliable server-side proxy (bypasses CORS entirely)
+  // Claude fetches the URL server-side and returns parsed items as JSON
+  try{
+    const prompt=`Fetch this RSS/XML URL and return a JSON array of news items. URL: ${url}
+Return ONLY a valid JSON array, no markdown, no explanation. Each item: {"title":"...","link":"...","pubDate":"...","description":"..."}
+Maximum 40 items, description max 200 chars, strip all HTML tags.`;
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:4000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await res.json();
+    // Extract text from response
+    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean=txt.replace(/```json|```/g,'').trim();
+    if(clean.startsWith('[')){
+      const items=JSON.parse(clean);
+      if(items?.length){console.log('[feed-0] Anthropic API ok:',items.length);return items.filter(i=>i.title);}
+    }
+  }catch(e){console.warn('[feed-0 Anthropic]',e.message)}
+
   // A: rss2json — best JSON API, handles Google/Yahoo, no CORS issues
   try{
     const res=await ft(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`);
     const j=await res.json();
     if(j.status==='ok'&&j.items?.length>0){
-      console.log('[feed] rss2json ok:', j.items.length, url);
+      console.log('[feed-A] rss2json ok:', j.items.length, url);
       return j.items.map(i=>({
         title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
         link:i.link||i.guid||'',
@@ -874,7 +906,7 @@ async function fetchFeed(url){
         description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,240),
       })).filter(i=>i.title);
     }
-    if(j.status==='error')console.warn('[feed] rss2json error:',j.message);
+    if(j.status==='error')console.warn('[feed-A] rss2json error:',j.message);
   }catch(e){console.warn('[feed-A]',e.message)}
 
   // B: allorigins /get — returns JSON {contents, status}
@@ -1366,9 +1398,9 @@ async function loadNearby(){
       const badgeStyle=isMTR?'background:rgba(255,71,87,.12);color:#ff8a96;border-color:rgba(255,71,87,.35);'
                       :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);'
                       :isLRT?'background:rgba(255,165,0,.1);color:#ffaa33;border-color:rgba(255,165,0,.3);':'';
-      const typeTag=isMTR?`<span style="font-size:9px;background:rgba(255,71,87,.15);color:#ff8a96;border-radius:4px;padding:1px 5px;margin-left:4px">MTR</span>`
-                   :isCTB?`<span style="font-size:9px;background:rgba(46,213,115,.12);color:#2ed573;border-radius:4px;padding:1px 5px;margin-left:4px">CTB</span>`
-                   :isLRT?`<span style="font-size:9px;background:rgba(255,165,0,.12);color:#ffaa33;border-radius:4px;padding:1px 5px;margin-left:4px">輕鐵</span>`:'';
+      const typeTag=isMTR?`<span class="tp tp-mtr">港鐵</span>`
+                   :isCTB?`<span class="tp tp-ctb">城巴</span>`
+                   :isLRT?`<span class="tp tp-lrt">輕鐵</span>`:`<span class="tp tp-kmb">九巴</span>`;
       const clickFn=isMTR?'':`onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"`;
       return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" ${clickFn}><div class="bus-badge" style="${badgeStyle}">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
     }).join('');
@@ -1389,8 +1421,8 @@ function renderBusList(){
     const urgency=m===null?'':m<=2?'soon':m<=8?'coming':'ok';
     const cc=m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
     let ec='';if(f._err)ec=`<div class="e-none">無數據</div>`;else if(!f._etas?.length)ec=`<div class="e-none">無班次</div>`;else ec=fmtEtas(f._etas,cc,now);
-    const tLabel=f.type==='ctb'?'<span style="font-size:9px;color:#2ed573;margin-left:4px">城巴</span>':f.type==='mtr'?'<span style="font-size:9px;color:#ff8a96;margin-left:4px">港鐵</span>':f.type==='lrt'?'<span style="font-size:9px;color:#ffaa33;margin-left:4px">輕鐵</span>':'<span style="font-size:9px;color:var(--dim);margin-left:4px">九巴</span>';
-    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}${tLabel}</div><div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
+    const tTag=f.type==='ctb'?'<span class="tp tp-ctb">城巴</span>':f.type==='mtr'?'<span class="tp tp-mtr">港鐵</span>':f.type==='lrt'?'<span class="tp tp-lrt">輕鐵</span>':'<span class="tp tp-kmb">九巴</span>';
+    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}</div><div class="bus-info"><div class="bus-stop">${f.stopName}${tTag}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
   }).join('');
 }
 function removeFav(e,i){e.stopPropagation();if(!confirm(`確定移除「${favs[i]?.route} 往 ${favs[i]?.dest}」？`))return;favs.splice(i,1);saveFavs(activePid,favs);renderBusList()}
@@ -1593,18 +1625,43 @@ async function doRouteSearch(){
 
   // ── MTR ───────────────────────────────────────────────────────────────────
   if(ts.mtr){
-    const mtrMatch=Object.entries(MTR_LINE).filter(([code,name])=>
-      code===q||code.includes(q)||name.includes(qZh)||
-      q==='MTR'||qZh==='港鐵'||qZh==='地鐵'
-    );
-    if(mtrMatch.length){
-      const html=`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrMatch.map(([code,name])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,71,87,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${code}</div>
-          <div><div style="font-size:14px;font-weight:500;color:var(--bright)">${name}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">港鐵 MTR · 點附近站可見班次</div></div>
-        </div>`).join('');
-      sections.push(html);
+    // Match by station name OR line name/code OR keywords
+    const isGeneral = q==='MTR'||qZh==='港鐵'||qZh==='地鐵'||qZh==='地铁';
+    // Station name match
+    const stnMatches = isGeneral ? MTR_STNS :
+      MTR_STNS.filter(s=>s.n.includes(qZh)||s.n.includes(q));
+    // Line name/code match
+    const lineMatches = isGeneral ? Object.entries(MTR_LINE) :
+      Object.entries(MTR_LINE).filter(([code,name])=>code===q||code.startsWith(q)||name.includes(qZh));
+
+    const mtrItems = [];
+    // Deduplicate stations
+    const seenStns = new Set();
+    stnMatches.forEach(s=>{
+      if(seenStns.has(s.n))return; seenStns.add(s.n);
+      const lineNames = s.lines.map(l=>MTR_LINE[l]||l).join('、');
+      mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(255,71,87,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px;display:flex;align-items:center;gap:11px">
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 11px;flex-shrink:0">🚇</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--bright)">${s.n}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">${lineNames}</div></div>
+        <span class="tp tp-mtr" style="font-size:10px">港鐵</span>
+      </div>`);
+    });
+    // Show line cards if matched by line
+    if(!stnMatches.length && lineMatches.length){
+      lineMatches.forEach(([code,name])=>{
+        const stnsOnLine=MTR_STNS.filter(s=>s.lines.includes(code));
+        mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(255,71,87,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:7px;padding:3px 10px">${code}</div>
+            <div style="font-size:14px;font-weight:600;color:var(--bright)">${name}</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${stnsOnLine.slice(0,12).map(s=>`<span style="font-size:12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:3px 8px;color:var(--txt)">${s.n}</span>`).join('')}${stnsOnLine.length>12?`<span style="font-size:12px;color:var(--dim)">+${stnsOnLine.length-12}</span>`:''}</div>
+        </div>`);
+      });
+    }
+    if(mtrItems.length){
+      sections.push(`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrItems.join(''));
     }
   }
 
@@ -1759,33 +1816,105 @@ const MTR_API='https://rt.data.one.gov.hk/v1/transport/mtr/getSchedule.php';
 
 // MTR station list (name, line, station code, approx coords)
 const MTR_STNS=[
-  {n:'金鐘',lines:['TWL','ISL','SIL'],codes:{TWL:'ADM',ISL:'ADM',SIL:'ADM'},lat:22.279,lng:114.165},
-  {n:'中環',lines:['TWL','ISL'],codes:{TWL:'CEN',ISL:'CEN'},lat:22.282,lng:114.158},
-  {n:'灣仔',lines:['ISL'],codes:{ISL:'WAC'},lat:22.277,lng:114.173},
-  {n:'銅鑼灣',lines:['ISL'],codes:{ISL:'CWB'},lat:22.280,lng:114.183},
-  {n:'旺角',lines:['TWL','KTL'],codes:{TWL:'MOK',KTL:'MOK'},lat:22.320,lng:114.169},
-  {n:'油麻地',lines:['TWL','KTL'],codes:{TWL:'YMT',KTL:'YMT'},lat:22.313,lng:114.171},
-  {n:'佐敦',lines:['TWL'],codes:{TWL:'JOR'},lat:22.305,lng:114.171},
-  {n:'尖沙咀',lines:['TWL'],codes:{TWL:'TST'},lat:22.298,lng:114.172},
-  {n:'紅磡',lines:['KTL','EAL'],codes:{KTL:'HOM',EAL:'HUH'},lat:22.303,lng:114.182},
-  {n:'九龍塘',lines:['KTL','EAL'],codes:{KTL:'KOT',EAL:'KOT'},lat:22.337,lng:114.176},
-  {n:'沙田',lines:['EAL','MAL'],codes:{EAL:'SHT',MAL:'SHT'},lat:22.382,lng:114.189},
-  {n:'大埔墟',lines:['EAL'],codes:{EAL:'TAP'},lat:22.445,lng:114.171},
-  {n:'上水',lines:['EAL'],codes:{EAL:'SHS'},lat:22.502,lng:114.128},
-  {n:'羅湖',lines:['EAL'],codes:{EAL:'LOW'},lat:22.533,lng:114.113},
-  {n:'將軍澳',lines:['TKL'],codes:{TKL:'TKO'},lat:22.307,lng:114.260},
-  {n:'坑口',lines:['TKL'],codes:{TKL:'HAH'},lat:22.316,lng:114.258},
-  {n:'青衣',lines:['TCL','AEL'],codes:{TCL:'TSY',AEL:'TSY'},lat:22.358,lng:114.109},
-  {n:'東涌',lines:['TCL'],codes:{TCL:'TUC'},lat:22.289,lng:113.944},
-  {n:'機場',lines:['AEL'],codes:{AEL:'AIR'},lat:22.315,lng:113.937},
-  {n:'荃灣',lines:['TWL'],codes:{TWL:'TSW'},lat:22.371,lng:114.117},
-  {n:'葵芳',lines:['TWL'],codes:{TWL:'KWF'},lat:22.358,lng:114.128},
-  {n:'美孚',lines:['TWL','WRL'],codes:{TWL:'MEF',WRL:'MEF'},lat:22.338,lng:114.137},
-  {n:'奧運',lines:['TWL'],codes:{TWL:'OLY'},lat:22.317,lng:114.160},
-  {n:'大圍',lines:['KTL','EAL','MAL'],codes:{KTL:'TAW',EAL:'TAW',MAL:'TAW'},lat:22.373,lng:114.178},
-  {n:'鑽石山',lines:['KTL'],codes:{KTL:'DIH'},lat:22.340,lng:114.201},
-  {n:'牛頭角',lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
-  {n:'觀塘',lines:['KTL'],codes:{KTL:'KWT'},lat:22.312,lng:114.226},
+  // 港島綫 ISL
+  {n:'堅尼地城',lines:['ISL'],codes:{ISL:'KET'},lat:22.282,lng:114.128},
+  {n:'香港大學',lines:['ISL'],codes:{ISL:'HKU'},lat:22.284,lng:114.137},
+  {n:'西營盤',  lines:['ISL'],codes:{ISL:'SYP'},lat:22.286,lng:114.143},
+  {n:'上環',    lines:['ISL'],codes:{ISL:'SHW'},lat:22.287,lng:114.152},
+  {n:'中環',    lines:['TWL','ISL'],codes:{TWL:'CEN',ISL:'CEN'},lat:22.282,lng:114.158},
+  {n:'金鐘',    lines:['TWL','ISL','SIL'],codes:{TWL:'ADM',ISL:'ADM',SIL:'ADM'},lat:22.279,lng:114.165},
+  {n:'灣仔',    lines:['ISL'],codes:{ISL:'WAC'},lat:22.277,lng:114.173},
+  {n:'銅鑼灣',  lines:['ISL'],codes:{ISL:'CWB'},lat:22.280,lng:114.183},
+  {n:'天后',    lines:['ISL'],codes:{ISL:'TIH'},lat:22.282,lng:114.192},
+  {n:'炮台山',  lines:['ISL'],codes:{ISL:'FOH'},lat:22.288,lng:114.198},
+  {n:'北角',    lines:['ISL'],codes:{ISL:'NOP'},lat:22.291,lng:114.209},
+  {n:'鰂魚涌',  lines:['ISL'],codes:{ISL:'QUB'},lat:22.288,lng:114.217},
+  {n:'太古',    lines:['ISL'],codes:{ISL:'TAK'},lat:22.285,lng:114.222},
+  {n:'西灣河',  lines:['ISL'],codes:{ISL:'SWH'},lat:22.280,lng:114.229},
+  {n:'筲箕灣',  lines:['ISL'],codes:{ISL:'SKW'},lat:22.278,lng:114.236},
+  {n:'杏花邨',  lines:['ISL'],codes:{ISL:'HFC'},lat:22.270,lng:114.238},
+  {n:'柴灣',    lines:['ISL'],codes:{ISL:'CHW'},lat:22.265,lng:114.238},
+  // 荃灣綫 TWL
+  {n:'荃灣',    lines:['TWL'],codes:{TWL:'TSW'},lat:22.371,lng:114.117},
+  {n:'大窩口',  lines:['TWL'],codes:{TWL:'TWO'},lat:22.370,lng:114.127},
+  {n:'葵興',    lines:['TWL'],codes:{TWL:'KWH'},lat:22.363,lng:114.127},
+  {n:'葵芳',    lines:['TWL'],codes:{TWL:'KWF'},lat:22.358,lng:114.128},
+  {n:'荔景',    lines:['TWL'],codes:{TWL:'LCK'},lat:22.348,lng:114.132},
+  {n:'美孚',    lines:['TWL','WRL'],codes:{TWL:'MEF',WRL:'MEF'},lat:22.338,lng:114.137},
+  {n:'茘枝角',  lines:['TWL'],codes:{TWL:'CSW'},lat:22.337,lng:114.149},
+  {n:'長沙灣',  lines:['TWL'],codes:{TWL:'CSW'},lat:22.335,lng:114.155},
+  {n:'深水埗',  lines:['TWL'],codes:{TWL:'SSP'},lat:22.330,lng:114.163},
+  {n:'太子',    lines:['TWL','KTL'],codes:{TWL:'PRE',KTL:'PRE'},lat:22.325,lng:114.168},
+  {n:'旺角',    lines:['TWL','KTL'],codes:{TWL:'MOK',KTL:'MOK'},lat:22.320,lng:114.169},
+  {n:'油麻地',  lines:['TWL','KTL'],codes:{TWL:'YMT',KTL:'YMT'},lat:22.313,lng:114.171},
+  {n:'佐敦',    lines:['TWL'],codes:{TWL:'JOR'},lat:22.305,lng:114.171},
+  {n:'尖沙咀',  lines:['TWL'],codes:{TWL:'TST'},lat:22.298,lng:114.172},
+  // 觀塘綫 KTL
+  {n:'調景嶺',  lines:['TKL','KTL'],codes:{TKL:'TIK',KTL:'TIK'},lat:22.304,lng:114.256},
+  {n:'彩虹',    lines:['KTL'],codes:{KTL:'CHH'},lat:22.334,lng:114.205},
+  {n:'鑽石山',  lines:['KTL'],codes:{KTL:'DIH'},lat:22.340,lng:114.201},
+  {n:'黃大仙',  lines:['KTL'],codes:{KTL:'WTS'},lat:22.342,lng:114.194},
+  {n:'樂富',    lines:['KTL'],codes:{KTL:'LOF'},lat:22.338,lng:114.187},
+  {n:'九龍塘',  lines:['KTL','EAL'],codes:{KTL:'KOT',EAL:'KOT'},lat:22.337,lng:114.176},
+  {n:'石硤尾',  lines:['KTL'],codes:{KTL:'SKM'},lat:22.332,lng:114.168},
+  {n:'又一城',  lines:['KTL'],codes:{KTL:'YAT'},lat:22.325,lng:114.172},
+  {n:'牛頭角',  lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
+  {n:'觀塘',    lines:['KTL'],codes:{KTL:'KWT'},lat:22.312,lng:114.226},
+  {n:'秀茂坪',  lines:['KTL'],codes:{KTL:'SMP'},lat:22.316,lng:114.232},
+  {n:'坪石',    lines:['KTL'],codes:{KTL:'PIH'},lat:22.319,lng:114.238},
+  {n:'九龍灣',  lines:['KTL'],codes:{KTL:'KOB'},lat:22.324,lng:114.213},
+  {n:'牛頭角',  lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
+  // 東鐵綫 EAL
+  {n:'紅磡',    lines:['KTL','EAL'],codes:{KTL:'HOM',EAL:'HUH'},lat:22.303,lng:114.182},
+  {n:'旺角東',  lines:['EAL'],codes:{EAL:'MKK'},lat:22.323,lng:114.172},
+  {n:'大圍',    lines:['KTL','EAL','MAL'],codes:{KTL:'TAW',EAL:'TAW',MAL:'TAW'},lat:22.373,lng:114.178},
+  {n:'沙田',    lines:['EAL','MAL'],codes:{EAL:'SHT',MAL:'SHT'},lat:22.382,lng:114.189},
+  {n:'火炭',    lines:['EAL'],codes:{EAL:'FOT'},lat:22.396,lng:114.198},
+  {n:'馬料水',  lines:['EAL'],codes:{EAL:'UNI'},lat:22.413,lng:114.210},
+  {n:'大學',    lines:['EAL'],codes:{EAL:'UNI'},lat:22.413,lng:114.210},
+  {n:'大埔墟',  lines:['EAL'],codes:{EAL:'TAP'},lat:22.445,lng:114.171},
+  {n:'太和',    lines:['EAL'],codes:{EAL:'TAH'},lat:22.450,lng:114.162},
+  {n:'粉嶺',    lines:['EAL'],codes:{EAL:'FLM'},lat:22.494,lng:114.139},
+  {n:'上水',    lines:['EAL'],codes:{EAL:'SHS'},lat:22.502,lng:114.128},
+  {n:'羅湖',    lines:['EAL'],codes:{EAL:'LOW'},lat:22.533,lng:114.113},
+  {n:'落馬洲',  lines:['EAL'],codes:{EAL:'LMC'},lat:22.529,lng:114.079},
+  // 將軍澳綫 TKL
+  {n:'寶琳',    lines:['TKL'],codes:{TKL:'POA'},lat:22.322,lng:114.262},
+  {n:'坑口',    lines:['TKL'],codes:{TKL:'HAH'},lat:22.316,lng:114.258},
+  {n:'將軍澳',  lines:['TKL'],codes:{TKL:'TKO'},lat:22.307,lng:114.260},
+  {n:'坑口',    lines:['TKL'],codes:{TKL:'HAH'},lat:22.316,lng:114.258},
+  {n:'日出康城',lines:['TKL'],codes:{TKL:'LHP'},lat:22.295,lng:114.270},
+  // 東涌綫 TCL / 機場快綫 AEL
+  {n:'青衣',    lines:['TCL','AEL'],codes:{TCL:'TSY',AEL:'TSY'},lat:22.358,lng:114.109},
+  {n:'東涌',    lines:['TCL'],codes:{TCL:'TUC'},lat:22.289,lng:113.944},
+  {n:'機場',    lines:['AEL'],codes:{AEL:'AIR'},lat:22.315,lng:113.937},
+  {n:'博覽館',  lines:['AEL'],codes:{AEL:'AWE'},lat:22.323,lng:113.944},
+  {n:'奧運',    lines:['TWL'],codes:{TWL:'OLY'},lat:22.317,lng:114.160},
+  // 南港島綫 SIL
+  {n:'海怡半島', lines:['SIL'],codes:{SIL:'OCP'},lat:22.243,lng:114.150},
+  {n:'黃竹坑',  lines:['SIL'],codes:{SIL:'WCH'},lat:22.247,lng:114.175},
+  {n:'利東',    lines:['SIL'],codes:{SIL:'LET'},lat:22.242,lng:114.161},
+  {n:'海洋公園', lines:['SIL'],codes:{SIL:'OCP'},lat:22.248,lng:114.173},
+  // 屯馬綫 WRL/MAL
+  {n:'烏溪沙',  lines:['MAL'],codes:{MAL:'WKS'},lat:22.425,lng:114.279},
+  {n:'馬鞍山',  lines:['MAL'],codes:{MAL:'MOS'},lat:22.421,lng:114.255},
+  {n:'恒安',    lines:['MAL'],codes:{MAL:'HEO'},lat:22.416,lng:114.246},
+  {n:'石門',    lines:['MAL'],codes:{MAL:'STK'},lat:22.393,lng:114.210},
+  {n:'圓洲角',  lines:['MAL'],codes:{MAL:'CKT'},lat:22.388,lng:114.197},
+  {n:'第一城',  lines:['MAL'],codes:{MAL:'SCK'},lat:22.385,lng:114.194},
+  {n:'車公廟',  lines:['MAL'],codes:{MAL:'CKT'},lat:22.381,lng:114.186},
+  {n:'兆康',    lines:['WRL'],codes:{WRL:'SIH'},lat:22.414,lng:113.968},
+  {n:'天水圍',  lines:['WRL'],codes:{WRL:'TWW'},lat:22.447,lng:114.008},
+  {n:'朗屏',    lines:['WRL'],codes:{WRL:'LPE'},lat:22.449,lng:114.031},
+  {n:'元朗',    lines:['WRL'],codes:{WRL:'YUL'},lat:22.445,lng:114.022},
+  {n:'錦上路',  lines:['WRL'],codes:{WRL:'KSR'},lat:22.470,lng:114.051},
+  {n:'荃灣西',  lines:['WRL'],codes:{WRL:'TWW'},lat:22.368,lng:114.108},
+  {n:'海壩',    lines:['WRL'],codes:{WRL:'HIB'},lat:22.338,lng:113.940},
+  {n:'屯門',    lines:['WRL'],codes:{WRL:'TUM'},lat:22.392,lng:113.977},
+  {n:'小欖',    lines:['WRL'],codes:{WRL:'SIL'},lat:22.448,lng:113.962},
+  {n:'長沙',    lines:['WRL'],codes:{WRL:'CHS'},lat:22.353,lng:114.004},
+  {n:'凹頭',    lines:['WRL'],codes:{WRL:'AWH'},lat:22.452,lng:114.016},
+  {n:'古洞',    lines:['WRL'],codes:{WRL:'KOT'},lat:22.508,lng:114.107},
 ];
 const MTR_LINE={TWL:'荃灣綫',ISL:'港島綫',KTL:'觀塘綫',EAL:'東鐵綫',TKL:'將軍澳綫',TCL:'東涌綫',AEL:'機場快綫',SIL:'南港島綫',MAL:'馬鞍山綫',WRL:'西鐵綫'};
 
