@@ -125,9 +125,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-dest{font-size:12px;color:var(--mid)}
 .nearby-dist{font-family:var(--mono);font-size:10px;color:var(--blu);margin-left:5px}
 .tp{display:inline-flex;align-items:center;font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;border:1px solid}
-.tp-kmb{color:var(--amb2);background:var(--amb-bg);border-color:var(--amb-bdr)}
-.tp-ctb{color:#2ed573;background:rgba(46,213,115,.1);border-color:rgba(46,213,115,.3)}
-.tp-mtr{color:#ff8a96;background:rgba(255,71,87,.12);border-color:rgba(255,71,87,.3)}
+.tp-kmb{color:#ff6b6b;background:rgba(255,71,87,.1);border-color:rgba(255,71,87,.3)}
+.tp-ctb{color:#ffd43b;background:rgba(255,212,59,.1);border-color:rgba(255,212,59,.3)}
+.tp-mtr{color:#74b9ff;background:rgba(116,185,255,.1);border-color:rgba(116,185,255,.3)}
 .tp-lrt{color:#ffaa33;background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.3)}
 .bus-eta-wrap{display:flex;align-items:center;padding:0 11px 0 4px;flex-shrink:0}
 .eta-col{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
@@ -865,91 +865,88 @@ function parseXML(text){
 }
 
 async function fetchFeed(url){
+  const cacheKey='rss_'+btoa(url).slice(0,40);
+  const TTL=12*60*1000; // 12 min cache
+
+  // Check localStorage cache first
+  try{
+    const cached=JSON.parse(localStorage.getItem(cacheKey)||'null');
+    if(cached&&cached.ts&&(Date.now()-cached.ts<TTL)&&cached.items?.length){
+      console.log('[feed] cache hit:',cached.items.length,url);
+      return cached.items;
+    }
+  }catch{}
+
   const enc=encodeURIComponent(url);
+  let items=null;
 
-  // Strategy 0: Anthropic API as reliable server-side proxy (bypasses CORS entirely)
-  // Claude fetches the URL server-side and returns parsed items as JSON
-  try{
-    const prompt=`Fetch this RSS/XML URL and return a JSON array of news items. URL: ${url}
-Return ONLY a valid JSON array, no markdown, no explanation. Each item: {"title":"...","link":"...","pubDate":"...","description":"..."}
-Maximum 40 items, description max 200 chars, strip all HTML tags.`;
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:4000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const data=await res.json();
-    // Extract text from response
-    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    const clean=txt.replace(/```json|```/g,'').trim();
-    if(clean.startsWith('[')){
-      const items=JSON.parse(clean);
-      if(items?.length){console.log('[feed-0] Anthropic API ok:',items.length);return items.filter(i=>i.title);}
+  // Run ALL strategies in PARALLEL - take first to succeed
+  const strategies=[
+    // A: rss2json (JSON API - most reliable for Google/Yahoo/RTHK)
+    fetch(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`,{signal:AbortSignal.timeout(12000)})
+      .then(r=>r.json()).then(j=>{
+        if(j.status==='ok'&&j.items?.length>0)
+          return j.items.map(i=>({
+            title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
+            link:i.link||i.guid||'',pubDate:i.pubDate||'',
+            description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,240),
+          })).filter(i=>i.title);
+        throw new Error('rss2json:'+j.status+':'+j.message);
+      }),
+    // B: allorigins /get JSON wrapper
+    fetch(`https://api.allorigins.win/get?url=${enc}`,{signal:AbortSignal.timeout(12000)})
+      .then(r=>r.json()).then(j=>{
+        if(j?.status?.http_code===200&&j.contents?.length>100){
+          const it=parseXML(j.contents);
+          if(it?.length)return it;
+        }throw new Error('allorigins/get empty');
+      }),
+    // C: corsproxy.io
+    fetch(`https://corsproxy.io/?${enc}`,{signal:AbortSignal.timeout(12000)})
+      .then(r=>{if(!r.ok)throw new Error('corsproxy '+r.status);return r.text()})
+      .then(t=>{const it=parseXML(t);if(it?.length)return it;throw new Error('corsproxy empty');}),
+    // D: allorigins /raw
+    fetch(`https://api.allorigins.win/raw?url=${enc}`,{signal:AbortSignal.timeout(12000)})
+      .then(r=>{if(!r.ok)throw new Error('raw '+r.status);return r.text()})
+      .then(t=>{const it=parseXML(t);if(it?.length)return it;throw new Error('raw empty');}),
+    // E: codetabs
+    fetch(`https://api.codetabs.com/v1/proxy?quest=${enc}`,{signal:AbortSignal.timeout(14000)})
+      .then(r=>{if(!r.ok)throw new Error('codetabs '+r.status);return r.text()})
+      .then(t=>{const it=parseXML(t);if(it?.length)return it;throw new Error('codetabs empty');}),
+  ];
+
+  // Race all in parallel, collect results, use first success
+  const results=await Promise.allSettled(strategies);
+  for(const[i,res]of results.entries()){
+    if(res.status==='fulfilled'&&res.value?.length){
+      console.log(`[feed] strategy ${String.fromCharCode(65+i)} won:`,res.value.length,url);
+      items=res.value;
+      break;
     }
-  }catch(e){console.warn('[feed-0 Anthropic]',e.message)}
+    console.warn(`[feed] strategy ${String.fromCharCode(65+i)} failed:`,
+      res.reason?.message||res.reason);
+  }
 
-  // A: rss2json — best JSON API, handles Google/Yahoo, no CORS issues
+  // Persist to localStorage cache
+  if(items?.length){
+    try{localStorage.setItem(cacheKey,JSON.stringify({items,ts:Date.now()}))}catch{}
+    return items;
+  }
+
+  // All failed - try returning stale cache rather than empty
   try{
-    const res=await ft(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`);
-    const j=await res.json();
-    if(j.status==='ok'&&j.items?.length>0){
-      console.log('[feed-A] rss2json ok:', j.items.length, url);
-      return j.items.map(i=>({
-        title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
-        link:i.link||i.guid||'',
-        pubDate:i.pubDate||'',
-        description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,240),
-      })).filter(i=>i.title);
+    const stale=JSON.parse(localStorage.getItem(cacheKey)||'null');
+    if(stale?.items?.length){
+      console.warn('[feed] using stale cache for',url);
+      return stale.items.map(i=>({...i,_stale:true}));
     }
-    if(j.status==='error')console.warn('[feed-A] rss2json error:',j.message);
-  }catch(e){console.warn('[feed-A]',e.message)}
+  }catch{}
 
-  // B: allorigins /get — returns JSON {contents, status}
-  try{
-    const j=await ft(`https://api.allorigins.win/get?url=${enc}`).then(r=>r.json());
-    if(j?.status?.http_code===200&&j.contents?.length>100){
-      const items=parseXML(j.contents);
-      if(items?.length){console.log('[feed-B] allorigins/get ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-B]',e.message)}
-
-  // C: corsproxy.io
-  try{
-    const res=await ft(`https://corsproxy.io/?${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-C] corsproxy ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-C]',e.message)}
-
-  // D: allorigins /raw
-  try{
-    const res=await ft(`https://api.allorigins.win/raw?url=${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-D] allorigins/raw ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-D]',e.message)}
-
-  // E: codetabs proxy
-  try{
-    const res=await ft(`https://api.codetabs.com/v1/proxy?quest=${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-E] codetabs ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-E]',e.message)}
-
-  console.warn('[feed] ALL failed for', url);
+  console.error('[feed] ALL strategies failed for',url);
   return null;
 }
 
-// Traffic: try direct fetch first (data.one.gov.hk has CORS:*)
+
 async function fetchTrafficDirect(src){
   // Try the data.one.gov.hk URL directly first — no proxy needed
   if(src.direct){
@@ -977,8 +974,8 @@ function renderFeedItems(items,el,srcKey,showSrc){
       <div style="font-size:32px;margin-bottom:12px">📡</div>
       <div style="font-size:14px;font-weight:500;color:var(--bright);margin-bottom:6px">無法載入資料</div>
       <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:16px">
-        RSS 來源受 CORS 限制，代理服務器繁忙或不可用。<br>
-        各代理均已嘗試，請稍後重試。
+        無法從所有代理取得資料。<br>
+        可點「↺ 重試」或直接訪問新聞網站。
       </div>
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button onclick="reloadCurrentFeed()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 18px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button>
@@ -990,11 +987,12 @@ function renderFeedItems(items,el,srcKey,showSrc){
   }
   el.innerHTML=items.slice(0,80).map((item,i)=>{
     const srcTag=showSrc&&item._src?`<span style="font-size:10px;font-weight:700;color:${SRC_COLOR[item._src]||'var(--dim)'};font-family:var(--mono);letter-spacing:.04em">${SRC_LABEL[item._src]||item._src}</span>`:'';
+    const staleTag=item._stale?`<span style="font-size:10px;color:var(--dim);margin-left:4px">（快取）</span>`:'';
     const timeTag=item.pubDate?`<span>${relTime(item.pubDate)}</span>`:'';
     return`<a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.01}s">
       <div class="feed-item-title">${item.title}</div>
       ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
-      <div class="feed-item-meta">${srcTag}${timeTag}</div>
+      <div class="feed-item-meta">${srcTag}${staleTag}${timeTag}</div>
     </a>`;
   }).join('');
 }
@@ -1370,16 +1368,7 @@ async function loadNearby(){
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();const rows=[];
     etaResults.forEach((res,i)=>{const stop=nearby[i];const seen=new Set();(res.data||[]).forEach(e=>{if(!e.eta)return;const ts=new Date(e.eta).getTime();if(ts<now-30000)return;const key=`${e.route}_${e.dir}_${stop.stop}`;if(!seen.has(key)){seen.add(key);rows.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,_etas:[ts]})}else{const ex=rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);if(ex&&ex._etas.length<3)ex._etas.push(ts)}})});
-    // Optionally add CTB/MTR results
-    const ts=getTransportSettings();
-    if(ts.ctb){
-      try{const ctbRows=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbRows)}catch{}
-    }
-    if(ts.mtr){
-      try{const mtrRows=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrRows)}catch{}
-    }
-
-    // Add CTB / MTR if enabled in settings
+    // Add CTB / MTR / LRT if enabled in settings
     const _ts=getTransportSettings();
     if(_ts.ctb){try{const ctbR=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbR)}catch(e){console.warn('[CTB]',e)}}
     if(_ts.mtr){try{const mtrR=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrR)}catch(e){console.warn('[MTR]',e)}}
@@ -1566,6 +1555,16 @@ function routeCard(route,dirs,badgeColor,borderColor,accentColor,label,clickFn){
   </div>`;
 }
 
+const TRANSPORT_KEYWORDS={
+  kmb:['九巴','九龍巴士','kmb'],
+  ctb:['城巴','citybus','ctb'],
+  mtr:['港鐵','地鐵','鐵路','mtr','metro'],
+  lrt:['輕鐵','lrt','輕鐵路線'],
+};
+function matchesKeyword(raw, type){
+  return TRANSPORT_KEYWORDS[type]?.some(k=>raw.toLowerCase().includes(k.toLowerCase()));
+}
+
 async function doRouteSearch(){
   const raw=(document.getElementById('search-route-inp')?.value||'').trim();
   const q=raw.toUpperCase();
@@ -1596,7 +1595,7 @@ async function doRouteSearch(){
   }catch(e){console.warn('[KMB search]',e)}
 
   // ── CTB ──────────────────────────────────────────────────────────────────
-  if(ts.ctb){
+  if(ts.ctb||matchesKeyword(raw,'ctb')){
     try{
       if(!window._ctbRoutes){
         // Fetch all CTB routes (both directions)
@@ -1624,7 +1623,7 @@ async function doRouteSearch(){
   }
 
   // ── MTR ───────────────────────────────────────────────────────────────────
-  if(ts.mtr){
+  if(ts.mtr||matchesKeyword(raw,'mtr')){
     // Match by station name OR line name/code OR keywords
     const isGeneral = q==='MTR'||qZh==='港鐵'||qZh==='地鐵'||qZh==='地铁';
     // Station name match
@@ -1666,7 +1665,7 @@ async function doRouteSearch(){
   }
 
   // ── LRT ───────────────────────────────────────────────────────────────────
-  if(ts.lrt){
+  if(ts.lrt||matchesKeyword(raw,'lrt')){
     const LRT_ROUTES={
       '505':'天水圍循環綫','507':'元朗─屯門南','610':'屯門市中心─兆康',
       '614':'屯門碼頭─元朗','614P':'屯門碼頭─元朗','615':'屯門碼頭─天水圍',
@@ -1952,42 +1951,61 @@ async function fetchMTRNearby(lat,lng){
 
 async function fetchCTBNearby(lat,lng,radius){
   try{
-    // CTB stop list is large; use a cached approach
+    // CTB stop list - cache in sessionStorage to avoid repeated large downloads
     if(!window._ctbStops){
-      const d=await fetch(`${CTB}/stop`).then(r=>r.json());
-      window._ctbStops=d.data||[];
+      const cached=sessionStorage.getItem('_ctbStops');
+      if(cached){window._ctbStops=JSON.parse(cached);}
+      else{
+        // CTB v2 API stop list
+        const d=await fetch('https://rt.data.one.gov.hk/v2/transport/citybus/stop',
+          {signal:AbortSignal.timeout(10000)}).then(r=>r.json());
+        window._ctbStops=d.data||[];
+        try{sessionStorage.setItem('_ctbStops',JSON.stringify(window._ctbStops))}catch{}
+      }
     }
     const nearby=window._ctbStops
-      .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude),parseFloat(s.long||s.longitude))}))
-      .filter(s=>s.dist<=radius&&!isNaN(s.dist))
-      .sort((a,b)=>a.dist-b.dist).slice(0,8);
+      .map(s=>({...s,
+        lat_n:parseFloat(s.lat||s.latitude||0),
+        lng_n:parseFloat(s.long||s.longitude||s.lng||0)
+      }))
+      .filter(s=>s.lat_n&&s.lng_n)
+      .map(s=>({...s,dist:haverDist(lat,lng,s.lat_n,s.lng_n)}))
+      .filter(s=>s.dist<=radius)
+      .sort((a,b)=>a.dist-b.dist).slice(0,6);
+    if(!nearby.length)return[];
     const now=Date.now();
     const results=[];
     await Promise.all(nearby.map(async stop=>{
       try{
-        const d=await fetch(`${CTB}/eta/CTB/${stop.stop}/all`).then(r=>r.json());
+        // Use v2 eta endpoint: /eta/CTB/{stop}/all
+        const d=await fetch(
+          `https://rt.data.one.gov.hk/v2/transport/citybus/eta/ctb/${stop.stop}/all`,
+          {signal:AbortSignal.timeout(8000)}
+        ).then(r=>r.json());
         const seen=new Set();
         (d.data||[]).forEach(e=>{
           if(!e.eta)return;
           const ts=new Date(e.eta).getTime();
           if(ts<now-30000)return;
-          const key=`${e.route}_${e.dir}`;
+          const key=`${e.route}_${e.dir}_${stop.stop}`;
           if(!seen.has(key)){
             seen.add(key);
             results.push({
-              type:'ctb',route:e.route,stopName:stop.name_tc||stop.stop,
-              dest:e.dest_tc||'',stopId:stop.stop,serviceType:'1',
+              type:'ctb',route:e.route,
+              stopName:stop.name_tc||stop.name_en||stop.stop,
+              dest:e.dest_tc||e.dest_en||'',
+              stopId:stop.stop,serviceType:'1',
               _etas:[ts],_first:ts,dist:Math.round(stop.dist),
             });
-          } else {
-            const ex=results.find(r=>r.route===e.route&&r.stopId===stop.stop);
+          }else{
+            const ex=results.find(r=>r.route===e.route&&r.stopId===stop.stop&&r.dir===e.dir);
             if(ex&&ex._etas.length<3)ex._etas.push(ts);
           }
         });
-      }catch{}
+      }catch(e){console.warn('[CTB stop]',stop.stop,e.message)}
     }));
     return results;
-  }catch{return[]}
+  }catch(e){console.warn('[CTBNearby]',e);return[]}
 }
 
 // ═══════════════════════════════════
