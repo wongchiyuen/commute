@@ -84,6 +84,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .tide-ht{font-family:var(--mono);font-size:11px;color:var(--mid);margin-top:1px}
 .loc-section-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:14px 0 8px;padding-left:1px}
 .rsl-focus{background:rgba(240,165,0,.06);border-radius:8px}
+.srch-section-lbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:10px 0 6px;padding-left:2px}
+.srch-section-lbl:first-child{margin-top:0}
 
 /* ══ PROFILE TABS ══ */
 .profiles-bar{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:60px}
@@ -117,7 +119,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-card.card-ghost{opacity:.25}.bus-card.card-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04)}.bus-card.card-slot::before{background:transparent}
 @keyframes slideIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .drag-handle{display:flex;align-items:center;justify-content:center;padding:0 8px;color:var(--dim);font-size:16px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
-.bus-badge{display:flex;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);color:var(--amb2);font-family:var(--mono);font-size:36px;font-weight:700;width:88px;flex-shrink:0;text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px}
+.bus-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);color:var(--amb2);font-family:var(--mono);font-size:32px;font-weight:700;width:80px;flex-shrink:0;text-shadow:0 0 18px rgba(240,165,0,.28);letter-spacing:-1px;gap:2px;padding:6px 4px}
 .bus-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:10px 11px}
 .bus-stop{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .bus-dest{font-size:12px;color:var(--mid)}
@@ -326,7 +328,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page" id="page-traffic">
   <div class="feed-page">
     <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ttab-td" onclick="switchTrafficFeed('td')">🚦 運輸署</button>
+      <button class="sub-tab active" id="ttab-all"  onclick="switchTrafficFeed('all')">📋 全部</button>
+      <button class="sub-tab"        id="ttab-td"   onclick="switchTrafficFeed('td')">🚦 特別交通消息</button>
+      <button class="sub-tab"        id="ttab-rthk" onclick="switchTrafficFeed('rthk')">📻 RTHK 交通</button>
     </div>
     <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
       <button class="feed-refresh-btn" onclick="reloadTrafficFeed()">↺ 重新載入</button>
@@ -417,7 +421,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <div class="copy-ver">v1.2 · 2026</div>
       <div class="copy-line">
         天氣：<a href="https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm" target="_blank">香港天文台開放數據</a><br>
-        巴士：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
+        九巴：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
+        城巴：<a href="https://data.one.gov.hk/zh-hant/dataset/citybus-eta" target="_blank">城巴實時到站 API</a><br>
+        港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
         新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台</a>、<a href="https://hk.news.yahoo.com" target="_blank">Yahoo 香港</a><br>
         交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
@@ -431,8 +437,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page" id="page-search">
   <div style="flex-shrink:0;padding:12px 12px 8px;background:var(--bg2);border-bottom:1px solid var(--bdr)">
     <div style="display:flex;gap:8px">
-      <input class="d-input" id="search-route-inp" placeholder="路線號碼（如 40X）" maxlength="8"
-        oninput="this.value=this.value.toUpperCase()"
+      <input class="d-input" id="search-route-inp" placeholder="路線 / 路線中文名（如 40X、荃灣）" maxlength="20" style="font-size:15px;letter-spacing:normal;text-transform:none;font-family:var(--sans)"
         onkeydown="if(event.key==='Enter')doRouteSearch()">
       <button class="d-btn" onclick="doRouteSearch()">搜尋</button>
     </div>
@@ -477,42 +482,68 @@ const KMB   = 'https://data.etabus.gov.hk/v1/transport/kmb';
 
 // Correct rhrread station list with approx coordinates
 const RHRREAD_STNS = [
-  // Full station list from HKO rhrread API (opendata_intro)
-  {n:'香港天文台',    lat:22.302,lng:114.174},
-  {n:'京士柏',        lat:22.312,lng:114.172},
-  {n:'香港國際機場',  lat:22.308,lng:113.920},
-  {n:'打鼓嶺',        lat:22.536,lng:114.138},
-  {n:'上水',          lat:22.501,lng:114.129},
-  {n:'流浮山',        lat:22.469,lng:113.996},
-  {n:'大美督',        lat:22.471,lng:114.237},
-  {n:'大埔',          lat:22.445,lng:114.171},
-  {n:'沙田',          lat:22.415,lng:114.210},
-  {n:'西貢',          lat:22.382,lng:114.274},
-  {n:'將軍澳',        lat:22.310,lng:114.257},
-  {n:'啟德',          lat:22.328,lng:114.209},
-  {n:'元朗',          lat:22.445,lng:114.023},
-  {n:'屯門',          lat:22.391,lng:113.977},
-  {n:'石崗',          lat:22.437,lng:114.079},
-  {n:'荃灣',          lat:22.371,lng:114.114},
-  {n:'青衣',          lat:22.349,lng:114.105},
-  {n:'葵涌',          lat:22.352,lng:114.128},
-  {n:'九龍城',        lat:22.330,lng:114.188},
-  {n:'黃大仙',        lat:22.342,lng:114.194},
-  {n:'觀塘',          lat:22.313,lng:114.228},
-  {n:'深水埗',        lat:22.330,lng:114.163},
-  {n:'跑馬地',        lat:22.273,lng:114.188},
-  {n:'黃竹坑',        lat:22.247,lng:114.175},
-  {n:'鰂魚涌',        lat:22.288,lng:114.209},
-  {n:'筲箕灣',        lat:22.278,lng:114.228},
-  {n:'赤柱',          lat:22.218,lng:114.213},
-  {n:'長洲',          lat:22.210,lng:114.028},
-  {n:'坪洲',          lat:22.285,lng:114.058},
-  {n:'大澳',          lat:22.254,lng:113.858},
-  {n:'南丫島',        lat:22.208,lng:114.105},
-  {n:'橫瀾島',        lat:22.183,lng:114.303},
-  {n:'昂坪',          lat:22.257,lng:113.946},
-  {n:'沙螺灣',        lat:22.318,lng:113.943},
-  {n:'清水灣',        lat:22.320,lng:114.277},
+  // Full station list from HKO Open Data API Documentation (Sep 2025)
+  // rhrread returns temperature + humidity for these stations
+  {n:'香港天文台',  lat:22.302,lng:114.174},
+  {n:'京士柏',      lat:22.312,lng:114.172},
+  {n:'橫瀾島',      lat:22.183,lng:114.303},
+  {n:'長洲',        lat:22.210,lng:114.028},
+  {n:'赤鱲角',      lat:22.308,lng:113.920},
+  {n:'香港國際機場',lat:22.308,lng:113.920},
+  {n:'大嶼山',      lat:22.254,lng:113.916},
+  {n:'大澳',        lat:22.254,lng:113.858},
+  {n:'昂坪',        lat:22.257,lng:113.946},
+  {n:'沙螺灣',      lat:22.318,lng:113.943},
+  {n:'石鼓洲',      lat:22.236,lng:114.013},
+  {n:'赤柱',        lat:22.218,lng:114.213},
+  {n:'黃竹坑',      lat:22.247,lng:114.175},
+  {n:'南丫島',      lat:22.208,lng:114.105},
+  {n:'鴨脷洲',      lat:22.243,lng:114.158},
+  {n:'薄扶林',      lat:22.271,lng:114.134},
+  {n:'香港公園',    lat:22.277,lng:114.162},
+  {n:'跑馬地',      lat:22.273,lng:114.188},
+  {n:'鰂魚涌',      lat:22.288,lng:114.209},
+  {n:'西灣河',      lat:22.278,lng:114.221},
+  {n:'筲箕灣',      lat:22.278,lng:114.228},
+  {n:'柴灣',        lat:22.265,lng:114.237},
+  {n:'啟德',        lat:22.328,lng:114.209},
+  {n:'啟德跑道公園',lat:22.317,lng:114.215},
+  {n:'九龍城',      lat:22.330,lng:114.188},
+  {n:'京士柏運動場',lat:22.309,lng:114.175},
+  {n:'何文田',      lat:22.320,lng:114.182},
+  {n:'深水埗',      lat:22.330,lng:114.163},
+  {n:'黃大仙',      lat:22.342,lng:114.194},
+  {n:'觀塘',        lat:22.313,lng:114.228},
+  {n:'油塘',        lat:22.298,lng:114.237},
+  {n:'將軍澳',      lat:22.310,lng:114.257},
+  {n:'清水灣',      lat:22.320,lng:114.277},
+  {n:'西貢',        lat:22.382,lng:114.274},
+  {n:'荃灣',        lat:22.371,lng:114.114},
+  {n:'葵涌',        lat:22.352,lng:114.128},
+  {n:'青衣',        lat:22.349,lng:114.105},
+  {n:'大欖涌',      lat:22.383,lng:113.977},
+  {n:'屯門',        lat:22.391,lng:113.977},
+  {n:'流浮山',      lat:22.469,lng:113.996},
+  {n:'元朗',        lat:22.445,lng:114.023},
+  {n:'濕地公園',    lat:22.468,lng:114.008},
+  {n:'天水圍',      lat:22.447,lng:114.008},
+  {n:'石崗',        lat:22.437,lng:114.079},
+  {n:'錦田',        lat:22.440,lng:114.052},
+  {n:'大埔',        lat:22.445,lng:114.171},
+  {n:'大埔滘',      lat:22.435,lng:114.184},
+  {n:'大美督',      lat:22.471,lng:114.237},
+  {n:'沙田',        lat:22.415,lng:114.210},
+  {n:'大圍',        lat:22.373,lng:114.178},
+  {n:'馬鞍山',      lat:22.412,lng:114.219},
+  {n:'西貢北',      lat:22.435,lng:114.294},
+  {n:'打鼓嶺',      lat:22.536,lng:114.138},
+  {n:'上水',        lat:22.501,lng:114.129},
+  {n:'粉嶺',        lat:22.494,lng:114.139},
+  {n:'坪輋',        lat:22.480,lng:114.138},
+  {n:'沙頭角',      lat:22.543,lng:114.215},
+  {n:'羅湖',        lat:22.533,lng:114.113},
+  {n:'塔門',        lat:22.471,lng:114.361},
+  {n:'東平洲',      lat:22.580,lng:114.437},
 ];
 
 // Tidal stations
@@ -554,424 +585,30 @@ const NEWS_FEEDS = {
   local:  { name:'RTHK 本地新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
   world:  { name:'RTHK 國際新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
 };
-const TRAFFIC_FEEDS = {
-  td: { name:'運輸署交通快訊', url:'https://www.td.gov.hk/tc/special_news/spnews_rss.xml' },
+// Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
+const TRAFFIC_SOURCES = {
+  td:   {
+    name:'特別交通消息',
+    // data.one.gov.hk has Access-Control-Allow-Origin: * — no proxy needed!
+    direct:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
+    proxy: 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml',
+  },
+  rthk: {
+    name:'RTHK 交通',
+    url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml',
+  },
 };
 
-const W_ICONS={50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'};
-const WARN_MAP={WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'};
-const AMB_WARNS=new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
-const DAY=['日','一','二','三','四','五','六'];
-const NEARBY_PID='__nearby__';
-const pad=n=>String(n).padStart(2,'0');
+// ─────────────────────────────────────────────────────────────────────────────
+//  NEWS: fetch via rss2json + allorigins fallback chain with 10-min cache
+// ─────────────────────────────────────────────────────────────────────────────
 
-function haverDist(la1,ln1,la2,ln2){
-  const R=6371000,r=Math.PI/180,dLa=(la2-la1)*r,dLn=(ln2-ln1)*r;
-  return 2*R*Math.asin(Math.sqrt(Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLn/2)**2));
-}
-function nearestOf(list,lat,lng){
-  let best=list[0],minD=Infinity;
-  list.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lng-lng);if(d<minD){minD=d;best=s}});
-  return best;
-}
-function num(v){
-  if(v==null)return null;
-  if(typeof v==='number')return isNaN(v)?null:v;
-  if(typeof v==='string'){const n=parseFloat(v);return isNaN(n)?null:n}
-  if(typeof v==='object')return num(v.value??v.data??Object.values(v).find(x=>typeof x==='number'||typeof x==='string'));
-  return null;
-}
-function hkoFind(arr,stn){
-  if(!Array.isArray(arr)||!arr.length)return null;
-  return arr.find(d=>d.place===stn)??arr[0];
-}
-function esc(s){return(s||'').replace(/'/g,"\\'")}
-function relTime(dateStr){
-  if(!dateStr)return'';
-  const d=new Date(dateStr);if(isNaN(d))return'';
-  const diff=Math.round((Date.now()-d)/60000);
-  if(diff<1)return'剛才';if(diff<60)return diff+'分鐘前';
-  if(diff<1440)return Math.round(diff/60)+'小時前';
-  return Math.round(diff/1440)+'天前';
-}
+let currentNewsFeed='all', currentTrafficFeed='all';
+const CACHE_TTL=10*60*1000; // 10 minutes
 
-// ═══════════════════════════════════
-//  STORAGE
-// ═══════════════════════════════════
-function loadProfiles(){
-  const raw=localStorage.getItem('profiles_v2');
-  if(raw)return JSON.parse(raw);
-  const def=[{id:'p_a',name:'返工'},{id:'p_b',name:'放工'},{id:'p_c',name:'日常'}];
-  localStorage.setItem('profiles_v2',JSON.stringify(def));return def;
-}
-function saveProfiles(p){localStorage.setItem('profiles_v2',JSON.stringify(p))}
-function loadFavs(pid){return JSON.parse(localStorage.getItem('favs_'+pid)||'[]')}
-function saveFavs(pid,arr){localStorage.setItem('favs_'+pid,JSON.stringify(arr.map(({route,stopId,stopName,dest,serviceType})=>({route,stopId,stopName,dest,serviceType}))))}
-function loadAutoTabs(){return JSON.parse(localStorage.getItem('auto_tabs')||'{}')}
-function saveAutoTabs(o){localStorage.setItem('auto_tabs',JSON.stringify(o))}
-
-let profiles=loadProfiles();
-let activePid=localStorage.getItem('active_pid')||profiles[0]?.id||'';
-if(!profiles.find(p=>p.id===activePid))activePid=profiles[0]?.id||'';
-function setActivePid(pid){activePid=pid;localStorage.setItem('active_pid',pid)}
-
-let favs=loadFavs(activePid);
-let selectedStn=localStorage.getItem('hko_stn')||'京士柏'; // default to central station
-let refreshing=false;
-let etaMode=localStorage.getItem('eta_mode')||'mins';
-let allStops=null;
-let nearbyLat=null,nearbyLng=null;
-let nearbyDist=parseInt(localStorage.getItem('nearby_dist')||'500');
-
-let currentNewsFeed='all';
-let currentTrafficFeed='td';
-let newsCache={};
-let trafficCache={};
-
-// ═══════════════════════════════════
-//  PAGE NAVIGATION
-// ═══════════════════════════════════
-function switchPage(name){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  document.getElementById('nav-'+name).classList.add('active');
-  if(name==='news'){ensureNewsFeedLoaded(currentNewsFeed).then(renderNewsFeed)}
-  if(name==='traffic'){ensureTrafficFeedLoaded(currentTrafficFeed).then(renderTrafficFeed)}
-  if(name==='settings'){document.getElementById('sett-stn-sub').textContent=selectedStn;renderAutoTabSettings();loadTodayHistory();loadTransportSettings()}
-}
-
-// ═══════════════════════════════════
-//  CLOCK
-// ═══════════════════════════════════
-function tickClock(){
-  const n=new Date();
-  document.getElementById('clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  document.getElementById('w-date').textContent=`${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()}（${DAY[n.getDay()]}）`;
-}
-tickClock();setInterval(tickClock,1000);
-
-// ═══════════════════════════════════
-//  AUTO LOCATE → nearest rhrread station
-// ═══════════════════════════════════
-// ═══════════════════════════════════
-//  GEOLOCATION (GPS primary, IP fallback for weather only)
-// ═══════════════════════════════════
-async function autoLocate(){
-  document.getElementById('w-loc-lbl').textContent=selectedStn;
-
-  // GPS — accurate, works on all modern browsers/PWA, permission asked once
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(
-      pos=>{
-        nearbyLat=pos.coords.latitude;
-        nearbyLng=pos.coords.longitude;
-        const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
-        if(near.n!==selectedStn){
-          selectedStn=near.n;
-          localStorage.setItem('hko_stn',near.n);
-          loadWeather();
-        }
-        document.getElementById('w-loc-lbl').textContent=selectedStn;
-        // If nearby tab is active, reload with accurate position
-        if(activePid===NEARBY_PID) loadNearby();
-      },
-      async ()=>{
-        // Permission denied / unavailable — fall back to IP for weather station only
-        // (IP is too inaccurate for bus stop distance, so nearby tab will show message)
-        try{
-          const d=await fetch('https://ip-api.com/json/?fields=lat,lon,status',
-            {signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-          if(d.status==='success'){
-            // Only use IP loc for HKO station selection, not for bus nearby
-            const near=nearestOf(RHRREAD_STNS,d.lat,d.lon);
-            if(near.n!==selectedStn){
-              selectedStn=near.n;
-              localStorage.setItem('hko_stn',near.n);
-              loadWeather();
-            }
-            document.getElementById('w-loc-lbl').textContent=selectedStn;
-          }
-        }catch{}
-      },
-      {timeout:10000, maximumAge:60000, enableHighAccuracy:false}
-    );
-  }
-}
-
-// ═══════════════════════════════════
-//  AUTO-TAB CHECK
-// ═══════════════════════════════════
-function checkAutoTab(){
-  const cfg=loadAutoTabs();const now=new Date();
-  const dow=now.getDay(),hhmm=now.getHours()*60+now.getMinutes();
-  for(const p of profiles){
-    const c=cfg[p.id];if(!c||!c.enabled)continue;
-    if(!c.days[dow])continue;
-    const[fh,fm]=(c.from||'00:00').split(':').map(Number);
-    const[th,tm]=(c.to||'23:59').split(':').map(Number);
-    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm){
-      setActivePid(p.id);favs=loadFavs(p.id);
-      console.log('[AutoTab] matched profile:',p.name,'at',now.getHours()+':'+now.getMinutes());
-      return;
-    }
-  }
-  // No rule matched — default to 附近 tab
-  console.log('[AutoTab] no rule matched at',now.getHours()+':'+now.getMinutes(),'→ 附近');
-  setActivePid(NEARBY_PID);
-}
-
-// Returns a human-readable description of current auto-tab status for settings UI
-function getAutoTabStatus(){
-  const cfg=loadAutoTabs();const now=new Date();
-  const dow=now.getDay(),hhmm=now.getHours()*60+now.getMinutes();
-  const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  for(const p of profiles){
-    const c=cfg[p.id];if(!c||!c.enabled)continue;
-    if(!c.days[dow])continue;
-    const[fh,fm]=(c.from||'00:00').split(':').map(Number);
-    const[th,tm]=(c.to||'23:59').split(':').map(Number);
-    if(hhmm>=fh*60+fm&&hhmm<=th*60+tm)
-      return{matched:true,name:p.name,msg:`✅ 現在 ${timeStr}，正在「${p.name}」時間內`};
-  }
-  // Show next upcoming window
-  const upcoming=[];
-  for(const p of profiles){
-    const c=cfg[p.id];if(!c||!c.enabled)continue;
-    const activeDays=c.days.map((on,i)=>on?DAY[i]:null).filter(Boolean).join('');
-    if(activeDays) upcoming.push(`「${p.name}」${activeDays} ${c.from}–${c.to}`);
-  }
-  if(upcoming.length)
-    return{matched:false,msg:`現在 ${timeStr} 不在任何時間段（${upcoming.join('；')}）→ 顯示附近`};
-  return{matched:false,msg:`現在 ${timeStr}，未設定任何自動跳轉規則`};
-}
-
-// ═══════════════════════════════════
-//  WEATHER (enhanced)
-// ═══════════════════════════════════
-async function loadWeather(){
-  try{
-    const[rhr,flw,warn]=await Promise.all([
-      fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json()),
-      fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
-      fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
-    ]);
-    const te=hkoFind(rhr.temperature?.data,selectedStn);
-    document.getElementById('w-temp').textContent=num(te?.value)??'--';
-    document.getElementById('w-loc-lbl').textContent=selectedStn;
-    document.getElementById('sett-stn-sub').textContent=selectedStn;
-    const ic=Array.isArray(rhr.icon)?rhr.icon[0]:rhr.icon;
-    document.getElementById('w-icon').textContent=W_ICONS[ic]??'🌡';
-    // Humidity inline badge
-    const he=hkoFind(rhr.humidity?.data,selectedStn);
-    const hv=num(he?.value);
-    wxDetails.humidity=hv; wxDetails.humidityStn=he?.place||selectedStn;
-    const humBadge=document.getElementById('w-hum-badge');
-    if(hv!=null){
-      humBadge.innerHTML=`<span class="w-hum-val">${hv}%</span><span class="w-hum-lbl">濕度</span>`;
-      humBadge.onclick=openWeatherDetails;
-      humBadge.style.display='';
-    } else { humBadge.style.display='none' }
-    // Today max/min from forecast
-    wxDetails.todayMaxT=num(flw.weatherForecast?.[0]?.forecastMaxtemp);
-    wxDetails.todayMinT=num(flw.weatherForecast?.[0]?.forecastMintemp);
-    // Warnings
-    const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
-    document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
-    document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
-    const fcs=flw.weatherForecast||[];
-    document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
-      const ds=String(f.forecastDate);
-      const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
-      const hl=i===1||i===2;
-      return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
-    }).join('');
-    loadExtraWeather();
-  }catch(e){console.warn('[weather]',e)}
-}
-
-// Extra weather data cache for details drawer
-let wxDetails = {};
-
-async function loadExtraWeather(){
-  const now=new Date();
-  const y=now.getFullYear(),mo=now.getMonth()+1,d=now.getDate();
-  const moStr=String(mo).padStart(2,'0');
-
-  // Use GPS if available, else fall back to selected weather station coords
-  const stnCoords=RHRREAD_STNS.find(s=>s.n===selectedStn);
-  const lat=nearbyLat??stnCoords?.lat;
-  const lng=nearbyLng??stnCoords?.lng;
-
-  // 1. Today actual max/min comes from FLW forecast (field 0 = today)
-  //    Already set in loadWeather() from flw.weatherForecast[0]
-  //    Also try to get from rhrread extremeTemperature if available
-  try{
-    const rhr=await fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json());
-    // rhrread may expose max/min under different keys depending on API version
-    const keys=['maximumTemperature','maxTemperature','highTemperature','extremeMaxTemperature'];
-    for(const k of keys){
-      const arr=rhr[k]?.data||[];
-      const e=hkoFind(arr,selectedStn)||arr[0];
-      if(num(e?.value)!=null){wxDetails.todayMaxT=num(e.value);break}
-    }
-    const minKeys=['minimumTemperature','minTemperature','lowTemperature','extremeMinTemperature'];
-    for(const k of minKeys){
-      const arr=rhr[k]?.data||[];
-      const e=hkoFind(arr,selectedStn)||arr[0];
-      if(num(e?.value)!=null){wxDetails.todayMinT=num(e.value);break}
-    }
-  }catch{}
-
-  // 2. Monthly climate normals for max/min (CLMMAXT/CLMMINT) — historical context
-  if(lat){
-    try{
-      const cstn=nearestOf(CLIMATE_STNS,lat,lng);
-      const [maxR,minR,avgR]=await Promise.all([
-        fetch(`${HKO_C}?dataType=CLMMAXT&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
-        fetch(`${HKO_C}?dataType=CLMMINT&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
-        fetch(`${HKO_C}?dataType=CLMTEMP&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
-      ]);
-      const getClim=obj=>{
-        if(!obj)return null;
-        const arr=obj.data||obj.ClimateData||[];
-        if(!arr.length)return null;
-        // climate API returns array of {year/month,value} — get last entry
-        const v=num(arr[arr.length-1]?.value??arr[arr.length-1]?.meanTemp??arr[0]?.value);
-        return v;
-      };
-      const cmax=getClim(maxR),cmin=getClim(minR),cavg=getClim(avgR);
-      if(cmax!=null||cmin!=null){
-        wxDetails.climMax=cmax; wxDetails.climMin=cmin; wxDetails.climAvg=cavg;
-        wxDetails.climStn=cstn.n;
-      }
-    }catch(e){console.warn('[clim]',e)}
-  }
-
-  // 3. Tide - nearest tide station
-  if(lat){
-    try{
-      const tstn=nearestOf(TIDE_STNS,lat,lng);
-      const url=`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${moStr}`;
-      const tdata=await fetch(url).then(r=>r.json());
-      const arr=tdata.data||tdata.HLT||[];
-      const today=arr.filter(t=>parseInt(t.date??t.day??t.Date??0)===d);
-      if(today.length){wxDetails.tide=today;wxDetails.tideStn=tstn.n}
-    }catch(e){console.warn('[tide]',e)}
-  }
-
-  // 4. Radiation (RYES) - try current month then previous two
-  if(lat){
-    try{
-      const cstn=nearestOf(CLIMATE_STNS,lat,lng);
-      let rdata=null;
-      for(const [yr,mn] of [[y,mo],[y,mo===1?12:mo-1],[y,mo<=2?12:mo-2]]){
-        try{
-          rdata=await fetch(`${HKO_C}?dataType=RYES&lang=tc&station=${cstn.code}&year=${yr}&month=${String(mn).padStart(2,'0')}`).then(r=>r.json());
-          if(rdata?.data?.length)break;
-        }catch{}
-        rdata=null;
-      }
-      if(rdata?.data?.length){
-        const latest=rdata.data[rdata.data.length-1];
-        const rv=num(latest?.value??latest?.radiation??latest?.MJm2??latest?.globalSolarRadiation);
-        if(rv!=null){wxDetails.radiation=rv;wxDetails.radiationStn=cstn.n}
-      }
-    }catch(e){console.warn('[radiation]',e)}
-  }
-}
-
-// ═══════════════════════════════════
-//  WEATHER DETAILS DRAWER
-// ═══════════════════════════════════
-function renderWeatherDetailsContent(){
-  const el=document.getElementById('drawer-body');
-  if(!el)return;
-  const hum=wxDetails.humidity, humStn=wxDetails.humidityStn||selectedStn;
-  const maxT=wxDetails.todayMaxT, minT=wxDetails.todayMinT;
-  const tide=wxDetails.tide||[], tideStn=wxDetails.tideStn||'';
-  const rad=wxDetails.radiation, radStn=wxDetails.radiationStn||'';
-  const tideHtml=tide.length
-    ?`<div class="wdet-tide-row">${tide.map(t=>{
-        const isH=String(t.type||t.tideType||'').match(/H|高/i);
-        return`<div class="tide-item"><div class="tide-type">${isH?'⬆ 高潮':'⬇ 低潮'}</div><div class="tide-time">${t.time||t.Time||'--'}</div><div class="tide-ht">${t.height||t.Height||'--'} m</div></div>`;
-      }).join('')}</div>`
-    :`<div style="color:var(--mid);font-size:12px;padding:6px 0">載入潮汐數據中，或此站附近暫無今日數據</div>`;
-  el.innerHTML=`
-    <div class="wdet-grid">
-      <div class="wdet-card">
-        <div class="wdet-lbl">濕度</div>
-        <div class="wdet-val">${hum!=null?hum+'%':'--'}</div>
-        <div class="wdet-sub">${humStn}</div>
-      </div>
-      <div class="wdet-card">
-        <div class="wdet-lbl">今日預測氣溫</div>
-        <div class="wdet-val" style="color:#ff8c5a">${maxT!=null?maxT+'°':'--'}<span style="font-size:14px;color:var(--mid)"> / </span><span style="color:#7ba8ff">${minT!=null?minT+'°':'--'}</span></div>
-        <div class="wdet-sub">最高 / 最低　${selectedStn}</div>
-      </div>
-      ${(wxDetails.climMax!=null||wxDetails.climMin!=null)?`<div class="wdet-card">
-        <div class="wdet-lbl">月均（歷史）· ${wxDetails.climStn||''}</div>
-        <div class="wdet-val" style="color:#ff8c5a">${wxDetails.climMax!=null?wxDetails.climMax+'°':'--'}<span style="font-size:14px;color:var(--mid)"> / </span><span style="color:#7ba8ff">${wxDetails.climMin!=null?wxDetails.climMin+'°':'--'}</span></div>
-        <div class="wdet-sub">月平均最高 / 最低${wxDetails.climAvg!=null?' · 月均 '+wxDetails.climAvg+'°':''}</div>
-      </div>`:''}
-      ${rad!=null?`<div class="wdet-card wdet-full">
-        <div class="wdet-lbl">昨日輻射量 · ${radStn}</div>
-        <div class="wdet-val">${rad} <span style="font-size:12px;font-weight:400;color:var(--mid)">MJ/m²</span></div>
-        <div class="wdet-sub">日總太陽輻射</div>
-      </div>`:''}
-    </div>
-    <div class="loc-section-title">🌊 潮汐高度${tideStn?' · '+tideStn:''}</div>
-    ${tideHtml}
-    <div style="height:14px"></div>
-    <div class="loc-section-title">📍 更改天氣地點</div>
-    <button class="loc-gps-btn" id="gps-btn2" onclick="useGPS2()">📡 用 GPS 精確定位（可選）</button>
-    <div class="sec-lbl">香港天文台即時測站</div>
-    <div class="loc-grid">${RHRREAD_STNS.map(s=>`<div class="loc-item${s.n===selectedStn?' sel':''}" onclick="pickStn('${s.n}')"><div class="loc-name">${s.n}</div></div>`).join('')}</div>`;
-}
-
-function openWeatherDetails(){
-  setDTitle('天氣詳情');
-  renderWeatherDetailsContent();
-  openOverlay();
-  loadExtraWeather().then(()=>{
-    if(document.getElementById('overlay').classList.contains('open'))
-      renderWeatherDetailsContent();
-  });
-}
-function useGPS2(){
-  if(!navigator.geolocation){alert('不支援定位');return}
-  const btn=document.getElementById('gps-btn2');if(!btn)return;
-  btn.textContent='📡 定位中…';btn.style.opacity='.6';
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const{latitude:lat,longitude:lng}=pos.coords;nearbyLat=lat;nearbyLng=lng;
-    const near=nearestOf(RHRREAD_STNS,lat,lng);pickStn(near.n);
-  },()=>{if(btn){btn.textContent='❌ 定位失敗，請手動選擇';btn.style.opacity='1'}},{timeout:10000});
-}
-
-// ═══════════════════════════════════
-//  RSS FETCHING
-// ═══════════════════════════════════
-// ── RSS helpers ─────────────────────────────────────────────────────────────
-function parseXMLItems(text){
-  if(!text||text.length<80)return null;
-  try{
-    // Strip BOM, XML declaration noise
-    const clean=text.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/,'').trim();
-    const xml=new DOMParser().parseFromString(clean,'text/xml');
-    if(xml.querySelector('parsererror'))return null;
-    const items=[...xml.querySelectorAll('item,entry')];
-    if(!items.length)return null;
-    return items.slice(0,60).map(item=>{
-      const gs=t=>item.querySelector(t)?.textContent?.trim().replace(/<!\[CDATA\[|\]\]>/g,'')||'';
-      let link=item.querySelector('link')?.textContent?.trim()||
-               item.querySelector('link')?.getAttribute('href')||
-               item.querySelector('guid')?.textContent?.trim()||'';
-      const rawDesc=gs('description')||gs('summary')||gs('content:encoded')||gs('content');
-      const desc=rawDesc.replace(/<!\[CDATA\[|\]\]>/g,'').replace(/<[^>]+>/g,'').trim().slice(0,220);
-      const title=gs('title').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
-      return{title,link,pubDate:gs('pubDate')||gs('published')||gs('updated'),description:desc};
-    }).filter(i=>i.title&&i.title.length>1);
-  }catch(e){console.warn('[parseXML]',e);return null}
+function cacheValid(key, store){
+  const e=store[key];
+  return e&&e.ts&&(Date.now()-e.ts<CACHE_TTL)&&e.items?.length;
 }
 
 async function ft(url,ms=14000){
@@ -981,198 +618,274 @@ async function ft(url,ms=14000){
   });
 }
 
-async function fetchRSS(feedCfg){
-  const url=feedCfg.url;
-  const enc=encodeURIComponent(url);
-  console.log('[RSS] fetching:',url);
+function parseXML(text){
+  if(!text||text.length<80)return null;
+  try{
+    const clean=text.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/,'').trim();
+    const xml=new DOMParser().parseFromString(clean,'text/xml');
+    if(xml.querySelector('parsererror'))return null;
+    const items=[...xml.querySelectorAll('item,entry')];
+    if(!items.length)return null;
+    return items.slice(0,60).map(item=>{
+      const gs=t=>item.querySelector(t)?.textContent?.trim().replace(/<!\[CDATA\[|\]\]>/g,'')||'';
+      const link=item.querySelector('link')?.textContent?.trim()||
+                 item.querySelector('link')?.getAttribute('href')||
+                 item.querySelector('guid')?.textContent?.trim()||'';
+      const desc=(gs('description')||gs('summary')||gs('content')).replace(/<!\[CDATA\[|\]\]>/g,'').replace(/<[^>]+>/g,'').trim().slice(0,240);
+      return{
+        title:gs('title').replace(/<!\[CDATA\[|\]\]>/g,'').trim(),
+        link, description:desc,
+        pubDate:gs('pubDate')||gs('published')||gs('updated'),
+      };
+    }).filter(i=>i.title&&i.title.length>1);
+  }catch(e){return null}
+}
 
-  // Strategy A: rss2json.com — JSON API, handles Google/Yahoo/RTHK
+async function fetchFeed(url){
+  const enc=encodeURIComponent(url);
+  // A: rss2json — best JSON API, handles Google/Yahoo, no CORS issues
   try{
     const res=await ft(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`);
     const j=await res.json();
-    console.log('[RSS] rss2json status:',j.status,'items:',j.items?.length);
     if(j.status==='ok'&&j.items?.length>0){
+      console.log('[feed] rss2json ok:', j.items.length, url);
       return j.items.map(i=>({
         title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
         link:i.link||i.guid||'',
         pubDate:i.pubDate||'',
-        description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,220),
+        description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,240),
       })).filter(i=>i.title);
     }
-  }catch(e){console.warn('[RSS-A]',e.message)}
+    if(j.status==='error')console.warn('[feed] rss2json error:',j.message);
+  }catch(e){console.warn('[feed-A]',e.message)}
 
-  // Strategy B: allorigins /get (JSON wrapper, avoids raw CORS issues)
+  // B: allorigins /get — returns JSON {contents, status}
   try{
-    const res=await ft(`https://api.allorigins.win/get?url=${enc}`);
-    const j=await res.json();
-    console.log('[RSS] allorigins/get http_code:',j?.status?.http_code,'content len:',j?.contents?.length);
+    const j=await ft(`https://api.allorigins.win/get?url=${enc}`).then(r=>r.json());
     if(j?.status?.http_code===200&&j.contents?.length>100){
-      const items=parseXMLItems(j.contents);
-      if(items?.length){console.log('[RSS-B] ok items:',items.length);return items}
+      const items=parseXML(j.contents);
+      if(items?.length){console.log('[feed-B] allorigins/get ok:',items.length);return items}
     }
-  }catch(e){console.warn('[RSS-B]',e.message)}
+  }catch(e){console.warn('[feed-B]',e.message)}
 
-  // Strategy C: corsproxy.io
+  // C: corsproxy.io
   try{
     const res=await ft(`https://corsproxy.io/?${enc}`);
     if(res.ok){
-      const text=await res.text();
-      console.log('[RSS-C] corsproxy len:',text?.length);
-      const items=parseXMLItems(text);
-      if(items?.length){console.log('[RSS-C] ok items:',items.length);return items}
+      const items=parseXML(await res.text());
+      if(items?.length){console.log('[feed-C] corsproxy ok:',items.length);return items}
     }
-  }catch(e){console.warn('[RSS-C]',e.message)}
+  }catch(e){console.warn('[feed-C]',e.message)}
 
-  // Strategy D: allorigins /raw
+  // D: allorigins /raw
   try{
     const res=await ft(`https://api.allorigins.win/raw?url=${enc}`);
     if(res.ok){
-      const text=await res.text();
-      console.log('[RSS-D] allorigins/raw len:',text?.length);
-      const items=parseXMLItems(text);
-      if(items?.length){console.log('[RSS-D] ok items:',items.length);return items}
+      const items=parseXML(await res.text());
+      if(items?.length){console.log('[feed-D] allorigins/raw ok:',items.length);return items}
     }
-  }catch(e){console.warn('[RSS-D]',e.message)}
+  }catch(e){console.warn('[feed-D]',e.message)}
 
-  // Strategy E: xmlproxy (another free proxy)
+  // E: codetabs proxy
   try{
     const res=await ft(`https://api.codetabs.com/v1/proxy?quest=${enc}`);
     if(res.ok){
-      const text=await res.text();
-      console.log('[RSS-E] codetabs len:',text?.length);
-      const items=parseXMLItems(text);
-      if(items?.length){console.log('[RSS-E] ok items:',items.length);return items}
+      const items=parseXML(await res.text());
+      if(items?.length){console.log('[feed-E] codetabs ok:',items.length);return items}
     }
-  }catch(e){console.warn('[RSS-E]',e.message)}
+  }catch(e){console.warn('[feed-E]',e.message)}
 
-  console.warn('[RSS] ALL strategies failed for',url);
+  console.warn('[feed] ALL failed for', url);
   return null;
 }
 
+// Traffic: try direct fetch first (data.one.gov.hk has CORS:*)
+async function fetchTrafficDirect(src){
+  // Try the data.one.gov.hk URL directly first — no proxy needed
+  if(src.direct){
+    try{
+      const res=await ft(src.direct);
+      if(res.ok){
+        const items=parseXML(await res.text());
+        if(items?.length){console.log('[traffic] direct ok:',items.length);return items}
+      }
+    }catch(e){console.warn('[traffic-direct]',e.message)}
+  }
+  // Fall back to RSS proxy chain
+  return fetchFeed(src.proxy||src.url);
+}
 
-function renderFeedItems(items,el){
-  if(!items||!items.length){
+// ─────────────────────────────────────────────────────────────────────────────
+//  NEWS RENDERING
+// ─────────────────────────────────────────────────────────────────────────────
+const SRC_LABEL={'google':'Google','yahoo':'Yahoo','local':'RTHK本地','world':'RTHK國際'};
+const SRC_COLOR={'google':'#4285f4','yahoo':'#ff6b35','local':'#5b8fff','world':'#2ed573'};
+
+function renderFeedItems(items,el,srcKey,showSrc){
+  if(!items?.length){
     el.innerHTML=`<div class="feed-err" style="padding:32px 20px">
       <div style="font-size:32px;margin-bottom:12px">📡</div>
       <div style="font-size:14px;font-weight:500;color:var(--bright);margin-bottom:6px">無法載入資料</div>
-      <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:16px">可能原因：網絡問題、RSS 來源暫時不可用，<br>或代理服務器繁忙。</div>
-      <button onclick="reloadCurrentFeed()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重新嘗試</button>
+      <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:16px">
+        RSS 來源受 CORS 限制，代理服務器繁忙或不可用。<br>
+        各代理均已嘗試，請稍後重試。
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button onclick="reloadCurrentFeed()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 18px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button>
+        ${srcKey==='local'||srcKey==='all'?`<a href="https://news.rthk.hk" target="_blank" style="background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);color:#7ba8ff;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK 網站</a>`:''}
+        ${srcKey==='google'||srcKey==='all'?`<a href="https://news.google.com/home?hl=zh-HK" target="_blank" style="background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);color:#4285f4;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 Google 新聞</a>`:''}
+      </div>
     </div>`;
     return;
   }
-  el.innerHTML=items.map((item,i)=>`
-    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.02}s">
+  el.innerHTML=items.slice(0,80).map((item,i)=>{
+    const srcTag=showSrc&&item._src?`<span style="font-size:10px;font-weight:700;color:${SRC_COLOR[item._src]||'var(--dim)'};font-family:var(--mono);letter-spacing:.04em">${SRC_LABEL[item._src]||item._src}</span>`:'';
+    const timeTag=item.pubDate?`<span>${relTime(item.pubDate)}</span>`:'';
+    return`<a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.01}s">
       <div class="feed-item-title">${item.title}</div>
       ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
-      <div class="feed-item-meta">
-        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
-      </div>
-    </a>`).join('');
+      <div class="feed-item-meta">${srcTag}${timeTag}</div>
+    </a>`;
+  }).join('');
 }
 
-// ═══════════════════════════════════
-//  NEWS
-// ═══════════════════════════════════
 function switchNewsFeed(key){
   currentNewsFeed=key;
   document.querySelectorAll('[id^=ntab-]').forEach(b=>b.classList.remove('active'));
-  document.getElementById('ntab-'+key).classList.add('active');
+  document.getElementById('ntab-'+key)?.classList.add('active');
   renderNewsFeed();
+  // Load any missing
+  ensureNewsFeedLoaded(key);
 }
+
 async function loadNewsFeed(key){
   if(key==='all'){
     await Promise.all(['google','yahoo','local','world'].map(k=>loadNewsFeed(k)));
     return;
   }
-  const items=await fetchRSS(NEWS_FEEDS[key]);
-  if(items)newsCache[key]=items.map(i=>({...i,_src:key}));
+  const items=await fetchFeed(NEWS_FEEDS[key].url);
+  newsCache[key]={items:items||[],ts:Date.now(),_src:key};
+  if(items)newsCache[key].items=items.map(i=>({...i,_src:key}));
 }
+
 async function ensureNewsFeedLoaded(key){
   if(key==='all'){
-    const missing=['google','yahoo','local','world'].filter(k=>!newsCache[k]);
+    const missing=['google','yahoo','local','world'].filter(k=>!cacheValid(k,newsCache));
     if(missing.length)await Promise.all(missing.map(k=>loadNewsFeed(k)));
-  } else {
-    if(!newsCache[key])await loadNewsFeed(key);
+  }else{
+    if(!cacheValid(key,newsCache))await loadNewsFeed(key);
   }
+  renderNewsFeed();
 }
+
 function getMergedNews(){
   const all=[];
-  ['google','yahoo','local','world'].forEach(k=>{
-    (newsCache[k]||[]).forEach(i=>all.push(i));
-  });
+  ['google','yahoo','local','world'].forEach(k=>{(newsCache[k]?.items||[]).forEach(i=>all.push(i))});
   return all.sort((a,b)=>{
     const ta=a.pubDate?new Date(a.pubDate).getTime():0;
     const tb=b.pubDate?new Date(b.pubDate).getTime():0;
     return tb-ta;
   });
 }
-const SRC_LABEL={'google':'Google','yahoo':'Yahoo','local':'RTHK本地','world':'RTHK國際'};
-const SRC_COLOR={'google':'#4285f4','yahoo':'#ff6b35','local':'#5b8fff','world':'#2ed573'};
+
 function renderNewsFeed(){
   const el=document.getElementById('news-list');
+  if(!el)return;
   const key=currentNewsFeed;
-  const items=key==='all'?getMergedNews():newsCache[key];
-  if(!items){el.innerHTML=`<div class="spinner"></div>`;return}
-  if(!items.length){el.innerHTML=`<div class="feed-err">⚠️ 無法載入資料<br><small style="color:var(--dim)">請檢查網絡連線，或 RSS 來源暫時不可用</small></div>`;return}
-  el.innerHTML=items.slice(0,60).map((item,i)=>`
-    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.015}s">
-      <div class="feed-item-title">${item.title}</div>
-      ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
-      <div class="feed-item-meta">
-        ${item._src&&key==='all'?`<span style="font-size:10px;font-weight:700;color:${SRC_COLOR[item._src]};font-family:var(--mono);letter-spacing:.04em">${SRC_LABEL[item._src]}</span>`:''}
-        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
-      </div>
-    </a>`).join('');
+  if(key==='all'){
+    const items=getMergedNews();
+    if(!items.length&&['google','yahoo','local','world'].some(k=>!newsCache[k])){
+      el.innerHTML=`<div class="spinner"></div>`;return;
+    }
+    renderFeedItems(items,el,key,true);
+  }else{
+    if(!newsCache[key]){el.innerHTML=`<div class="spinner"></div>`;return}
+    renderFeedItems(newsCache[key].items,el,key,false);
+  }
 }
-async function reloadCurrentFeed(){
-  const activePage=document.querySelector('.page.active')?.id;
-  if(activePage==='page-news') reloadNewsFeed();
-  else if(activePage==='page-traffic') reloadTrafficFeed();
-}
+
 async function reloadNewsFeed(){
   if(currentNewsFeed==='all'){['google','yahoo','local','world'].forEach(k=>delete newsCache[k])}
   else delete newsCache[currentNewsFeed];
   document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
   await ensureNewsFeedLoaded(currentNewsFeed);
-  renderNewsFeed();
 }
 
-// ═══════════════════════════════════
-//  TRAFFIC
-// ═══════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+//  TRAFFIC RENDERING
+// ─────────────────────────────────────────────────────────────────────────────
+const TSRC_LABEL={'td':'運輸署','rthk':'RTHK'};
+const TSRC_COLOR={'td':'#f0a500','rthk':'#5b8fff'};
+
 function switchTrafficFeed(key){
   currentTrafficFeed=key;
   document.querySelectorAll('[id^=ttab-]').forEach(b=>b.classList.remove('active'));
-  document.getElementById('ttab-'+key).classList.add('active');
+  document.getElementById('ttab-'+key)?.classList.add('active');
+  renderTrafficFeed();
+  ensureTrafficFeedLoaded(key);
+}
+
+async function loadTrafficFeed(key){
+  if(key==='all'){
+    await Promise.all(['td','rthk'].map(k=>loadTrafficFeed(k)));
+    return;
+  }
+  const src=TRAFFIC_SOURCES[key];
+  const items=key==='td'?await fetchTrafficDirect(src):await fetchFeed(src.url);
+  if(items){
+    trafficCache[key]={items:items.map(i=>({...i,_src:key})),ts:Date.now()};
+  }else{
+    trafficCache[key]={items:[],ts:Date.now()};
+  }
+}
+
+async function ensureTrafficFeedLoaded(key){
+  if(key==='all'){
+    const missing=['td','rthk'].filter(k=>!cacheValid(k,trafficCache));
+    if(missing.length)await Promise.all(missing.map(k=>loadTrafficFeed(k)));
+  }else{
+    if(!cacheValid(key,trafficCache))await loadTrafficFeed(key);
+  }
   renderTrafficFeed();
 }
-async function loadTrafficFeed(key){
-  const items=await fetchRSS(TRAFFIC_FEEDS[key]);
-  if(items)trafficCache[key]=items.map(i=>({...i,_src:key}));
+
+function getMergedTraffic(){
+  const all=[];
+  ['td','rthk'].forEach(k=>{(trafficCache[k]?.items||[]).forEach(i=>all.push(i))});
+  return all.sort((a,b)=>{
+    const ta=a.pubDate?new Date(a.pubDate).getTime():0;
+    const tb=b.pubDate?new Date(b.pubDate).getTime():0;
+    return tb-ta;
+  });
 }
-async function ensureTrafficFeedLoaded(key){
-  if(!trafficCache[key])await loadTrafficFeed(key);
-}
+
 function renderTrafficFeed(){
   const el=document.getElementById('traffic-list');
+  if(!el)return;
   const key=currentTrafficFeed;
-  const items=trafficCache[key];
-  if(!items){el.innerHTML=`<div class="spinner"></div>`;return}
-  if(!items.length){el.innerHTML=`<div class="feed-err">⚠️ 無法載入資料<br><small style="color:var(--dim)">請檢查網絡連線，或來源暫時不可用</small></div>`;return}
-  el.innerHTML=items.slice(0,80).map((item,i)=>`
-    <a class="feed-item" href="${item.link||'#'}" target="_blank" style="animation-delay:${i*.015}s">
-      <div class="feed-item-title">${item.title}</div>
-      ${item.description?`<div class="feed-item-desc">${item.description}</div>`:''}
-      <div class="feed-item-meta">
-        ${item.pubDate?`<span>${relTime(item.pubDate)}</span>`:''}
-      </div>
-    </a>`).join('');
+  if(key==='all'){
+    const items=getMergedTraffic();
+    if(!items.length&&['td','rthk'].some(k=>!trafficCache[k])){
+      el.innerHTML=`<div class="spinner"></div>`;return;
+    }
+    renderFeedItems(items,el,key,true);
+  }else{
+    if(!trafficCache[key]){el.innerHTML=`<div class="spinner"></div>`;return}
+    renderFeedItems(trafficCache[key].items,el,key,false);
+  }
 }
+
 async function reloadTrafficFeed(){
-  delete trafficCache[currentTrafficFeed];
+  if(currentTrafficFeed==='all'){['td','rthk'].forEach(k=>delete trafficCache[k])}
+  else delete trafficCache[currentTrafficFeed];
   document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
   await ensureTrafficFeedLoaded(currentTrafficFeed);
-  renderTrafficFeed();
+}
+
+function reloadCurrentFeed(){
+  const pg=document.querySelector('.page.active')?.id;
+  if(pg==='page-news')reloadNewsFeed();
+  else if(pg==='page-traffic')reloadTrafficFeed();
 }
 
 // ═══════════════════════════════════
@@ -1458,7 +1171,8 @@ function renderBusList(){
     const urgency=m===null?'':m<=2?'soon':m<=8?'coming':'ok';
     const cc=m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
     let ec='';if(f._err)ec=`<div class="e-none">無數據</div>`;else if(!f._etas?.length)ec=`<div class="e-none">無班次</div>`;else ec=fmtEtas(f._etas,cc,now);
-    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}</div><div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
+    const tLabel=f.type==='ctb'?'<span style="font-size:9px;color:#2ed573;margin-left:4px">城巴</span>':f.type==='mtr'?'<span style="font-size:9px;color:#ff8a96;margin-left:4px">港鐵</span>':f.type==='lrt'?'<span style="font-size:9px;color:#ffaa33;margin-left:4px">輕鐵</span>':'<span style="font-size:9px;color:var(--dim);margin-left:4px">九巴</span>';
+    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}${tLabel}</div><div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
   }).join('');
 }
 function removeFav(e,i){e.stopPropagation();if(!confirm(`確定移除「${favs[i]?.route} 往 ${favs[i]?.dest}」？`))return;favs.splice(i,1);saveFavs(activePid,favs);renderBusList()}
@@ -1603,86 +1317,152 @@ function routeCard(route,dirs,badgeColor,borderColor,accentColor,label,clickFn){
 }
 
 async function doRouteSearch(){
-  const q=(document.getElementById('search-route-inp')?.value||'').trim().toUpperCase();
-  if(!q)return;
+  const raw=(document.getElementById('search-route-inp')?.value||'').trim();
+  const q=raw.toUpperCase();
+  const qZh=raw; // keep original for Chinese matching
+  if(!raw)return;
   const el=document.getElementById('search-page-results');
   el.innerHTML=`<div class="spinner"></div>`;
   const ts=getTransportSettings();
   const sections=[];
 
+  // ── KMB ──────────────────────────────────────────────────────────────────
   try{
-    // KMB routes
     const all=await getAllRoutes();
-    const matches=all.filter(r=>r.route===q||r.route.startsWith(q));
+    const matches=all.filter(r=>
+      r.route===q||r.route.startsWith(q)||
+      r.dest_tc?.includes(qZh)||r.orig_tc?.includes(qZh)||
+      r.dest_en?.toUpperCase().includes(q)||r.orig_en?.toUpperCase().includes(q)
+    );
     if(matches.length){
       const grouped={};
       matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
-      const kmbHtml=Object.entries(grouped).map(([route,dirs])=>
+      const kmbHtml=Object.entries(grouped).slice(0,8).map(([route,dirs])=>
         routeCard(route,dirs,'var(--amb-bg)','var(--amb-bdr)','var(--amb2)','九巴 KMB',
           (d)=>`openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)`)
       ).join('');
-      if(kmbHtml)sections.push(kmbHtml);
+      if(kmbHtml)sections.push(`<div class="srch-section-lbl">🚌 九巴 KMB</div>`+kmbHtml);
     }
-  }catch{}
+  }catch(e){console.warn('[KMB search]',e)}
 
-  // CTB routes (if enabled)
+  // ── CTB ──────────────────────────────────────────────────────────────────
   if(ts.ctb){
     try{
       if(!window._ctbRoutes){
-        const d=await fetch(`${CTB}/route`).then(r=>r.json());
+        // Fetch all CTB routes (both directions)
+        const d=await fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
         window._ctbRoutes=d.data||[];
       }
-      const matches=window._ctbRoutes.filter(r=>r.route===q||r.route.startsWith(q));
+      const matches=window._ctbRoutes.filter(r=>
+        r.route===q||r.route.startsWith(q)||
+        r.dest_tc?.includes(qZh)||r.orig_tc?.includes(qZh)
+      );
       if(matches.length){
         const grouped={};
-        matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
-        const html=Object.entries(grouped).map(([route,dirs])=>
+        matches.forEach(r=>{
+          if(!grouped[r.route])grouped[r.route]=[];
+          // Avoid duplicate direction entries
+          if(!grouped[r.route].find(x=>x.bound===r.bound))grouped[r.route].push(r);
+        });
+        const html=Object.entries(grouped).slice(0,8).map(([route,dirs])=>
           routeCard(route,dirs,'rgba(46,213,115,.1)','rgba(46,213,115,.3)','#2ed573','城巴 CTB',
-            (d)=>`alert('城巴路線詳情開發中')`)
+            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound||'O')}','${esc(d.dest_tc||'')}')`)
         ).join('');
-        if(html)sections.push(html);
+        if(html)sections.push(`<div class="srch-section-lbl">🟢 城巴 CTB</div>`+html);
       }
-    }catch{}
+    }catch(e){console.warn('[CTB search]',e)}
   }
 
-  // MTR lines (if enabled) — match line code
+  // ── MTR ───────────────────────────────────────────────────────────────────
   if(ts.mtr){
     const mtrMatch=Object.entries(MTR_LINE).filter(([code,name])=>
-      code.includes(q)||name.includes(q)||q==='MTR');
+      code===q||code.includes(q)||name.includes(qZh)||
+      q==='MTR'||qZh==='港鐵'||qZh==='地鐵'
+    );
     if(mtrMatch.length){
-      const html=mtrMatch.map(([code,name])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,71,87,.3);border-radius:12px;margin-bottom:8px;padding:14px 16px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 12px">${code}</div>
-            <div><div style="font-size:14px;color:var(--bright)">${name}</div><div style="font-size:11px;color:var(--mid);margin-top:2px">港鐵 MTR</div></div>
-          </div>
+      const html=`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrMatch.map(([code,name])=>`
+        <div style="background:var(--bg2);border:1px solid rgba(255,71,87,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${code}</div>
+          <div><div style="font-size:14px;font-weight:500;color:var(--bright)">${name}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">港鐵 MTR · 點附近站可見班次</div></div>
         </div>`).join('');
       sections.push(html);
     }
   }
 
-  // LRT routes (if enabled)
+  // ── LRT ───────────────────────────────────────────────────────────────────
   if(ts.lrt){
-    try{
-      const lrtRoutes=['505','507','610','614','614P','615','615P','705','706','751','751P','761P'];
-      const lrtMatch=lrtRoutes.filter(r=>r===q||r.startsWith(q));
-      if(lrtMatch.length||q==='LRT'||q==='輕鐵'){
-        const show=q==='LRT'||q==='輕鐵'?lrtRoutes:lrtMatch;
-        const html=`<div style="background:var(--bg2);border:1px solid rgba(255,165,0,.3);border-radius:12px;margin-bottom:8px;padding:14px 16px">
-          <div style="font-size:11px;font-weight:700;color:#ffaa33;margin-bottom:8px">輕鐵 LRT</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">${show.map(r=>`<span style="font-family:var(--mono);font-size:14px;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.25);border-radius:7px;padding:4px 10px;color:#ffaa33">${r}</span>`).join('')}</div>
-        </div>`;
-        sections.push(html);
-      }
-    }catch{}
+    const LRT_ROUTES={
+      '505':'天水圍循環綫','507':'元朗─屯門南','610':'屯門市中心─兆康',
+      '614':'屯門碼頭─元朗','614P':'屯門碼頭─元朗','615':'屯門碼頭─天水圍',
+      '615P':'屯門碼頭─天水圍','705':'天水圍循環綫','706':'天水圍循環綫',
+      '751':'天水圍─元朗','751P':'天水圍─元朗','761P':'天水圍─屯門碼頭',
+    };
+    const lrtMatch=Object.entries(LRT_ROUTES).filter(([no,desc])=>
+      no===q||no.startsWith(q)||desc.includes(qZh)||
+      q==='LRT'||qZh==='輕鐵'
+    );
+    if(lrtMatch.length){
+      const html=`<div class="srch-section-lbl">🚊 輕鐵 LRT</div>`+lrtMatch.map(([no,desc])=>`
+        <div style="background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${no}</div>
+          <div><div style="font-size:13px;font-weight:500;color:var(--bright)">${desc}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">輕鐵 LRT</div></div>
+        </div>`).join('');
+      sections.push(html);
+    }
   }
 
   if(!sections.length){
-    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)"><div style="font-size:32px;margin-bottom:10px">🔍</div><div style="font-size:14px">找不到路線「${q}」</div><div style="font-size:12px;color:var(--dim);margin-top:5px">已搜尋九巴${ts.ctb?' · 城巴':''}${ts.mtr?' · 港鐵':''}${ts.lrt?' · 輕鐵':''}</div></div>`;
+    const hint=`九巴${ts.ctb?' · 城巴':''}${ts.mtr?' · 港鐵':''}${ts.lrt?' · 輕鐵':''}`;
+    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)">
+      <div style="font-size:32px;margin-bottom:10px">🔍</div>
+      <div style="font-size:14px">找不到「${raw}」</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:5px">已搜尋：${hint}</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:3px">支援路線號碼（40X）或中文（荃灣）</div>
+    </div>`;
   }else{
-    el.innerHTML=`<div style="font-size:10px;color:var(--dim);font-family:var(--mono);letter-spacing:.1em;margin-bottom:8px">搜尋：${q}</div>`+sections.join('');
+    el.innerHTML=sections.join('');
   }
 }
+
+async function openCTBDetail(route,bound,dest){
+  setDTitle(`城巴 ${route} 路線詳情`);
+  document.getElementById('drawer-body').innerHTML=`<div class="spinner"></div>`;
+  openOverlay();
+  try{
+    const dir=bound==='O'||bound==='outbound'?'outbound':'inbound';
+    const[sd,si]=await Promise.all([
+      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dir}`).then(r=>r.json()),
+      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/stop`).then(r=>r.json()),
+    ]);
+    const stops=sd.data||[];
+    const stopMap={};(si.data||[]).forEach(s=>stopMap[s.stop]=s.name_tc||s.stop);
+    const el=document.getElementById('drawer-body');
+    const otherDir=dir==='outbound'?'inbound':'outbound';
+    el.innerHTML=`
+      <div class="route-detail-hdr">
+        <div class="route-detail-badge" style="color:#2ed573;background:rgba(46,213,115,.1);border-color:rgba(46,213,115,.3)">${route}</div>
+        <div class="route-detail-info">
+          <div class="route-detail-dest">往 ${dest||'(目的地)'} <span style="font-size:10px;color:var(--mid)">[城巴]</span></div>
+          <div class="route-detail-orig">${stops.length} 個站</div>
+        </div>
+      </div>
+      <div class="dir-tab-row">
+        <div class="dir-tab${dir==='outbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','O','${esc(dest)}')">往 ${dest||'外'}（去程）</div>
+        <div class="dir-tab${dir==='inbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','I','${esc(dest)}')">（回程）</div>
+      </div>
+      <div class="route-stop-list">${stops.map((s,i)=>`
+        <div class="rsl-item">
+          <div class="rsl-line"></div>
+          <div class="rsl-dot${i===0?' first':i===stops.length-1?' last':''}"></div>
+          <div class="rsl-seq">${s.seq}</div>
+          <div class="rsl-name">${stopMap[s.stop]||s.stop}</div>
+        </div>`).join('')}
+      </div>`;
+  }catch(e){document.getElementById('drawer-body').innerHTML=`<div class="msg">載入失敗：${e.message}</div>`}
+}
+
 
 // ═══════════════════════════════════
 //  TRANSPORT SETTINGS (CTB / MTR)
