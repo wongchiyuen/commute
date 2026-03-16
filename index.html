@@ -1079,7 +1079,7 @@ async function reloadCurrentFeed(){
   if(activePage==='page-news') reloadNewsFeed();
   else if(activePage==='page-traffic') reloadTrafficFeed();
 }
-function reloadNewsFeed(){
+async function reloadNewsFeed(){
   if(currentNewsFeed==='all'){['google','yahoo','local','world'].forEach(k=>delete newsCache[k])}
   else delete newsCache[currentNewsFeed];
   document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
