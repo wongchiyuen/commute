@@ -17,7 +17,7 @@
   --amb:#f0a500;--amb2:#ffc03a;
   --amb-bg:rgba(240,165,0,.09);--amb-bdr:rgba(240,165,0,.26);
   --grn:#2ed573;--red:#ff4757;--blu:#5b8fff;
-  --txt:#edf1fb;--mid:#adb8d4;--dim:#6b7a9e;--bright:#e4eaf8;
+  --txt:#edf1fb;--mid:#bbc5dc;--dim:#8898b8;--bright:#e8eef9;
   --mono:'Azeret Mono',monospace;--sans:'Noto Sans HK',sans-serif;
   --nav-h:60px;
 }
@@ -294,12 +294,12 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
     <div class="dist-row" id="dist-row" style="display:none">
       <span class="dist-lbl">距離：</span>
-      <button class="dist-pill" data-m="20"   onclick="setDist(20)">20m</button>
       <button class="dist-pill" data-m="100"  onclick="setDist(100)">100m</button>
       <button class="dist-pill" data-m="300"  onclick="setDist(300)">300m</button>
       <button class="dist-pill active" data-m="500"  onclick="setDist(500)">500m</button>
       <button class="dist-pill" data-m="1000" onclick="setDist(1000)">1km</button>
       <button class="dist-pill" data-m="3000" onclick="setDist(3000)">3km</button>
+      <button class="dist-pill" data-m="5000" onclick="setDist(5000)">5km</button>
     </div>
     <div class="bus-list" id="bus-list"></div>
   </div>
@@ -362,9 +362,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         <label class="toggle"><input type="checkbox" id="toggle-mtr" onchange="saveTransportSettings()"><span class="toggle-slider"></span></label>
       </div>
       <div class="sett-row" style="cursor:default">
-        <div class="sett-ico">🚃</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">電車 (Tram)</div><div class="sett-lbl-sub">暫無公開 API，敬請期待</div></div>
-        <label class="toggle"><input type="checkbox" disabled><span class="toggle-slider" style="opacity:.4"></span></label>
+        <div class="sett-ico">🚊</div>
+        <div class="sett-lbl"><div class="sett-lbl-main">輕鐵 (LRT)</div><div class="sett-lbl-sub">rt.data.one.gov.hk/mtr/lrt</div></div>
+        <label class="toggle"><input type="checkbox" id="toggle-lrt" onchange="saveTransportSettings()"><span class="toggle-slider"></span></label>
       </div>
     </div>
     <div class="sett-section-title">🚌 巴士資料</div>
@@ -419,9 +419,9 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         天氣：<a href="https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm" target="_blank">香港天文台開放數據</a><br>
         巴士：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
         新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台</a>、<a href="https://hk.news.yahoo.com" target="_blank">Yahoo 香港</a><br>
-        交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a>、<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台</a><br>
+        交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
-        © 2026 生活日常。GOODTIME。保留所有權利。
+        © 2026 生活日常。保留所有權利。
       </div>
     </div>
   </div>
@@ -627,7 +627,6 @@ let currentNewsFeed='all';
 let currentTrafficFeed='td';
 let newsCache={};
 let trafficCache={};
-let historyLoaded=false;
 
 // ═══════════════════════════════════
 //  PAGE NAVIGATION
@@ -797,36 +796,71 @@ let wxDetails = {};
 async function loadExtraWeather(){
   const now=new Date();
   const y=now.getFullYear(),mo=now.getMonth()+1,d=now.getDate();
-
-  // 1. Today max/min from rhrread (overrides forecast value if available)
-  try{
-    const rhr=await fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json());
-    const maxArr=rhr.maximumTemperature?.data||rhr.maxTemp?.data||[];
-    const minArr=rhr.minimumTemperature?.data||rhr.minTemp?.data||[];
-    const maxE=hkoFind(maxArr,selectedStn);
-    const minE=hkoFind(minArr,selectedStn);
-    if(num(maxE?.value)!=null) wxDetails.todayMaxT=num(maxE.value);
-    if(num(minE?.value)!=null) wxDetails.todayMinT=num(minE.value);
-  }catch{}
+  const moStr=String(mo).padStart(2,'0');
 
   // Use GPS if available, else fall back to selected weather station coords
-  const stnCoords = RHRREAD_STNS.find(s=>s.n===selectedStn);
-  const lat = nearbyLat ?? stnCoords?.lat;
-  const lng = nearbyLng ?? stnCoords?.lng;
+  const stnCoords=RHRREAD_STNS.find(s=>s.n===selectedStn);
+  const lat=nearbyLat??stnCoords?.lat;
+  const lng=nearbyLng??stnCoords?.lng;
 
-  // 2. Tide - nearest tide station
+  // 1. Today actual max/min comes from FLW forecast (field 0 = today)
+  //    Already set in loadWeather() from flw.weatherForecast[0]
+  //    Also try to get from rhrread extremeTemperature if available
+  try{
+    const rhr=await fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json());
+    // rhrread may expose max/min under different keys depending on API version
+    const keys=['maximumTemperature','maxTemperature','highTemperature','extremeMaxTemperature'];
+    for(const k of keys){
+      const arr=rhr[k]?.data||[];
+      const e=hkoFind(arr,selectedStn)||arr[0];
+      if(num(e?.value)!=null){wxDetails.todayMaxT=num(e.value);break}
+    }
+    const minKeys=['minimumTemperature','minTemperature','lowTemperature','extremeMinTemperature'];
+    for(const k of minKeys){
+      const arr=rhr[k]?.data||[];
+      const e=hkoFind(arr,selectedStn)||arr[0];
+      if(num(e?.value)!=null){wxDetails.todayMinT=num(e.value);break}
+    }
+  }catch{}
+
+  // 2. Monthly climate normals for max/min (CLMMAXT/CLMMINT) — historical context
+  if(lat){
+    try{
+      const cstn=nearestOf(CLIMATE_STNS,lat,lng);
+      const [maxR,minR,avgR]=await Promise.all([
+        fetch(`${HKO_C}?dataType=CLMMAXT&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
+        fetch(`${HKO_C}?dataType=CLMMINT&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
+        fetch(`${HKO_C}?dataType=CLMTEMP&lang=tc&station=${cstn.code}&year=${y}&month=${moStr}`).then(r=>r.json()).catch(()=>null),
+      ]);
+      const getClim=obj=>{
+        if(!obj)return null;
+        const arr=obj.data||obj.ClimateData||[];
+        if(!arr.length)return null;
+        // climate API returns array of {year/month,value} — get last entry
+        const v=num(arr[arr.length-1]?.value??arr[arr.length-1]?.meanTemp??arr[0]?.value);
+        return v;
+      };
+      const cmax=getClim(maxR),cmin=getClim(minR),cavg=getClim(avgR);
+      if(cmax!=null||cmin!=null){
+        wxDetails.climMax=cmax; wxDetails.climMin=cmin; wxDetails.climAvg=cavg;
+        wxDetails.climStn=cstn.n;
+      }
+    }catch(e){console.warn('[clim]',e)}
+  }
+
+  // 3. Tide - nearest tide station
   if(lat){
     try{
       const tstn=nearestOf(TIDE_STNS,lat,lng);
-      const url=`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${String(mo).padStart(2,'0')}`;
+      const url=`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${moStr}`;
       const tdata=await fetch(url).then(r=>r.json());
       const arr=tdata.data||tdata.HLT||[];
       const today=arr.filter(t=>parseInt(t.date??t.day??t.Date??0)===d);
-      if(today.length){ wxDetails.tide=today; wxDetails.tideStn=tstn.n }
+      if(today.length){wxDetails.tide=today;wxDetails.tideStn=tstn.n}
     }catch(e){console.warn('[tide]',e)}
   }
 
-  // 3. Radiation (RYES) - try current month then previous
+  // 4. Radiation (RYES) - try current month then previous two
   if(lat){
     try{
       const cstn=nearestOf(CLIMATE_STNS,lat,lng);
@@ -834,14 +868,14 @@ async function loadExtraWeather(){
       for(const [yr,mn] of [[y,mo],[y,mo===1?12:mo-1],[y,mo<=2?12:mo-2]]){
         try{
           rdata=await fetch(`${HKO_C}?dataType=RYES&lang=tc&station=${cstn.code}&year=${yr}&month=${String(mn).padStart(2,'0')}`).then(r=>r.json());
-          if(rdata?.data?.length) break;
+          if(rdata?.data?.length)break;
         }catch{}
         rdata=null;
       }
       if(rdata?.data?.length){
         const latest=rdata.data[rdata.data.length-1];
         const rv=num(latest?.value??latest?.radiation??latest?.MJm2??latest?.globalSolarRadiation);
-        if(rv!=null){ wxDetails.radiation=rv; wxDetails.radiationStn=cstn.n }
+        if(rv!=null){wxDetails.radiation=rv;wxDetails.radiationStn=cstn.n}
       }
     }catch(e){console.warn('[radiation]',e)}
   }
@@ -871,10 +905,15 @@ function renderWeatherDetailsContent(){
         <div class="wdet-sub">${humStn}</div>
       </div>
       <div class="wdet-card">
-        <div class="wdet-lbl">今日氣溫</div>
-        <div class="wdet-val" style="color:#ff8c5a">${maxT!=null?maxT+'°':'--'}<span style="font-size:12px;color:var(--mid)"> / ${minT!=null?minT+'°':'--'}</span></div>
+        <div class="wdet-lbl">今日預測氣溫</div>
+        <div class="wdet-val" style="color:#ff8c5a">${maxT!=null?maxT+'°':'--'}<span style="font-size:14px;color:var(--mid)"> / </span><span style="color:#7ba8ff">${minT!=null?minT+'°':'--'}</span></div>
         <div class="wdet-sub">最高 / 最低　${selectedStn}</div>
       </div>
+      ${(wxDetails.climMax!=null||wxDetails.climMin!=null)?`<div class="wdet-card">
+        <div class="wdet-lbl">月均（歷史）· ${wxDetails.climStn||''}</div>
+        <div class="wdet-val" style="color:#ff8c5a">${wxDetails.climMax!=null?wxDetails.climMax+'°':'--'}<span style="font-size:14px;color:var(--mid)"> / </span><span style="color:#7ba8ff">${wxDetails.climMin!=null?wxDetails.climMin+'°':'--'}</span></div>
+        <div class="wdet-sub">月平均最高 / 最低${wxDetails.climAvg!=null?' · 月均 '+wxDetails.climAvg+'°':''}</div>
+      </div>`:''}
       ${rad!=null?`<div class="wdet-card wdet-full">
         <div class="wdet-lbl">昨日輻射量 · ${radStn}</div>
         <div class="wdet-val">${rad} <span style="font-size:12px;font-weight:400;color:var(--mid)">MJ/m²</span></div>
@@ -914,91 +953,102 @@ function useGPS2(){
 // ═══════════════════════════════════
 // ── RSS helpers ─────────────────────────────────────────────────────────────
 function parseXMLItems(text){
-  if(!text||text.length<100)return null;
-  // Strip BOM and leading whitespace
-  const clean=text.replace(/^﻿/,'').trim();
+  if(!text||text.length<80)return null;
   try{
+    // Strip BOM, XML declaration noise
+    const clean=text.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/,'').trim();
     const xml=new DOMParser().parseFromString(clean,'text/xml');
-    if(xml.querySelector('parsererror')){
-      // Try as HTML fallback
-      const html=new DOMParser().parseFromString(clean,'text/html');
-      const items=[...html.querySelectorAll('item,entry')];
-      if(!items.length)return null;
-    }
+    if(xml.querySelector('parsererror'))return null;
     const items=[...xml.querySelectorAll('item,entry')];
     if(!items.length)return null;
     return items.slice(0,60).map(item=>{
-      const gs=t=>{
-        const el=item.querySelector(t);
-        return el?.textContent?.trim()||el?.getAttribute('href')||'';
-      };
-      // Handle CDATA and encoded links
+      const gs=t=>item.querySelector(t)?.textContent?.trim().replace(/<!\[CDATA\[|\]\]>/g,'')||'';
       let link=item.querySelector('link')?.textContent?.trim()||
                item.querySelector('link')?.getAttribute('href')||
                item.querySelector('guid')?.textContent?.trim()||'';
-      const desc=(gs('description')||gs('summary')||gs('content')).replace(/<!\[CDATA\[|\]\]>/g,'').replace(/<[^>]+>/g,'').trim().slice(0,200);
-      return{title:gs('title').replace(/<!\[CDATA\[|\]\]>/g,'').trim(),link,
-             pubDate:gs('pubDate')||gs('published')||gs('updated')||gs('dc\:date'),
-             description:desc};
+      const rawDesc=gs('description')||gs('summary')||gs('content:encoded')||gs('content');
+      const desc=rawDesc.replace(/<!\[CDATA\[|\]\]>/g,'').replace(/<[^>]+>/g,'').trim().slice(0,220);
+      const title=gs('title').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
+      return{title,link,pubDate:gs('pubDate')||gs('published')||gs('updated'),description:desc};
     }).filter(i=>i.title&&i.title.length>1);
   }catch(e){console.warn('[parseXML]',e);return null}
 }
 
-async function fetchWithTimeout(url,ms=12000){
-  const ctrl=new AbortController();
-  const tid=setTimeout(()=>ctrl.abort(),ms);
-  try{const r=await fetch(url,{signal:ctrl.signal});clearTimeout(tid);return r}
-  catch(e){clearTimeout(tid);throw e}
+async function ft(url,ms=14000){
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error('timeout')),ms);
+    fetch(url).then(r=>{clearTimeout(t);res(r)}).catch(e=>{clearTimeout(t);rej(e)});
+  });
 }
 
 async function fetchRSS(feedCfg){
   const url=feedCfg.url;
   const enc=encodeURIComponent(url);
-  const strategies=[
-    // 1. rss2json.com — JSON API, best for Google/Yahoo, no CORS issues
-    async()=>{
-      const j=await fetchWithTimeout(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`).then(r=>r.json());
-      if(j.status==='ok'&&j.items?.length){
-        return j.items.map(i=>({
-          title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
-          link:i.link||i.guid||'',
-          pubDate:i.pubDate||'',
-          description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,200),
-        })).filter(i=>i.title);
-      }
-      if(j.status==='error')console.warn('[rss2json] error:',j.message);
-      return null;
-    },
-    // 2. allorigins /get — returns JSON wrapper {contents,status}
-    async()=>{
-      const j=await fetchWithTimeout(`https://api.allorigins.win/get?url=${enc}`).then(r=>r.json());
-      if(j?.status?.http_code===200&&j.contents){
-        return parseXMLItems(j.contents);
-      }
-      return null;
-    },
-    // 3. allorigins /raw — direct text (sometimes works when /get doesn't)
-    async()=>{
-      const r=await fetchWithTimeout(`https://api.allorigins.win/raw?url=${enc}`);
-      if(!r.ok)return null;
-      return parseXMLItems(await r.text());
-    },
-    // 4. corsproxy.io
-    async()=>{
-      const r=await fetchWithTimeout(`https://corsproxy.io/?${enc}`);
-      if(!r.ok)return null;
-      return parseXMLItems(await r.text());
-    },
-  ];
-  for(const [i,fn] of strategies.entries()){
-    try{
-      const items=await fn();
-      if(items?.length){console.log(`[RSS] strategy ${i+1} succeeded for`,url);return items}
-    }catch(e){console.warn(`[RSS] strategy ${i+1} failed:`,e.message||e)}
-  }
-  console.warn('[RSS] all strategies failed for',url);
+  console.log('[RSS] fetching:',url);
+
+  // Strategy A: rss2json.com — JSON API, handles Google/Yahoo/RTHK
+  try{
+    const res=await ft(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`);
+    const j=await res.json();
+    console.log('[RSS] rss2json status:',j.status,'items:',j.items?.length);
+    if(j.status==='ok'&&j.items?.length>0){
+      return j.items.map(i=>({
+        title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
+        link:i.link||i.guid||'',
+        pubDate:i.pubDate||'',
+        description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,220),
+      })).filter(i=>i.title);
+    }
+  }catch(e){console.warn('[RSS-A]',e.message)}
+
+  // Strategy B: allorigins /get (JSON wrapper, avoids raw CORS issues)
+  try{
+    const res=await ft(`https://api.allorigins.win/get?url=${enc}`);
+    const j=await res.json();
+    console.log('[RSS] allorigins/get http_code:',j?.status?.http_code,'content len:',j?.contents?.length);
+    if(j?.status?.http_code===200&&j.contents?.length>100){
+      const items=parseXMLItems(j.contents);
+      if(items?.length){console.log('[RSS-B] ok items:',items.length);return items}
+    }
+  }catch(e){console.warn('[RSS-B]',e.message)}
+
+  // Strategy C: corsproxy.io
+  try{
+    const res=await ft(`https://corsproxy.io/?${enc}`);
+    if(res.ok){
+      const text=await res.text();
+      console.log('[RSS-C] corsproxy len:',text?.length);
+      const items=parseXMLItems(text);
+      if(items?.length){console.log('[RSS-C] ok items:',items.length);return items}
+    }
+  }catch(e){console.warn('[RSS-C]',e.message)}
+
+  // Strategy D: allorigins /raw
+  try{
+    const res=await ft(`https://api.allorigins.win/raw?url=${enc}`);
+    if(res.ok){
+      const text=await res.text();
+      console.log('[RSS-D] allorigins/raw len:',text?.length);
+      const items=parseXMLItems(text);
+      if(items?.length){console.log('[RSS-D] ok items:',items.length);return items}
+    }
+  }catch(e){console.warn('[RSS-D]',e.message)}
+
+  // Strategy E: xmlproxy (another free proxy)
+  try{
+    const res=await ft(`https://api.codetabs.com/v1/proxy?quest=${enc}`);
+    if(res.ok){
+      const text=await res.text();
+      console.log('[RSS-E] codetabs len:',text?.length);
+      const items=parseXMLItems(text);
+      if(items?.length){console.log('[RSS-E] ok items:',items.length);return items}
+    }
+  }catch(e){console.warn('[RSS-E]',e.message)}
+
+  console.warn('[RSS] ALL strategies failed for',url);
   return null;
 }
+
 
 function renderFeedItems(items,el){
   if(!items||!items.length){
@@ -1128,14 +1178,48 @@ async function reloadTrafficFeed(){
 // ═══════════════════════════════════
 //  TODAY IN HISTORY
 // ═══════════════════════════════════
+let _historyEvents=[], _historyIdx=0;
+
+function renderHistoryEvent(el,dateStr){
+  if(!_historyEvents.length)return;
+  const pick=_historyEvents[_historyIdx];
+  const text=pick.text||pick.pages?.[0]?.description||'';
+  const total=_historyEvents.length;
+  el.innerHTML=`
+    <div class="history-date">${dateStr} · 歷史上的今天</div>
+    <div class="history-year">${pick.year}<sup style="font-size:14px;font-weight:400;color:var(--amb);margin-left:2px">年</sup></div>
+    <div class="history-text">${text}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+      <div class="history-src">資料來源：維基百科</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--dim)">${_historyIdx+1} / ${total}</span>
+        <button onclick="nextHistoryEvent()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--amb2);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--sans)">下一個 ›</button>
+      </div>
+    </div>`;
+}
+
+function nextHistoryEvent(){
+  if(!_historyEvents.length)return;
+  _historyIdx=(_historyIdx+1)%_historyEvents.length;
+  const el=document.getElementById('history-card');
+  const now=new Date();
+  renderHistoryEvent(el,`${now.getMonth()+1}月${now.getDate()}日`);
+}
+
 async function loadTodayHistory(){
-  if(historyLoaded)return;
+  if(_historyEvents.length){
+    // Already loaded — just re-render (settings page re-opened)
+    const el=document.getElementById('history-card');
+    const now=new Date();
+    renderHistoryEvent(el,`${now.getMonth()+1}月${now.getDate()}日`);
+    return;
+  }
   const el=document.getElementById('history-card');
   const now=new Date(),mo=now.getMonth()+1,d=now.getDate();
   const dateStr=`${mo}月${d}日`;
+  el.innerHTML=`<div class="history-loading">載入中…</div>`;
   try{
     let events=[];
-    // Try Chinese Wikipedia first
     const r=await fetch(`https://zh.wikipedia.org/api/rest_v1/feed/onthisday/selected/${mo}/${d}`,{signal:AbortSignal.timeout(6000)}).then(x=>x.json()).catch(()=>null);
     events=r?.selected||r?.events||[];
     if(!events.length){
@@ -1143,11 +1227,9 @@ async function loadTodayHistory(){
       events=r2?.selected||r2?.events||[];
     }
     if(!events.length){el.innerHTML=`<div class="history-date">${dateStr}</div><div class="history-text" style="color:var(--mid)">暫無資料</div>`;return}
-    const sorted=[...events].sort((a,b)=>a.year-b.year);
-    const pick=sorted[Math.floor(Math.random()*Math.min(5,sorted.length))];
-    const text=pick.text||pick.pages?.[0]?.description||'';
-    historyLoaded=true;
-    el.innerHTML=`<div class="history-date">${dateStr} · 歷史上的今天</div><div class="history-year">${pick.year}<sup style="font-size:14px;font-weight:400;color:var(--amb);margin-left:2px">年</sup></div><div class="history-text">${text}</div><div class="history-src">資料來源：維基百科</div>`;
+    _historyEvents=[...events].sort((a,b)=>a.year-b.year);
+    _historyIdx=0;
+    renderHistoryEvent(el,dateStr);
   }catch{el.innerHTML=`<div class="history-date">${dateStr}</div><div class="history-text" style="color:var(--mid)">無法載入歷史資料</div>`}
 }
 
@@ -1338,6 +1420,7 @@ async function loadNearby(){
     const _ts=getTransportSettings();
     if(_ts.ctb){try{const ctbR=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbR)}catch(e){console.warn('[CTB]',e)}}
     if(_ts.mtr){try{const mtrR=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrR)}catch(e){console.warn('[MTR]',e)}}
+    if(_ts.lrt){try{const lrtR=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...lrtR)}catch(e){console.warn('[LRT]',e)}}
 
     rows.sort((a,b)=>a._etas[0]-b._etas[0]);
     if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
@@ -1348,10 +1431,13 @@ async function loadNearby(){
       const cc=m<=2?'sc':m<=8?'cc':'oc';
       const isMTR=r.type==='mtr';
       const isCTB=r.type==='ctb';
+      const isLRT=r.type==='lrt';
       const badgeStyle=isMTR?'background:rgba(255,71,87,.12);color:#ff8a96;border-color:rgba(255,71,87,.35);'
-                      :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);':'';
+                      :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);'
+                      :isLRT?'background:rgba(255,165,0,.1);color:#ffaa33;border-color:rgba(255,165,0,.3);':'';
       const typeTag=isMTR?`<span style="font-size:9px;background:rgba(255,71,87,.15);color:#ff8a96;border-radius:4px;padding:1px 5px;margin-left:4px">MTR</span>`
-                   :isCTB?`<span style="font-size:9px;background:rgba(46,213,115,.12);color:#2ed573;border-radius:4px;padding:1px 5px;margin-left:4px">CTB</span>`:'';
+                   :isCTB?`<span style="font-size:9px;background:rgba(46,213,115,.12);color:#2ed573;border-radius:4px;padding:1px 5px;margin-left:4px">CTB</span>`
+                   :isLRT?`<span style="font-size:9px;background:rgba(255,165,0,.12);color:#ffaa33;border-radius:4px;padding:1px 5px;margin-left:4px">輕鐵</span>`:'';
       const clickFn=isMTR?'':`onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"`;
       return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" ${clickFn}><div class="bus-badge" style="${badgeStyle}">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
     }).join('');
@@ -1430,7 +1516,8 @@ async function _showRouteDetail(route,routes,svcType,dest,focusStopId,dirIdx){
       if(!etaMap[e.eta_seq])etaMap[e.eta_seq]=m;
     });
 
-    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="_showRouteDetail('${route}',routes,null,'${esc(rr.dest_tc)}',null,${i})">往 ${rr.dest_tc}</div>`).join('');
+    window._detailRoutes=routes;
+    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="_showRouteDetail('${esc(route)}',window._detailRoutes,null,'${esc(rr.dest_tc)}',null,${i})">往 ${rr.dest_tc}</div>`).join('');
     const stopHtml=stops.map((s,i)=>{
       const isFocus=s.stopId===focusStopId;
       const isFirst=i===0,isLast=i===stops.length-1;
@@ -1499,36 +1586,102 @@ async function getAllRoutes(){
   return _allRoutes;
 }
 
+function routeCard(route,dirs,badgeColor,borderColor,accentColor,label,clickFn){
+  return`<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--bdr)">
+      <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${accentColor};background:${badgeColor};border:1px solid ${borderColor};border-radius:8px;padding:4px 12px">${route}</div>
+      <div style="flex:1">
+        ${dirs.map(d=>`<div style="font-size:13px;color:var(--txt)">${d.orig||d.orig_tc||''} → ${d.dest||d.dest_tc||d.dest_en||''}</div>`).join('')}
+        ${label?`<div style="font-size:10px;font-weight:700;color:${accentColor};margin-top:2px">${label}</div>`:''}
+      </div>
+    </div>
+    ${dirs.map((d,i)=>`<div onclick="${clickFn(d,i)}" style="display:flex;align-items:center;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bdr)" ontouchstart="this.style.background='var(--bg3)'" ontouchend="this.style.background=''">
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">往 ${d.dest||d.dest_tc||d.dest_en||''}</div><div style="font-size:11px;color:var(--mid);margin-top:2px">${d.orig||d.orig_tc?'由 '+(d.orig||d.orig_tc):''}</div></div>
+      <div style="color:var(--dim);font-size:17px">›</div>
+    </div>`).join('')}
+  </div>`;
+}
+
 async function doRouteSearch(){
   const q=(document.getElementById('search-route-inp')?.value||'').trim().toUpperCase();
   if(!q)return;
   const el=document.getElementById('search-page-results');
   el.innerHTML=`<div class="spinner"></div>`;
+  const ts=getTransportSettings();
+  const sections=[];
+
   try{
+    // KMB routes
     const all=await getAllRoutes();
     const matches=all.filter(r=>r.route===q||r.route.startsWith(q));
-    if(!matches.length){
-      el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)"><div style="font-size:32px;margin-bottom:10px">🔍</div><div>找不到路線「${q}」</div></div>`;
-      return;
+    if(matches.length){
+      const grouped={};
+      matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
+      const kmbHtml=Object.entries(grouped).map(([route,dirs])=>
+        routeCard(route,dirs,'var(--amb-bg)','var(--amb-bdr)','var(--amb2)','九巴 KMB',
+          (d)=>`openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)`)
+      ).join('');
+      if(kmbHtml)sections.push(kmbHtml);
     }
-    // Group by route
-    const grouped={};
-    matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
-    const html=Object.entries(grouped).map(([route,dirs])=>`
-      <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden">
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--bdr)">
-          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--amb2);background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:4px 12px">${route}</div>
-          <div style="flex:1">
-            ${dirs.map(d=>`<div style="font-size:13px;color:var(--txt)">${d.orig_tc} → ${d.dest_tc}</div>`).join('')}
+  }catch{}
+
+  // CTB routes (if enabled)
+  if(ts.ctb){
+    try{
+      if(!window._ctbRoutes){
+        const d=await fetch(`${CTB}/route`).then(r=>r.json());
+        window._ctbRoutes=d.data||[];
+      }
+      const matches=window._ctbRoutes.filter(r=>r.route===q||r.route.startsWith(q));
+      if(matches.length){
+        const grouped={};
+        matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
+        const html=Object.entries(grouped).map(([route,dirs])=>
+          routeCard(route,dirs,'rgba(46,213,115,.1)','rgba(46,213,115,.3)','#2ed573','城巴 CTB',
+            (d)=>`alert('城巴路線詳情開發中')`)
+        ).join('');
+        if(html)sections.push(html);
+      }
+    }catch{}
+  }
+
+  // MTR lines (if enabled) — match line code
+  if(ts.mtr){
+    const mtrMatch=Object.entries(MTR_LINE).filter(([code,name])=>
+      code.includes(q)||name.includes(q)||q==='MTR');
+    if(mtrMatch.length){
+      const html=mtrMatch.map(([code,name])=>`
+        <div style="background:var(--bg2);border:1px solid rgba(255,71,87,.3);border-radius:12px;margin-bottom:8px;padding:14px 16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 12px">${code}</div>
+            <div><div style="font-size:14px;color:var(--bright)">${name}</div><div style="font-size:11px;color:var(--mid);margin-top:2px">港鐵 MTR</div></div>
           </div>
-        </div>
-        ${dirs.map(d=>`<div onclick="openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)" style="display:flex;align-items:center;padding:11px 14px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--bdr)" ontouchstart="this.style.background='var(--bg3)'" ontouchend="this.style.background=''">
-          <div style="flex:1"><div style="font-size:13px;font-weight:500">往 ${d.dest_tc}</div><div style="font-size:11px;color:var(--mid);margin-top:2px">由 ${d.orig_tc}</div></div>
-          <div style="color:var(--dim);font-size:17px">›</div>
-        </div>`).join('')}
-      </div>`).join('');
-    el.innerHTML=html;
-  }catch(e){el.innerHTML=`<div class="msg">載入失敗：${e.message}</div>`}
+        </div>`).join('');
+      sections.push(html);
+    }
+  }
+
+  // LRT routes (if enabled)
+  if(ts.lrt){
+    try{
+      const lrtRoutes=['505','507','610','614','614P','615','615P','705','706','751','751P','761P'];
+      const lrtMatch=lrtRoutes.filter(r=>r===q||r.startsWith(q));
+      if(lrtMatch.length||q==='LRT'||q==='輕鐵'){
+        const show=q==='LRT'||q==='輕鐵'?lrtRoutes:lrtMatch;
+        const html=`<div style="background:var(--bg2);border:1px solid rgba(255,165,0,.3);border-radius:12px;margin-bottom:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:700;color:#ffaa33;margin-bottom:8px">輕鐵 LRT</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${show.map(r=>`<span style="font-family:var(--mono);font-size:14px;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.25);border-radius:7px;padding:4px 10px;color:#ffaa33">${r}</span>`).join('')}</div>
+        </div>`;
+        sections.push(html);
+      }
+    }catch{}
+  }
+
+  if(!sections.length){
+    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)"><div style="font-size:32px;margin-bottom:10px">🔍</div><div style="font-size:14px">找不到路線「${q}」</div><div style="font-size:12px;color:var(--dim);margin-top:5px">已搜尋九巴${ts.ctb?' · 城巴':''}${ts.mtr?' · 港鐵':''}${ts.lrt?' · 輕鐵':''}</div></div>`;
+  }else{
+    el.innerHTML=`<div style="font-size:10px;color:var(--dim);font-family:var(--mono);letter-spacing:.1em;margin-bottom:8px">搜尋：${q}</div>`+sections.join('');
+  }
 }
 
 // ═══════════════════════════════════
@@ -1538,22 +1691,72 @@ function loadTransportSettings(){
   const s=JSON.parse(localStorage.getItem('transport_settings')||'{}');
   const ctb=document.getElementById('toggle-ctb');
   const mtr=document.getElementById('toggle-mtr');
+  const lrt=document.getElementById('toggle-lrt');
   if(ctb)ctb.checked=!!s.ctb;
   if(mtr)mtr.checked=!!s.mtr;
+  if(lrt)lrt.checked=!!s.lrt;
   return s;
 }
 function saveTransportSettings(){
   const ctb=document.getElementById('toggle-ctb')?.checked||false;
   const mtr=document.getElementById('toggle-mtr')?.checked||false;
-  localStorage.setItem('transport_settings',JSON.stringify({ctb,mtr}));
+  const lrt=document.getElementById('toggle-lrt')?.checked||false;
+  localStorage.setItem('transport_settings',JSON.stringify({ctb,mtr,lrt}));
   showToast('已儲存交通服務設定');
 }
 function getTransportSettings(){
   return JSON.parse(localStorage.getItem('transport_settings')||'{}');
 }
 
-// CTB API constants
+// CTB / LRT API constants
 const CTB='https://rt.data.one.gov.hk/v2/transport/citybus';
+const LRT_API='https://rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule';
+
+// LRT station list (id, name, coords)
+const LRT_STNS=[
+  {id:'003',n:'屯門',lat:22.394,lng:113.977},{id:'004',n:'三聖',lat:22.378,lng:113.969},
+  {id:'005',n:'兆禧',lat:22.399,lng:113.959},{id:'006',n:'友愛',lat:22.388,lng:113.974},
+  {id:'007',n:'南昌',lat:22.383,lng:113.973},{id:'009',n:'田景',lat:22.408,lng:113.975},
+  {id:'010',n:'美樂',lat:22.413,lng:113.975},{id:'012',n:'天逸',lat:22.416,lng:113.972},
+  {id:'013',n:'天水圍',lat:22.447,lng:114.008},{id:'014',n:'天澤',lat:22.444,lng:114.004},
+  {id:'016',n:'天恩',lat:22.439,lng:114.000},{id:'017',n:'天富',lat:22.435,lng:113.996},
+  {id:'018',n:'天華',lat:22.429,lng:113.993},{id:'020',n:'天瑞',lat:22.423,lng:113.990},
+  {id:'021',n:'元朗',lat:22.444,lng:114.022},{id:'022',n:'教育路',lat:22.448,lng:114.023},
+  {id:'024',n:'朗屏',lat:22.449,lng:114.031},{id:'025',n:'頌大',lat:22.456,lng:114.033},
+  {id:'027',n:'兆康',lat:22.411,lng:113.968},{id:'029',n:'業旺',lat:22.407,lng:113.964},
+  {id:'030',n:'翠豐',lat:22.404,lng:113.961},{id:'031',n:'青松',lat:22.415,lng:113.957},
+];
+
+async function fetchLRTNearby(lat,lng,radius){
+  try{
+    const nearby=LRT_STNS
+      .map(s=>({...s,dist:haverDist(lat,lng,s.lat,s.lng)}))
+      .filter(s=>s.dist<=Math.min(radius,1500))
+      .sort((a,b)=>a.dist-b.dist).slice(0,4);
+    if(!nearby.length)return[];
+    const results=[];
+    await Promise.all(nearby.map(async stn=>{
+      try{
+        const d=await fetch(`${LRT_API}?station_id=${stn.id}`).then(r=>r.json());
+        if(d.status!=='1')return;
+        (d.platform_list||[]).forEach(plat=>{
+          (plat.route_list||[]).slice(0,2).forEach(route=>{
+            if(!route.time_en)return;
+            const mins=parseInt(route.time_en);
+            if(isNaN(mins))return;
+            const ts=Date.now()+mins*60000;
+            results.push({
+              type:'lrt',route:route.route_no,stopName:stn.n,
+              dest:route.dest_ch||route.dest_en||'',stopId:stn.id,serviceType:'1',
+              _etas:[ts],_first:ts,dist:Math.round(stn.dist),
+            });
+          });
+        });
+      }catch{}
+    }));
+    return results;
+  }catch{return[]}
+}
 const MTR_API='https://rt.data.one.gov.hk/v1/transport/mtr/getSchedule.php';
 
 // MTR station list (name, line, station code, approx coords)
