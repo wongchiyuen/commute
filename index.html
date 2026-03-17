@@ -129,6 +129,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .tp-ctb{color:#ffd43b;background:rgba(255,212,59,.1);border-color:rgba(255,212,59,.3)}
 .tp-mtr{color:#74b9ff;background:rgba(116,185,255,.1);border-color:rgba(116,185,255,.3)}
 .tp-lrt{color:#ffaa33;background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.3)}
+.tp-lwb{color:#a29bfe;background:rgba(162,155,254,.1);border-color:rgba(162,155,254,.3)}
+.tp-nlb{color:#fd79a8;background:rgba(253,121,168,.1);border-color:rgba(253,121,168,.3)}
 .bus-eta-wrap{display:flex;align-items:center;padding:0 11px 0 4px;flex-shrink:0}
 .eta-col{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
 .e1{font-family:var(--mono);font-size:25px;font-weight:700;line-height:1.1}
@@ -312,23 +314,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
   </div>
 </div>
 
-<!-- ══ NEWS ══ -->
-<div class="page" id="page-news">
-  <div class="feed-page">
-    <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ntab-all"    onclick="switchNewsFeed('all')">📋 全部</button>
-      <button class="sub-tab"        id="ntab-google" onclick="switchNewsFeed('google')">🔍 Google</button>
-      <button class="sub-tab"        id="ntab-yahoo"  onclick="switchNewsFeed('yahoo')">🔶 Yahoo</button>
-      <button class="sub-tab"        id="ntab-local"  onclick="switchNewsFeed('local')">📻 RTHK本地</button>
-      <button class="sub-tab"        id="ntab-world"  onclick="switchNewsFeed('world')">🌍 RTHK國際</button>
-    </div>
-    <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
-      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 重新載入</button>
-    </div>
-    <div class="feed-list" id="news-list"><div class="spinner"></div></div>
-  </div>
-</div>
-
 <!-- ══ TRAFFIC ══ -->
 <div class="page" id="page-traffic">
   <div class="feed-page">
@@ -421,19 +406,10 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
     <div class="sett-section-title">ℹ️ 關於</div>
     <div class="copy-block">
-      <div style="font-size:34px;margin-bottom:5px">🌿</div>
+      <div style="font-size:34px;margin-bottom:8px">🌿</div>
       <div class="copy-app">生活日常</div>
       <div class="copy-ver">v1.2 · 2026</div>
-      <div class="copy-line">
-        天氣：<a href="https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm" target="_blank">香港天文台開放數據</a><br>
-        九巴：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
-        城巴：<a href="https://data.one.gov.hk/zh-hant/dataset/citybus-eta" target="_blank">城巴實時到站 API</a><br>
-        港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
-        新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台</a>、<a href="https://hk.news.yahoo.com" target="_blank">Yahoo 香港</a><br>
-        交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
-        歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
-        © 2026 生活日常。保留所有權利。
-      </div>
+      <div style="font-size:12px;color:var(--mid);margin-top:6px">© 2026 生活日常。保留所有權利。</div>
     </div>
   </div>
 </div>
@@ -460,7 +436,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <nav class="bottom-nav">
   <button class="nav-btn active" id="nav-home"     onclick="switchPage('home')">    <span class="nav-ico">🌿</span><span class="nav-lbl">主頁</span></button>
   <button class="nav-btn"        id="nav-search"   onclick="switchPage('search')">  <span class="nav-ico">🔍</span><span class="nav-lbl">搜尋</span></button>
-  <button class="nav-btn"        id="nav-news"     onclick="switchPage('news')">    <span class="nav-ico">📰</span><span class="nav-lbl">新聞</span></button>
   <button class="nav-btn"        id="nav-traffic"  onclick="switchPage('traffic')"> <span class="nav-ico">🚦</span><span class="nav-lbl">交通</span></button>
   <button class="nav-btn"        id="nav-settings" onclick="switchPage('settings')"><span class="nav-ico">⚙️</span><span class="nav-lbl">設定</span></button>
 </nav>
@@ -627,7 +602,6 @@ function switchPage(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
-  if(name==='news')ensureNewsFeedLoaded(currentNewsFeed);
   if(name==='traffic')ensureTrafficFeedLoaded(currentTrafficFeed);
   if(name==='settings'){document.getElementById('sett-stn-sub').textContent=selectedStn;renderAutoTabSettings();loadTodayHistory();loadTransportSettings()}
 }
@@ -809,9 +783,9 @@ const NEWS_FEEDS = {
 };
 // Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
 const TRAFFIC_SOURCES = {
-  td:   {
+  td: {
     name:'特別交通消息',
-    // data.one.gov.hk has Access-Control-Allow-Origin: * — no proxy needed!
+    // data.one.gov.hk CORS:* — direct fetch, no proxy
     direct:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
     proxy: 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml',
   },
@@ -819,6 +793,12 @@ const TRAFFIC_SOURCES = {
     name:'RTHK 交通',
     url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml',
   },
+};
+// data.one.gov.hk real-time transport data (CORS:* — direct fetch)
+const DATA_ONE={
+  kmb_eta:'https://data.etabus.gov.hk/v1/transport/kmb',
+  ctb_eta:'https://rt.data.one.gov.hk/v2/transport/citybus',
+  td_announce:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1132,8 +1112,7 @@ async function reloadTrafficFeed(){
 
 function reloadCurrentFeed(){
   const pg=document.querySelector('.page.active')?.id;
-  if(pg==='page-news')reloadNewsFeed();
-  else if(pg==='page-traffic')reloadTrafficFeed();
+  if(pg==='page-traffic')reloadTrafficFeed();
 }
 
 // ═══════════════════════════════════
@@ -1240,10 +1219,19 @@ async function doRefresh(){
 //  ETA MODE
 // ═══════════════════════════════════
 function toggleEtaMode(){
-  etaMode=etaMode==='mins'?'clock':'mins';localStorage.setItem('eta_mode',etaMode);
-  const btn=document.getElementById('eta-mode-btn');
-  if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}
+  if(etaMode==='mins')etaMode='clock';
+  else if(etaMode==='clock')etaMode='both';
+  else etaMode='mins';
+  localStorage.setItem('eta_mode',etaMode);
+  updateEtaBtn();
   if(activePid===NEARBY_PID)loadNearby();else renderBusList();
+}
+function updateEtaBtn(){
+  const btn=document.getElementById('eta-mode-btn');
+  if(!btn)return;
+  if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins');btn.style.fontSize='';}
+  else if(etaMode==='clock'){btn.textContent='🕐 時間';btn.classList.remove('mins');btn.style.fontSize='';}
+  else{btn.textContent='⏱🕐 兩者';btn.classList.remove('mins');btn.style.fontSize='10px';}
 }
 
 // ═══════════════════════════════════
@@ -1335,8 +1323,14 @@ document.addEventListener('touchend',()=>{if(TD.idx===-1)return;if(TD.on){TD.clo
 // ═══════════════════════════════════
 function fmtEtas(etas,cc,now){
   const fmt=(ts,cls)=>{
-    if(etaMode==='mins'){const m=Math.round((ts-now)/60000);return`<div class="${cls}">${m<=0?'即將':m+'分'}</div>`}
-    const dv=new Date(ts);return`<div class="${cls}">${pad(dv.getHours())}:${pad(dv.getMinutes())}</div>`;
+    const m=Math.round((ts-now)/60000);
+    const dv=new Date(ts);
+    const mStr=m<=0?'即將':m+'分';
+    const tStr=`${pad(dv.getHours())}:${pad(dv.getMinutes())}`;
+    if(etaMode==='mins')return`<div class="${cls}">${mStr}</div>`;
+    if(etaMode==='clock')return`<div class="${cls}">${tStr}</div>`;
+    // both mode: show mins big, time small below
+    return`<div class="${cls}">${mStr}<span style="font-size:10px;font-weight:400;display:block;opacity:.7">${tStr}</span></div>`;
   };
   return(etas[0]?fmt(etas[0],`e1 ${cc}`):'')+(etas[1]?fmt(etas[1],'e2'):'')+(etas[2]?fmt(etas[2],'e3'):'');
 }
@@ -1387,9 +1381,10 @@ async function loadNearby(){
       const badgeStyle=isMTR?'background:rgba(255,71,87,.12);color:#ff8a96;border-color:rgba(255,71,87,.35);'
                       :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);'
                       :isLRT?'background:rgba(255,165,0,.1);color:#ffaa33;border-color:rgba(255,165,0,.3);':'';
+      const _nop=getOperator(r.route);
       const typeTag=isMTR?`<span class="tp tp-mtr">港鐵</span>`
                    :isCTB?`<span class="tp tp-ctb">城巴</span>`
-                   :isLRT?`<span class="tp tp-lrt">輕鐵</span>`:`<span class="tp tp-kmb">九巴</span>`;
+                   :isLRT?`<span class="tp tp-lrt">輕鐵</span>`:`<span class="tp ${_nop.cls}">${_nop.name}</span>`;
       const clickFn=isMTR?'':`onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"`;
       return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" ${clickFn}><div class="bus-badge" style="${badgeStyle}">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
     }).join('');
@@ -1410,7 +1405,7 @@ function renderBusList(){
     const urgency=m===null?'':m<=2?'soon':m<=8?'coming':'ok';
     const cc=m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
     let ec='';if(f._err)ec=`<div class="e-none">無數據</div>`;else if(!f._etas?.length)ec=`<div class="e-none">無班次</div>`;else ec=fmtEtas(f._etas,cc,now);
-    const tTag=f.type==='ctb'?'<span class="tp tp-ctb">城巴</span>':f.type==='mtr'?'<span class="tp tp-mtr">港鐵</span>':f.type==='lrt'?'<span class="tp tp-lrt">輕鐵</span>':'<span class="tp tp-kmb">九巴</span>';
+    const _op=getOperator(f.route);const tTag=f.type==='ctb'?'<span class="tp tp-ctb">城巴</span>':f.type==='mtr'?'<span class="tp tp-mtr">港鐵</span>':f.type==='lrt'?'<span class="tp tp-lrt">輕鐵</span>':`<span class="tp ${_op.cls}">${_op.name}</span>`;
     return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}</div><div class="bus-info"><div class="bus-stop">${f.stopName}${tTag}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
   }).join('');
 }
@@ -1540,12 +1535,16 @@ async function getAllRoutes(){
 }
 
 function routeCard(route,dirs,badgeColor,borderColor,accentColor,label,clickFn){
+  // Show operator label in badge
+  const op=LWB_ROUTES.has(route)?'龍運':(label||'');
   return`<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden">
     <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--bdr)">
-      <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${accentColor};background:${badgeColor};border:1px solid ${borderColor};border-radius:8px;padding:4px 12px">${route}</div>
+      <div style="flex-shrink:0;text-align:center">
+        <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${accentColor};background:${badgeColor};border:1px solid ${borderColor};border-radius:8px;padding:4px 12px">${route}</div>
+        ${op?`<div style="font-size:9px;font-weight:700;color:${accentColor};margin-top:3px;letter-spacing:.05em">${op}</div>`:''}
+      </div>
       <div style="flex:1">
         ${dirs.map(d=>`<div style="font-size:13px;color:var(--txt)">${d.orig||d.orig_tc||''} → ${d.dest||d.dest_tc||d.dest_en||''}</div>`).join('')}
-        ${label?`<div style="font-size:10px;font-weight:700;color:${accentColor};margin-top:2px">${label}</div>`:''}
       </div>
     </div>
     ${dirs.map((d,i)=>`<div onclick="${clickFn(d,i)}" style="display:flex;align-items:center;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bdr)" ontouchstart="this.style.background='var(--bg3)'" ontouchend="this.style.background=''">
@@ -1559,10 +1558,47 @@ const TRANSPORT_KEYWORDS={
   kmb:['九巴','九龍巴士','kmb'],
   ctb:['城巴','citybus','ctb'],
   mtr:['港鐵','地鐵','鐵路','mtr','metro'],
-  lrt:['輕鐵','lrt','輕鐵路線'],
+  lrt:['輕鐵','lrt'],
+  lwb:['龍運','龍運巴士','lwb'],
+  nlb:['嶼巴','新大嶼山','nlb'],
 };
 function matchesKeyword(raw, type){
   return TRANSPORT_KEYWORDS[type]?.some(k=>raw.toLowerCase().includes(k.toLowerCase()));
+}
+
+// LWB routes served by Long Win Bus (龍運巴士) under KMB group
+const LWB_ROUTES=new Set(['A11','A12','A21','A22','A22A','A22P','A22S','A23','A28',
+  'A29','A31','A33','A36','A41','A41P','A43','A47','E11','E11A','E11B','E11C','E11P',
+  'E21','E21A','E21P','E22','E22A','E22P','E22S','E23','E23B','E23P','E24','E31',
+  'E32','E33','E34','E34P','E35','E36','E36A','E36B','E36P','E37','E41','E41A',
+  'E42','E42A','E43','E44','E44A','E45','N11','N21','N22','N23','N29','N30','N31',
+  'N35','N36','N40','N41','N42','N43','S1','S52','S56','S64','S1A']);
+
+// NLB routes (新大嶼山巴士) - Lantau routes
+const NLB_ROUTE_PREFIX=['1','2','3','11','23','38','A35','A35P'];
+
+function getOperator(route){
+  if(LWB_ROUTES.has(route))return{name:'龍運',cls:'tp-lwb'};
+  return{name:'九巴',cls:'tp-kmb'};
+}
+
+function showMTRStnInfo(stnName){
+  const stn=MTR_STNS.find(s=>s.n===stnName);
+  if(!stn)return;
+  setDTitle(`🚇 ${stn.n}`);
+  const lineNames=stn.lines.map(l=>MTR_LINE[l]||l);
+  document.getElementById('drawer-body').innerHTML=`
+    <div style="padding:4px 0 16px">
+      <div style="font-size:20px;font-weight:700;color:var(--bright);margin-bottom:6px">${stn.n}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        ${lineNames.map(n=>`<span class="tp tp-mtr" style="font-size:12px;padding:3px 10px">${n}</span>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--mid);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.7">
+        港鐵班次資料需要 GPS 定位。<br>
+        開啟主頁「附近」並啟用港鐵，即可查看 ${stn.n} 站附近班次。
+      </div>
+    </div>`;
+  openOverlay();
 }
 
 async function doRouteSearch(){
@@ -1590,7 +1626,9 @@ async function doRouteSearch(){
         routeCard(route,dirs,'var(--amb-bg)','var(--amb-bdr)','var(--amb2)','九巴 KMB',
           (d)=>`openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)`)
       ).join('');
-      if(kmbHtml)sections.push(`<div class="srch-section-lbl">🚌 九巴 KMB</div>`+kmbHtml);
+      const hasLWB=matches.some(r=>LWB_ROUTES.has(r.route));
+      const secLbl=hasLWB?'🚌 九巴 / 龍運':'🚌 九巴 KMB';
+      if(kmbHtml)sections.push(`<div class="srch-section-lbl">${secLbl}</div>`+kmbHtml);
     }
   }catch(e){console.warn('[KMB search]',e)}
 
@@ -1615,7 +1653,7 @@ async function doRouteSearch(){
         });
         const html=Object.entries(grouped).slice(0,8).map(([route,dirs])=>
           routeCard(route,dirs,'rgba(46,213,115,.1)','rgba(46,213,115,.3)','#2ed573','城巴 CTB',
-            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound||'O')}','${esc(d.dest_tc||'')}')`)
+            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound||'O')}','${esc(d.dest_tc||d.dest_en||'')}')`)
         ).join('');
         if(html)sections.push(`<div class="srch-section-lbl">🟢 城巴 CTB</div>`+html);
       }
@@ -1639,20 +1677,21 @@ async function doRouteSearch(){
     stnMatches.forEach(s=>{
       if(seenStns.has(s.n))return; seenStns.add(s.n);
       const lineNames = s.lines.map(l=>MTR_LINE[l]||l).join('、');
-      mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(255,71,87,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px;display:flex;align-items:center;gap:11px">
-        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 11px;flex-shrink:0">🚇</div>
+      mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(116,185,255,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px;display:flex;align-items:center;gap:11px;cursor:pointer" onclick="showMTRStnInfo('${esc(s.n)}')" ontouchstart="this.style.opacity='.7'" ontouchend="this.style.opacity=''">
+        <div style="font-size:22px;flex-shrink:0">🚇</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--bright)">${s.n}</div>
           <div style="font-size:11px;color:var(--mid);margin-top:2px">${lineNames}</div></div>
-        <span class="tp tp-mtr" style="font-size:10px">港鐵</span>
+        <div style="color:var(--dim)">›</div>
       </div>`);
     });
-    // Show line cards if matched by line
+
+    // Show line cards if no station match but line code matched
     if(!stnMatches.length && lineMatches.length){
       lineMatches.forEach(([code,name])=>{
         const stnsOnLine=MTR_STNS.filter(s=>s.lines.includes(code));
-        mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(255,71,87,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px">
+        mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(116,185,255,.2);border-radius:12px;margin-bottom:8px;padding:13px 15px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-            <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:7px;padding:3px 10px">${code}</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:#74b9ff;background:rgba(116,185,255,.1);border:1px solid rgba(116,185,255,.3);border-radius:7px;padding:3px 10px">${code}</div>
             <div style="font-size:14px;font-weight:600;color:var(--bright)">${name}</div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:5px">${stnsOnLine.slice(0,12).map(s=>`<span style="font-size:12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:3px 8px;color:var(--txt)">${s.n}</span>`).join('')}${stnsOnLine.length>12?`<span style="font-size:12px;color:var(--dim)">+${stnsOnLine.length-12}</span>`:''}</div>
@@ -1663,154 +1702,9 @@ async function doRouteSearch(){
       sections.push(`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrItems.join(''));
     }
   }
-
-  // ── LRT ───────────────────────────────────────────────────────────────────
-  if(ts.lrt||matchesKeyword(raw,'lrt')){
-    const LRT_ROUTES={
-      '505':'天水圍循環綫','507':'元朗─屯門南','610':'屯門市中心─兆康',
-      '614':'屯門碼頭─元朗','614P':'屯門碼頭─元朗','615':'屯門碼頭─天水圍',
-      '615P':'屯門碼頭─天水圍','705':'天水圍循環綫','706':'天水圍循環綫',
-      '751':'天水圍─元朗','751P':'天水圍─元朗','761P':'天水圍─屯門碼頭',
-    };
-    const lrtMatch=Object.entries(LRT_ROUTES).filter(([no,desc])=>
-      no===q||no.startsWith(q)||desc.includes(qZh)||
-      q==='LRT'||qZh==='輕鐵'
-    );
-    if(lrtMatch.length){
-      const html=`<div class="srch-section-lbl">🚊 輕鐵 LRT</div>`+lrtMatch.map(([no,desc])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${no}</div>
-          <div><div style="font-size:13px;font-weight:500;color:var(--bright)">${desc}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">輕鐵 LRT</div></div>
-        </div>`).join('');
-      sections.push(html);
-    }
-  }
-
-  if(!sections.length){
-    const hint=`九巴${ts.ctb?' · 城巴':''}${ts.mtr?' · 港鐵':''}${ts.lrt?' · 輕鐵':''}`;
-    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)">
-      <div style="font-size:32px;margin-bottom:10px">🔍</div>
-      <div style="font-size:14px">找不到「${raw}」</div>
-      <div style="font-size:12px;color:var(--dim);margin-top:5px">已搜尋：${hint}</div>
-      <div style="font-size:11px;color:var(--dim);margin-top:3px">支援路線號碼（40X）或中文（荃灣）</div>
-    </div>`;
-  }else{
-    el.innerHTML=sections.join('');
-  }
 }
+// ─── end doRouteSearch ───
 
-async function openCTBDetail(route,bound,dest){
-  setDTitle(`城巴 ${route} 路線詳情`);
-  document.getElementById('drawer-body').innerHTML=`<div class="spinner"></div>`;
-  openOverlay();
-  try{
-    const dir=bound==='O'||bound==='outbound'?'outbound':'inbound';
-    const[sd,si]=await Promise.all([
-      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dir}`).then(r=>r.json()),
-      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/stop`).then(r=>r.json()),
-    ]);
-    const stops=sd.data||[];
-    const stopMap={};(si.data||[]).forEach(s=>stopMap[s.stop]=s.name_tc||s.stop);
-    const el=document.getElementById('drawer-body');
-    const otherDir=dir==='outbound'?'inbound':'outbound';
-    el.innerHTML=`
-      <div class="route-detail-hdr">
-        <div class="route-detail-badge" style="color:#2ed573;background:rgba(46,213,115,.1);border-color:rgba(46,213,115,.3)">${route}</div>
-        <div class="route-detail-info">
-          <div class="route-detail-dest">往 ${dest||'(目的地)'} <span style="font-size:10px;color:var(--mid)">[城巴]</span></div>
-          <div class="route-detail-orig">${stops.length} 個站</div>
-        </div>
-      </div>
-      <div class="dir-tab-row">
-        <div class="dir-tab${dir==='outbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','O','${esc(dest)}')">往 ${dest||'外'}（去程）</div>
-        <div class="dir-tab${dir==='inbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','I','${esc(dest)}')">（回程）</div>
-      </div>
-      <div class="route-stop-list">${stops.map((s,i)=>`
-        <div class="rsl-item">
-          <div class="rsl-line"></div>
-          <div class="rsl-dot${i===0?' first':i===stops.length-1?' last':''}"></div>
-          <div class="rsl-seq">${s.seq}</div>
-          <div class="rsl-name">${stopMap[s.stop]||s.stop}</div>
-        </div>`).join('')}
-      </div>`;
-  }catch(e){document.getElementById('drawer-body').innerHTML=`<div class="msg">載入失敗：${e.message}</div>`}
-}
-
-
-// ═══════════════════════════════════
-//  TRANSPORT SETTINGS (CTB / MTR)
-// ═══════════════════════════════════
-function loadTransportSettings(){
-  const s=JSON.parse(localStorage.getItem('transport_settings')||'{}');
-  const ctb=document.getElementById('toggle-ctb');
-  const mtr=document.getElementById('toggle-mtr');
-  const lrt=document.getElementById('toggle-lrt');
-  if(ctb)ctb.checked=!!s.ctb;
-  if(mtr)mtr.checked=!!s.mtr;
-  if(lrt)lrt.checked=!!s.lrt;
-  return s;
-}
-function saveTransportSettings(){
-  const ctb=document.getElementById('toggle-ctb')?.checked||false;
-  const mtr=document.getElementById('toggle-mtr')?.checked||false;
-  const lrt=document.getElementById('toggle-lrt')?.checked||false;
-  localStorage.setItem('transport_settings',JSON.stringify({ctb,mtr,lrt}));
-  showToast('已儲存交通服務設定');
-}
-function getTransportSettings(){
-  return JSON.parse(localStorage.getItem('transport_settings')||'{}');
-}
-
-// CTB / LRT API constants
-const CTB='https://rt.data.one.gov.hk/v2/transport/citybus';
-const LRT_API='https://rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule';
-
-// LRT station list (id, name, coords)
-const LRT_STNS=[
-  {id:'003',n:'屯門',lat:22.394,lng:113.977},{id:'004',n:'三聖',lat:22.378,lng:113.969},
-  {id:'005',n:'兆禧',lat:22.399,lng:113.959},{id:'006',n:'友愛',lat:22.388,lng:113.974},
-  {id:'007',n:'南昌',lat:22.383,lng:113.973},{id:'009',n:'田景',lat:22.408,lng:113.975},
-  {id:'010',n:'美樂',lat:22.413,lng:113.975},{id:'012',n:'天逸',lat:22.416,lng:113.972},
-  {id:'013',n:'天水圍',lat:22.447,lng:114.008},{id:'014',n:'天澤',lat:22.444,lng:114.004},
-  {id:'016',n:'天恩',lat:22.439,lng:114.000},{id:'017',n:'天富',lat:22.435,lng:113.996},
-  {id:'018',n:'天華',lat:22.429,lng:113.993},{id:'020',n:'天瑞',lat:22.423,lng:113.990},
-  {id:'021',n:'元朗',lat:22.444,lng:114.022},{id:'022',n:'教育路',lat:22.448,lng:114.023},
-  {id:'024',n:'朗屏',lat:22.449,lng:114.031},{id:'025',n:'頌大',lat:22.456,lng:114.033},
-  {id:'027',n:'兆康',lat:22.411,lng:113.968},{id:'029',n:'業旺',lat:22.407,lng:113.964},
-  {id:'030',n:'翠豐',lat:22.404,lng:113.961},{id:'031',n:'青松',lat:22.415,lng:113.957},
-];
-
-async function fetchLRTNearby(lat,lng,radius){
-  try{
-    const nearby=LRT_STNS
-      .map(s=>({...s,dist:haverDist(lat,lng,s.lat,s.lng)}))
-      .filter(s=>s.dist<=Math.min(radius,1500))
-      .sort((a,b)=>a.dist-b.dist).slice(0,4);
-    if(!nearby.length)return[];
-    const results=[];
-    await Promise.all(nearby.map(async stn=>{
-      try{
-        const d=await fetch(`${LRT_API}?station_id=${stn.id}`).then(r=>r.json());
-        if(d.status!=='1')return;
-        (d.platform_list||[]).forEach(plat=>{
-          (plat.route_list||[]).slice(0,2).forEach(route=>{
-            if(!route.time_en)return;
-            const mins=parseInt(route.time_en);
-            if(isNaN(mins))return;
-            const ts=Date.now()+mins*60000;
-            results.push({
-              type:'lrt',route:route.route_no,stopName:stn.n,
-              dest:route.dest_ch||route.dest_en||'',stopId:stn.id,serviceType:'1',
-              _etas:[ts],_first:ts,dist:Math.round(stn.dist),
-            });
-          });
-        });
-      }catch{}
-    }));
-    return results;
-  }catch{return[]}
-}
 const MTR_API='https://rt.data.one.gov.hk/v1/transport/mtr/getSchedule.php';
 
 // MTR station list (name, line, station code, approx coords)
@@ -2027,7 +1921,7 @@ function setDTitle(t){document.getElementById('drawer-title').textContent=t}
 // ═══════════════════════════════════
 //  INIT
 // ═══════════════════════════════════
-(()=>{const btn=document.getElementById('eta-mode-btn');if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}})();
+updateEtaBtn();
 syncDistPills();
 loadTransportSettings();
 checkAutoTab();   // sets activePid based on time rules (or NEARBY_PID)
