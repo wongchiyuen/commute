@@ -1241,6 +1241,7 @@ function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer(
 // ═══════════════════════════════════
 function renderProfiles(){
   const bar=document.getElementById('profiles-bar');
+  if(!bar)return;
   bar.innerHTML=
     `<button class="profile-tab nearby-tab${activePid===NEARBY_PID?' active':''}" onclick="switchToNearby()">📍 附近</button>`+
     profiles.map((p,i)=>`<button class="profile-tab${p.id===activePid?' active':''}" data-idx="${i}" data-pid="${p.id}" onclick="switchProfile('${p.id}')">${p.name}</button>`).join('')+
@@ -1252,9 +1253,12 @@ function renderProfiles(){
     tab.addEventListener('touchmove',()=>{if(pt){clearTimeout(pt);pt=null}},{passive:true});
   });
   const nb=activePid===NEARBY_PID;
-  document.getElementById('add-route-btn').style.display=nb?'none':'';
-  document.getElementById('dist-row').style.display=nb?'':'none';
-  document.getElementById('bus-hdr-lbl').textContent=nb?`${nearbyDist}米內到站時間`:'到站時間';
+  const arBtn=document.getElementById('add-route-btn');
+  const drRow=document.getElementById('dist-row');
+  const bHdr=document.getElementById('bus-hdr-lbl');
+  if(arBtn)arBtn.style.display=nb?'none':'';
+  if(drRow)drRow.style.display=nb?'':'none';
+  if(bHdr)bHdr.textContent=nb?`${nearbyDist}米內到站時間`:'到站時間';
 }
 function switchProfile(pid){setActivePid(pid);favs=loadFavs(pid);renderProfiles();refreshAllETAs()}
 function switchToNearby(){setActivePid(NEARBY_PID);renderProfiles();syncDistPills();loadNearby()}
@@ -1895,9 +1899,67 @@ async function fetchCTBNearby(lat,lng,radius){
   }catch(e){console.warn('[CTBNearby]',e);return[]}
 }
 
-// ═══════════════════════════════════
-//  IMPORT / EXPORT
-// ═══════════════════════════════════
+// ─── LRT (輕鐵) — rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule ───────
+const LRT_API='https://rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule';
+const LRT_STNS=[
+  {id:'003',n:'屯門',       lat:22.3937,lng:113.9766},
+  {id:'004',n:'三聖',       lat:22.3835,lng:113.9756},
+  {id:'005',n:'兆禧',       lat:22.3990,lng:113.9588},
+  {id:'006',n:'友愛',       lat:22.3881,lng:113.9736},
+  {id:'007',n:'南昌(輕鐵)', lat:22.3832,lng:113.9736},
+  {id:'009',n:'田景',       lat:22.4078,lng:113.9749},
+  {id:'010',n:'美樂',       lat:22.4129,lng:113.9745},
+  {id:'012',n:'天逸',       lat:22.4158,lng:113.9723},
+  {id:'013',n:'天水圍(輕鐵)',lat:22.4473,lng:114.0076},
+  {id:'014',n:'天澤',       lat:22.4436,lng:114.0044},
+  {id:'016',n:'天恩',       lat:22.4393,lng:114.0003},
+  {id:'017',n:'天富',       lat:22.4347,lng:113.9961},
+  {id:'018',n:'天華',       lat:22.4289,lng:113.9927},
+  {id:'020',n:'天瑞',       lat:22.4231,lng:113.9900},
+  {id:'021',n:'元朗(輕鐵)', lat:22.4455,lng:114.0224},
+  {id:'022',n:'教育路',     lat:22.4479,lng:114.0233},
+  {id:'024',n:'朗屏',       lat:22.4488,lng:114.0310},
+  {id:'025',n:'頌大',       lat:22.4561,lng:114.0329},
+  {id:'027',n:'兆康',       lat:22.4112,lng:113.9679},
+  {id:'029',n:'業旺',       lat:22.4075,lng:113.9638},
+  {id:'030',n:'翠豐',       lat:22.4040,lng:113.9614},
+  {id:'031',n:'青松',       lat:22.4147,lng:113.9567},
+];
+
+async function fetchLRTNearby(lat,lng,radius){
+  try{
+    const nearby=LRT_STNS
+      .map(s=>({...s,dist:haverDist(lat,lng,s.lat,s.lng)}))
+      .filter(s=>s.dist<=Math.min(radius,1200))
+      .sort((a,b)=>a.dist-b.dist).slice(0,4);
+    if(!nearby.length)return[];
+    const results=[];
+    await Promise.all(nearby.map(async stn=>{
+      try{
+        const d=await fetch(`${LRT_API}?station_id=${stn.id}`,
+          {signal:AbortSignal.timeout(8000)}).then(r=>r.json());
+        if(d.status!=='1'&&d.status!==1)return;
+        (d.platform_list||[]).forEach(plat=>{
+          (plat.route_list||[]).slice(0,2).forEach(route=>{
+            if(!route.time_en&&!route.time_ch)return;
+            const raw=route.time_en||route.time_ch||'';
+            // time_en is minutes as string ("3") or "即將" 
+            const mins=parseInt(raw);
+            const ts=isNaN(mins)?Date.now():(Date.now()+mins*60000);
+            results.push({
+              type:'lrt',route:String(route.route_no),
+              stopName:stn.n,dest:route.dest_ch||route.dest_en||'',
+              stopId:stn.id,serviceType:'1',
+              _etas:[ts],_first:ts,dist:Math.round(stn.dist),
+            });
+          });
+        });
+      }catch(e){console.warn('[LRT stn]',stn.id,e.message)}
+    }));
+    return results;
+  }catch(e){console.warn('[LRTNearby]',e);return[]}
+}
+
 function exportBusData(){const data={profiles,favsByProfile:{}};profiles.forEach(p=>{data.favsByProfile[p.id]=loadFavs(p.id)});const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`swd-bus-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);showToast('✅ 已匯出巴士資料')}
 function importBusData(event){const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!data.profiles||!data.favsByProfile)throw new Error();if(!confirm(`確定匯入？覆蓋現有 ${data.profiles.length} 個版面。`))return;profiles=data.profiles;saveProfiles(profiles);Object.entries(data.favsByProfile).forEach(([pid,arr])=>saveFavs(pid,arr));activePid=profiles[0]?.id||'';setActivePid(activePid);favs=loadFavs(activePid);renderProfiles();refreshAllETAs();showToast('✅ 匯入成功')}catch{showToast('❌ 檔案格式不正確')}};reader.readAsText(file);event.target.value=''}
 
