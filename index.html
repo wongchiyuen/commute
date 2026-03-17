@@ -336,29 +336,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     <div class="sett-section-title">⏰ 自動跳轉版面</div>
     <div id="auto-tab-list"></div>
 
-    <div class="sett-section-title">🚇 交通服務</div>
-    <div class="sett-card">
-      <div class="sett-row" style="cursor:default">
-        <div class="sett-ico">🚌</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">九巴 (KMB)</div><div class="sett-lbl-sub">預設啟用</div></div>
-        <label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label>
-      </div>
-      <div class="sett-row" style="cursor:default">
-        <div class="sett-ico">🟢</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">城巴 (CTB)</div><div class="sett-lbl-sub">rt.data.one.gov.hk</div></div>
-        <label class="toggle"><input type="checkbox" id="toggle-ctb" onchange="saveTransportSettings()" ><span class="toggle-slider"></span></label>
-      </div>
-      <div class="sett-row" style="cursor:default">
-        <div class="sett-ico">🔴</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">港鐵 (MTR)</div><div class="sett-lbl-sub">附近站下班車資料</div></div>
-        <label class="toggle"><input type="checkbox" id="toggle-mtr" onchange="saveTransportSettings()"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="sett-row" style="cursor:default">
-        <div class="sett-ico">🚊</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">輕鐵 (LRT)</div><div class="sett-lbl-sub">rt.data.one.gov.hk/mtr/lrt</div></div>
-        <label class="toggle"><input type="checkbox" id="toggle-lrt" onchange="saveTransportSettings()"><span class="toggle-slider"></span></label>
-      </div>
-    </div>
+
     <div class="sett-section-title">🚌 巴士資料</div>
     <div class="sett-card">
       <div class="sett-row" onclick="exportBusData()">
@@ -578,24 +556,7 @@ function getOperator(route){
   return{name:'九巴',cls:'tp-kmb'};
 }
 
-function showMTRStnInfo(stnName){
-  const stn=MTR_STNS.find(s=>s.n===stnName);
-  if(!stn)return;
-  setDTitle(`🚇 ${stn.n}`);
-  const lineNames=stn.lines.map(l=>MTR_LINE[l]||l);
-  document.getElementById('drawer-body').innerHTML=`
-    <div style="padding:4px 0 16px">
-      <div style="font-size:20px;font-weight:700;color:var(--bright);margin-bottom:6px">${stn.n}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        ${lineNames.map(n=>`<span class="tp tp-mtr" style="font-size:12px;padding:3px 10px">${n}</span>`).join('')}
-      </div>
-      <div style="font-size:12px;color:var(--mid);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.7">
-        港鐵班次資料需要 GPS 定位。<br>
-        開啟主頁「附近」並啟用港鐵，即可查看 ${stn.n} 站附近班次。
-      </div>
-    </div>`;
-  openOverlay();
-}
+
 const DAY=['日','一','二','三','四','五','六'];
 const NEARBY_PID='__nearby__';
 const pad=n=>String(n).padStart(2,'0');
@@ -824,11 +785,6 @@ const TRAFFIC_SOURCES = {
   },
 };
 // data.one.gov.hk real-time transport data (CORS:* — direct fetch)
-const DATA_ONE={
-  kmb_eta:'https://data.etabus.gov.hk/v1/transport/kmb',
-  ctb_eta:'https://rt.data.one.gov.hk/v2/transport/citybus',
-  td_announce:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  NEWS: fetch via rss2json + allorigins fallback chain with 10-min cache
@@ -1360,12 +1316,6 @@ async function loadNearby(){
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();const rows=[];
     etaResults.forEach((res,i)=>{const stop=nearby[i];const seen=new Set();(res.data||[]).forEach(e=>{if(!e.eta)return;const ts=new Date(e.eta).getTime();if(ts<now-30000)return;const key=`${e.route}_${e.dir}_${stop.stop}`;if(!seen.has(key)){seen.add(key);rows.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,_etas:[ts]})}else{const ex=rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);if(ex&&ex._etas.length<3)ex._etas.push(ts)}})});
-    // Add CTB / MTR / LRT if enabled in settings
-    const _ts=getTransportSettings();
-    if(_ts.ctb){try{const ctbR=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbR)}catch(e){console.warn('[CTB]',e)}}
-    if(_ts.mtr){try{const mtrR=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrR)}catch(e){console.warn('[MTR]',e)}}
-    if(_ts.lrt){try{const lrtR=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...lrtR)}catch(e){console.warn('[LRT]',e)}}
-
     rows.sort((a,b)=>a._etas[0]-b._etas[0]);
     if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
     const now2=Date.now();
@@ -1373,18 +1323,9 @@ async function loadNearby(){
       const m=Math.round((r._etas[0]-now2)/60000);
       const urgency=m<=2?'soon':m<=8?'coming':'ok';
       const cc=m<=2?'sc':m<=8?'cc':'oc';
-      const isMTR=r.type==='mtr';
-      const isCTB=r.type==='ctb';
-      const isLRT=r.type==='lrt';
-      const badgeStyle=isMTR?'background:rgba(255,71,87,.12);color:#ff8a96;border-color:rgba(255,71,87,.35);'
-                      :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);'
-                      :isLRT?'background:rgba(255,165,0,.1);color:#ffaa33;border-color:rgba(255,165,0,.3);':'';
       const _nop=getOperator(r.route);
-      const typeTag=isMTR?`<span class="tp tp-mtr">港鐵</span>`
-                   :isCTB?`<span class="tp tp-ctb">城巴</span>`
-                   :isLRT?`<span class="tp tp-lrt">輕鐵</span>`:`<span class="tp ${_nop.cls}">${_nop.name}</span>`;
-      const clickFn=isMTR?'':`onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"`;
-      return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" ${clickFn}><div class="bus-badge" style="${badgeStyle}">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
+      const typeTag=`<span class="tp ${_nop.cls}">${_nop.name}</span>`;
+      return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"><div class="bus-badge">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
     }).join('');
   }catch(e){console.warn('[nearby]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
@@ -1552,31 +1493,18 @@ function routeCard(route,dirs,badgeColor,borderColor,accentColor,label,clickFn){
   </div>`;
 }
 
-const TRANSPORT_KEYWORDS={
-  kmb:['九巴','九龍巴士','kmb'],
-  ctb:['城巴','citybus','ctb'],
-  mtr:['港鐵','地鐵','鐵路','mtr','metro'],
-  lrt:['輕鐵','lrt'],
-  lwb:['龍運','龍運巴士','lwb'],
-  nlb:['嶼巴','新大嶼山','nlb'],
-};
-function matchesKeyword(raw, type){
-  return TRANSPORT_KEYWORDS[type]?.some(k=>raw.toLowerCase().includes(k.toLowerCase()));
-}
+
+
 
 
 
 async function doRouteSearch(){
   const raw=(document.getElementById('search-route-inp')?.value||'').trim();
   const q=raw.toUpperCase();
-  const qZh=raw; // keep original for Chinese matching
+  const qZh=raw;
   if(!raw)return;
   const el=document.getElementById('search-page-results');
   el.innerHTML=`<div class="spinner"></div>`;
-  const ts=getTransportSettings();
-  const sections=[];
-
-  // ── KMB ──────────────────────────────────────────────────────────────────
   try{
     const all=await getAllRoutes();
     const matches=all.filter(r=>
@@ -1584,382 +1512,43 @@ async function doRouteSearch(){
       r.dest_tc?.includes(qZh)||r.orig_tc?.includes(qZh)||
       r.dest_en?.toUpperCase().includes(q)||r.orig_en?.toUpperCase().includes(q)
     );
-    if(matches.length){
-      const grouped={};
-      matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
-      const kmbHtml=Object.entries(grouped).slice(0,8).map(([route,dirs])=>
-        routeCard(route,dirs,'var(--amb-bg)','var(--amb-bdr)','var(--amb2)','九巴 KMB',
-          (d)=>`openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)`)
-      ).join('');
-      const hasLWB=matches.some(r=>LWB_ROUTES.has(r.route));
-      const secLbl=hasLWB?'🚌 九巴 / 龍運':'🚌 九巴 KMB';
-      if(kmbHtml)sections.push(`<div class="srch-section-lbl">${secLbl}</div>`+kmbHtml);
+    if(!matches.length){
+      el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)">
+        <div style="font-size:32px;margin-bottom:10px">🔍</div>
+        <div style="font-size:14px;color:var(--bright)">找不到「${raw}」</div>
+        <div style="font-size:12px;color:var(--dim);margin-top:6px">支援路線號碼（如 40X）或目的地中文（如 荃灣）</div>
+      </div>`;
+      return;
     }
-  }catch(e){console.warn('[KMB search]',e)}
-
-  // ── CTB ──────────────────────────────────────────────────────────────────
-  if(ts.ctb||matchesKeyword(raw,'ctb')){
-    try{
-      if(!window._ctbRoutes){
-        // Fetch all CTB routes (both directions)
-        const d=await fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
-        window._ctbRoutes=d.data||[];
-      }
-      const matches=window._ctbRoutes.filter(r=>
-        r.route===q||r.route.startsWith(q)||
-        r.dest_tc?.includes(qZh)||r.orig_tc?.includes(qZh)
-      );
-      if(matches.length){
-        const grouped={};
-        matches.forEach(r=>{
-          if(!grouped[r.route])grouped[r.route]=[];
-          // Avoid duplicate direction entries
-          if(!grouped[r.route].find(x=>x.bound===r.bound))grouped[r.route].push(r);
-        });
-        const html=Object.entries(grouped).slice(0,8).map(([route,dirs])=>
-          routeCard(route,dirs,'rgba(46,213,115,.1)','rgba(46,213,115,.3)','#2ed573','城巴 CTB',
-            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound||'O')}','${esc(d.dest_tc||d.dest_en||'')}')`)
-        ).join('');
-        if(html)sections.push(`<div class="srch-section-lbl">🟢 城巴 CTB</div>`+html);
-      }
-    }catch(e){console.warn('[CTB search]',e)}
-  }
-
-  // ── MTR ───────────────────────────────────────────────────────────────────
-  if(ts.mtr||matchesKeyword(raw,'mtr')){
-    // Match by station name OR line name/code OR keywords
-    const isGeneral = q==='MTR'||qZh==='港鐵'||qZh==='地鐵'||qZh==='地铁';
-    // Station name match
-    const stnMatches = isGeneral ? MTR_STNS :
-      MTR_STNS.filter(s=>s.n.includes(qZh)||s.n.includes(q));
-    // Line name/code match
-    const lineMatches = isGeneral ? Object.entries(MTR_LINE) :
-      Object.entries(MTR_LINE).filter(([code,name])=>code===q||code.startsWith(q)||name.includes(qZh));
-
-    const mtrItems = [];
-    // Deduplicate stations
-    const seenStns = new Set();
-    stnMatches.forEach(s=>{
-      if(seenStns.has(s.n))return; seenStns.add(s.n);
-      const lineNames = s.lines.map(l=>MTR_LINE[l]||l).join('、');
-      mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(116,185,255,.2);border-radius:12px;margin-bottom:7px;padding:12px 14px;display:flex;align-items:center;gap:11px;cursor:pointer" onclick="showMTRStnInfo('${esc(s.n)}')" ontouchstart="this.style.opacity='.7'" ontouchend="this.style.opacity=''">
-        <div style="font-size:22px;flex-shrink:0">🚇</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--bright)">${s.n}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">${lineNames}</div></div>
-        <div style="color:var(--dim)">›</div>
-      </div>`);
-    });
-
-    // Show line cards if no station match but line code matched
-    if(!stnMatches.length && lineMatches.length){
-      lineMatches.forEach(([code,name])=>{
-        const stnsOnLine=MTR_STNS.filter(s=>s.lines.includes(code));
-        mtrItems.push(`<div style="background:var(--bg2);border:1px solid rgba(116,185,255,.2);border-radius:12px;margin-bottom:8px;padding:13px 15px">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-            <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:#74b9ff;background:rgba(116,185,255,.1);border:1px solid rgba(116,185,255,.3);border-radius:7px;padding:3px 10px">${code}</div>
-            <div style="font-size:14px;font-weight:600;color:var(--bright)">${name}</div>
+    const grouped={};
+    matches.forEach(r=>{if(!grouped[r.route])grouped[r.route]=[];grouped[r.route].push(r)});
+    el.innerHTML=Object.entries(grouped).slice(0,12).map(([route,dirs])=>{
+      const op=getOperator(route);
+      return`<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--amb2);background:var(--amb-bg);border:1px solid var(--amb-bdr);border-radius:8px;padding:4px 12px">${route}</div>
+            <div class="tp ${op.cls}" style="margin-top:4px;display:inline-flex">${op.name}</div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">${stnsOnLine.slice(0,12).map(s=>`<span style="font-size:12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:3px 8px;color:var(--txt)">${s.n}</span>`).join('')}${stnsOnLine.length>12?`<span style="font-size:12px;color:var(--dim)">+${stnsOnLine.length-12}</span>`:''}</div>
-        </div>`);
-      });
-    }
-    if(mtrItems.length){
-      sections.push(`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrItems.join(''));
-    }
-  }
-
-  // ── LRT ───────────────────────────────────────────────────────────────────
-  if(ts.lrt||matchesKeyword(raw,'lrt')){
-    const LRT_ROUTES={'505':'天水圍循環綫','507':'元朗─屯門南','610':'屯門市中心─兆康',
-      '614':'屯門碼頭─元朗','614P':'屯門碼頭─元朗','615':'屯門碼頭─天水圍',
-      '615P':'屯門碼頭─天水圍','705':'天水圍循環綫','706':'天水圍循環綫',
-      '751':'天水圍─元朗','751P':'天水圍─元朗','761P':'天水圍─屯門碼頭'};
-    const lrtMatch=Object.entries(LRT_ROUTES).filter(([no,desc])=>
-      no===q||no.startsWith(q)||desc.includes(qZh)||q==='LRT'||qZh==='輕鐵'
-    );
-    if(lrtMatch.length){
-      const html=`<div class="srch-section-lbl">🚊 輕鐵 LRT</div>`+lrtMatch.map(([no,desc])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${no}</div>
-          <div><div style="font-size:13px;font-weight:500;color:var(--bright)">${desc}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">輕鐵 LRT</div></div>
-        </div>`).join('');
-      sections.push(html);
-    }
-  }
-
-  // ── Render results ────────────────────────────────────────────────────────
-  if(!sections.length){
-    const hint=`九巴${ts.ctb||matchesKeyword(raw,'ctb')?' · 城巴':''}${ts.mtr||matchesKeyword(raw,'mtr')?' · 港鐵':''}${ts.lrt||matchesKeyword(raw,'lrt')?' · 輕鐵':''}`;
-    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)">
-      <div style="font-size:32px;margin-bottom:10px">🔍</div>
-      <div style="font-size:14px;color:var(--bright)">找不到「${raw}」</div>
-      <div style="font-size:12px;color:var(--dim);margin-top:6px;line-height:1.7">已搜尋：${hint}<br>支援中英文及路線號碼</div>
-    </div>`;
-  }else{
-    el.innerHTML=sections.join('');
+          <div style="flex:1;font-size:12px;color:var(--mid)">${[...new Set(dirs.map(d=>d.orig_tc))].slice(0,2).join(' / ')}</div>
+        </div>
+        ${dirs.map(d=>`<div onclick="openBusDetail('${esc(d.route)}','${d.service_type}','${esc(d.dest_tc)}',null)"
+          style="display:flex;align-items:center;padding:11px 14px;cursor:pointer;border-top:1px solid var(--bdr)"
+          ontouchstart="this.style.background='var(--bg3)'" ontouchend="this.style.background=''">
+          <div style="flex:1"><div style="font-size:14px;font-weight:500;color:var(--bright)">往 ${d.dest_tc}</div>
+            <div style="font-size:11px;color:var(--mid);margin-top:2px">由 ${d.orig_tc}</div></div>
+          <div style="color:var(--dim)">›</div>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+  }catch(e){
+    console.error('[search]',e);
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--mid)">載入失敗，請重試</div>`;
   }
 }
 // ─── end doRouteSearch ───
 
-const MTR_API='https://rt.data.one.gov.hk/v1/transport/mtr/getSchedule.php';
-
-// MTR station list (name, line, station code, approx coords)
-const MTR_STNS=[
-  // 港島綫 ISL
-  {n:'堅尼地城',lines:['ISL'],codes:{ISL:'KET'},lat:22.282,lng:114.128},
-  {n:'香港大學',lines:['ISL'],codes:{ISL:'HKU'},lat:22.284,lng:114.137},
-  {n:'西營盤',  lines:['ISL'],codes:{ISL:'SYP'},lat:22.286,lng:114.143},
-  {n:'上環',    lines:['ISL'],codes:{ISL:'SHW'},lat:22.287,lng:114.152},
-  {n:'中環',    lines:['TWL','ISL'],codes:{TWL:'CEN',ISL:'CEN'},lat:22.282,lng:114.158},
-  {n:'金鐘',    lines:['TWL','ISL','SIL'],codes:{TWL:'ADM',ISL:'ADM',SIL:'ADM'},lat:22.279,lng:114.165},
-  {n:'灣仔',    lines:['ISL'],codes:{ISL:'WAC'},lat:22.277,lng:114.173},
-  {n:'銅鑼灣',  lines:['ISL'],codes:{ISL:'CWB'},lat:22.280,lng:114.183},
-  {n:'天后',    lines:['ISL'],codes:{ISL:'TIH'},lat:22.282,lng:114.192},
-  {n:'炮台山',  lines:['ISL'],codes:{ISL:'FOH'},lat:22.288,lng:114.198},
-  {n:'北角',    lines:['ISL'],codes:{ISL:'NOP'},lat:22.291,lng:114.209},
-  {n:'鰂魚涌',  lines:['ISL'],codes:{ISL:'QUB'},lat:22.288,lng:114.217},
-  {n:'太古',    lines:['ISL'],codes:{ISL:'TAK'},lat:22.285,lng:114.222},
-  {n:'西灣河',  lines:['ISL'],codes:{ISL:'SWH'},lat:22.280,lng:114.229},
-  {n:'筲箕灣',  lines:['ISL'],codes:{ISL:'SKW'},lat:22.278,lng:114.236},
-  {n:'杏花邨',  lines:['ISL'],codes:{ISL:'HFC'},lat:22.270,lng:114.238},
-  {n:'柴灣',    lines:['ISL'],codes:{ISL:'CHW'},lat:22.265,lng:114.238},
-  // 荃灣綫 TWL
-  {n:'荃灣',    lines:['TWL'],codes:{TWL:'TSW'},lat:22.371,lng:114.117},
-  {n:'大窩口',  lines:['TWL'],codes:{TWL:'TWO'},lat:22.370,lng:114.127},
-  {n:'葵興',    lines:['TWL'],codes:{TWL:'KWH'},lat:22.363,lng:114.127},
-  {n:'葵芳',    lines:['TWL'],codes:{TWL:'KWF'},lat:22.358,lng:114.128},
-  {n:'荔景',    lines:['TWL'],codes:{TWL:'LCK'},lat:22.348,lng:114.132},
-  {n:'美孚',    lines:['TWL','WRL'],codes:{TWL:'MEF',WRL:'MEF'},lat:22.338,lng:114.137},
-  {n:'茘枝角',  lines:['TWL'],codes:{TWL:'CSW'},lat:22.337,lng:114.149},
-  {n:'長沙灣',  lines:['TWL'],codes:{TWL:'CSW'},lat:22.335,lng:114.155},
-  {n:'深水埗',  lines:['TWL'],codes:{TWL:'SSP'},lat:22.330,lng:114.163},
-  {n:'太子',    lines:['TWL','KTL'],codes:{TWL:'PRE',KTL:'PRE'},lat:22.325,lng:114.168},
-  {n:'旺角',    lines:['TWL','KTL'],codes:{TWL:'MOK',KTL:'MOK'},lat:22.320,lng:114.169},
-  {n:'油麻地',  lines:['TWL','KTL'],codes:{TWL:'YMT',KTL:'YMT'},lat:22.313,lng:114.171},
-  {n:'佐敦',    lines:['TWL'],codes:{TWL:'JOR'},lat:22.305,lng:114.171},
-  {n:'尖沙咀',  lines:['TWL'],codes:{TWL:'TST'},lat:22.298,lng:114.172},
-  // 觀塘綫 KTL
-  {n:'調景嶺',  lines:['TKL','KTL'],codes:{TKL:'TIK',KTL:'TIK'},lat:22.304,lng:114.256},
-  {n:'彩虹',    lines:['KTL'],codes:{KTL:'CHH'},lat:22.334,lng:114.205},
-  {n:'鑽石山',  lines:['KTL'],codes:{KTL:'DIH'},lat:22.340,lng:114.201},
-  {n:'黃大仙',  lines:['KTL'],codes:{KTL:'WTS'},lat:22.342,lng:114.194},
-  {n:'樂富',    lines:['KTL'],codes:{KTL:'LOF'},lat:22.338,lng:114.187},
-  {n:'九龍塘',  lines:['KTL','EAL'],codes:{KTL:'KOT',EAL:'KOT'},lat:22.337,lng:114.176},
-  {n:'石硤尾',  lines:['KTL'],codes:{KTL:'SKM'},lat:22.332,lng:114.168},
-  {n:'又一城',  lines:['KTL'],codes:{KTL:'YAT'},lat:22.325,lng:114.172},
-  {n:'牛頭角',  lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
-  {n:'觀塘',    lines:['KTL'],codes:{KTL:'KWT'},lat:22.312,lng:114.226},
-  {n:'秀茂坪',  lines:['KTL'],codes:{KTL:'SMP'},lat:22.316,lng:114.232},
-  {n:'坪石',    lines:['KTL'],codes:{KTL:'PIH'},lat:22.319,lng:114.238},
-  {n:'九龍灣',  lines:['KTL'],codes:{KTL:'KOB'},lat:22.324,lng:114.213},
-  {n:'牛頭角',  lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
-  // 東鐵綫 EAL
-  {n:'紅磡',    lines:['KTL','EAL'],codes:{KTL:'HOM',EAL:'HUH'},lat:22.303,lng:114.182},
-  {n:'旺角東',  lines:['EAL'],codes:{EAL:'MKK'},lat:22.323,lng:114.172},
-  {n:'大圍',    lines:['KTL','EAL','MAL'],codes:{KTL:'TAW',EAL:'TAW',MAL:'TAW'},lat:22.373,lng:114.178},
-  {n:'沙田',    lines:['EAL','MAL'],codes:{EAL:'SHT',MAL:'SHT'},lat:22.382,lng:114.189},
-  {n:'火炭',    lines:['EAL'],codes:{EAL:'FOT'},lat:22.396,lng:114.198},
-  {n:'馬料水',  lines:['EAL'],codes:{EAL:'UNI'},lat:22.413,lng:114.210},
-  {n:'大學',    lines:['EAL'],codes:{EAL:'UNI'},lat:22.413,lng:114.210},
-  {n:'大埔墟',  lines:['EAL'],codes:{EAL:'TAP'},lat:22.445,lng:114.171},
-  {n:'太和',    lines:['EAL'],codes:{EAL:'TAH'},lat:22.450,lng:114.162},
-  {n:'粉嶺',    lines:['EAL'],codes:{EAL:'FLM'},lat:22.494,lng:114.139},
-  {n:'上水',    lines:['EAL'],codes:{EAL:'SHS'},lat:22.502,lng:114.128},
-  {n:'羅湖',    lines:['EAL'],codes:{EAL:'LOW'},lat:22.533,lng:114.113},
-  {n:'落馬洲',  lines:['EAL'],codes:{EAL:'LMC'},lat:22.529,lng:114.079},
-  // 將軍澳綫 TKL
-  {n:'寶琳',    lines:['TKL'],codes:{TKL:'POA'},lat:22.322,lng:114.262},
-  {n:'坑口',    lines:['TKL'],codes:{TKL:'HAH'},lat:22.316,lng:114.258},
-  {n:'將軍澳',  lines:['TKL'],codes:{TKL:'TKO'},lat:22.307,lng:114.260},
-  {n:'坑口',    lines:['TKL'],codes:{TKL:'HAH'},lat:22.316,lng:114.258},
-  {n:'日出康城',lines:['TKL'],codes:{TKL:'LHP'},lat:22.295,lng:114.270},
-  // 東涌綫 TCL / 機場快綫 AEL
-  {n:'青衣',    lines:['TCL','AEL'],codes:{TCL:'TSY',AEL:'TSY'},lat:22.358,lng:114.109},
-  {n:'東涌',    lines:['TCL'],codes:{TCL:'TUC'},lat:22.289,lng:113.944},
-  {n:'機場',    lines:['AEL'],codes:{AEL:'AIR'},lat:22.315,lng:113.937},
-  {n:'博覽館',  lines:['AEL'],codes:{AEL:'AWE'},lat:22.323,lng:113.944},
-  {n:'奧運',    lines:['TWL'],codes:{TWL:'OLY'},lat:22.317,lng:114.160},
-  // 南港島綫 SIL
-  {n:'海怡半島', lines:['SIL'],codes:{SIL:'OCP'},lat:22.243,lng:114.150},
-  {n:'黃竹坑',  lines:['SIL'],codes:{SIL:'WCH'},lat:22.247,lng:114.175},
-  {n:'利東',    lines:['SIL'],codes:{SIL:'LET'},lat:22.242,lng:114.161},
-  {n:'海洋公園', lines:['SIL'],codes:{SIL:'OCP'},lat:22.248,lng:114.173},
-  // 屯馬綫 WRL/MAL
-  {n:'烏溪沙',  lines:['MAL'],codes:{MAL:'WKS'},lat:22.425,lng:114.279},
-  {n:'馬鞍山',  lines:['MAL'],codes:{MAL:'MOS'},lat:22.421,lng:114.255},
-  {n:'恒安',    lines:['MAL'],codes:{MAL:'HEO'},lat:22.416,lng:114.246},
-  {n:'石門',    lines:['MAL'],codes:{MAL:'STK'},lat:22.393,lng:114.210},
-  {n:'圓洲角',  lines:['MAL'],codes:{MAL:'CKT'},lat:22.388,lng:114.197},
-  {n:'第一城',  lines:['MAL'],codes:{MAL:'SCK'},lat:22.385,lng:114.194},
-  {n:'車公廟',  lines:['MAL'],codes:{MAL:'CKT'},lat:22.381,lng:114.186},
-  {n:'兆康',    lines:['WRL'],codes:{WRL:'SIH'},lat:22.414,lng:113.968},
-  {n:'天水圍',  lines:['WRL'],codes:{WRL:'TWW'},lat:22.447,lng:114.008},
-  {n:'朗屏',    lines:['WRL'],codes:{WRL:'LPE'},lat:22.449,lng:114.031},
-  {n:'元朗',    lines:['WRL'],codes:{WRL:'YUL'},lat:22.445,lng:114.022},
-  {n:'錦上路',  lines:['WRL'],codes:{WRL:'KSR'},lat:22.470,lng:114.051},
-  {n:'荃灣西',  lines:['WRL'],codes:{WRL:'TWW'},lat:22.368,lng:114.108},
-  {n:'海壩',    lines:['WRL'],codes:{WRL:'HIB'},lat:22.338,lng:113.940},
-  {n:'屯門',    lines:['WRL'],codes:{WRL:'TUM'},lat:22.392,lng:113.977},
-  {n:'小欖',    lines:['WRL'],codes:{WRL:'SIL'},lat:22.448,lng:113.962},
-  {n:'長沙',    lines:['WRL'],codes:{WRL:'CHS'},lat:22.353,lng:114.004},
-  {n:'凹頭',    lines:['WRL'],codes:{WRL:'AWH'},lat:22.452,lng:114.016},
-  {n:'古洞',    lines:['WRL'],codes:{WRL:'KOT'},lat:22.508,lng:114.107},
-];
-const MTR_LINE={TWL:'荃灣綫',ISL:'港島綫',KTL:'觀塘綫',EAL:'東鐵綫',TKL:'將軍澳綫',TCL:'東涌綫',AEL:'機場快綫',SIL:'南港島綫',MAL:'馬鞍山綫',WRL:'西鐵綫'};
-
-async function fetchMTRNearby(lat,lng){
-  const stn=nearestOf(MTR_STNS,lat,lng);
-  const dist=haverDist(lat,lng,stn.lat,stn.lng);
-  if(dist>1500)return[]; // only show if within 1.5km
-  const results=[];
-  for(const line of stn.lines.slice(0,2)){
-    try{
-      const code=stn.codes[line];
-      const d=await fetch(`${MTR_API}?line=${line}&sta=${code}`).then(r=>r.json());
-      if(d.status!==0)continue;
-      const dirs=d.data?.[`${line}-${code}`];
-      if(!dirs)continue;
-      ['UP','DOWN'].forEach(dir=>{
-        const trains=(dirs[dir]||[]).slice(0,3);
-        if(!trains.length)return;
-        const etas=trains.map(t=>{
-          const ts=new Date(t.time).getTime();
-          return ts;
-        }).filter(ts=>ts>Date.now()-30000);
-        if(etas.length){
-          results.push({
-            type:'mtr',route:line,stopName:stn.n,dest:dir==='UP'?'往上行':'往下行',
-            _etas:etas,_first:etas[0],stopId:code,serviceType:'1',dist:Math.round(dist),
-            lineName:MTR_LINE[line]||line,
-          });
-        }
-      });
-    }catch{}
-  }
-  return results;
-}
-
-async function fetchCTBNearby(lat,lng,radius){
-  try{
-    // CTB stop list - cache in sessionStorage to avoid repeated large downloads
-    if(!window._ctbStops){
-      const cached=sessionStorage.getItem('_ctbStops');
-      if(cached){window._ctbStops=JSON.parse(cached);}
-      else{
-        // CTB v2 API stop list
-        const d=await fetch('https://rt.data.one.gov.hk/v2/transport/citybus/stop',
-          {signal:AbortSignal.timeout(10000)}).then(r=>r.json());
-        window._ctbStops=d.data||[];
-        try{sessionStorage.setItem('_ctbStops',JSON.stringify(window._ctbStops))}catch{}
-      }
-    }
-    const nearby=window._ctbStops
-      .map(s=>({...s,
-        lat_n:parseFloat(s.lat||s.latitude||0),
-        lng_n:parseFloat(s.long||s.longitude||s.lng||0)
-      }))
-      .filter(s=>s.lat_n&&s.lng_n)
-      .map(s=>({...s,dist:haverDist(lat,lng,s.lat_n,s.lng_n)}))
-      .filter(s=>s.dist<=radius)
-      .sort((a,b)=>a.dist-b.dist).slice(0,6);
-    if(!nearby.length)return[];
-    const now=Date.now();
-    const results=[];
-    await Promise.all(nearby.map(async stop=>{
-      try{
-        // Use v2 eta endpoint: /eta/CTB/{stop}/all
-        const d=await fetch(
-          `https://rt.data.one.gov.hk/v2/transport/citybus/eta/ctb/${stop.stop}/all`,
-          {signal:AbortSignal.timeout(8000)}
-        ).then(r=>r.json());
-        const seen=new Set();
-        (d.data||[]).forEach(e=>{
-          if(!e.eta)return;
-          const ts=new Date(e.eta).getTime();
-          if(ts<now-30000)return;
-          const key=`${e.route}_${e.dir}_${stop.stop}`;
-          if(!seen.has(key)){
-            seen.add(key);
-            results.push({
-              type:'ctb',route:e.route,
-              stopName:stop.name_tc||stop.name_en||stop.stop,
-              dest:e.dest_tc||e.dest_en||'',
-              stopId:stop.stop,serviceType:'1',
-              _etas:[ts],_first:ts,dist:Math.round(stop.dist),
-            });
-          }else{
-            const ex=results.find(r=>r.route===e.route&&r.stopId===stop.stop&&r.dir===e.dir);
-            if(ex&&ex._etas.length<3)ex._etas.push(ts);
-          }
-        });
-      }catch(e){console.warn('[CTB stop]',stop.stop,e.message)}
-    }));
-    return results;
-  }catch(e){console.warn('[CTBNearby]',e);return[]}
-}
-
 // ─── LRT (輕鐵) — rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule ───────
-const LRT_API='https://rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule';
-const LRT_STNS=[
-  {id:'003',n:'屯門',       lat:22.3937,lng:113.9766},
-  {id:'004',n:'三聖',       lat:22.3835,lng:113.9756},
-  {id:'005',n:'兆禧',       lat:22.3990,lng:113.9588},
-  {id:'006',n:'友愛',       lat:22.3881,lng:113.9736},
-  {id:'007',n:'南昌(輕鐵)', lat:22.3832,lng:113.9736},
-  {id:'009',n:'田景',       lat:22.4078,lng:113.9749},
-  {id:'010',n:'美樂',       lat:22.4129,lng:113.9745},
-  {id:'012',n:'天逸',       lat:22.4158,lng:113.9723},
-  {id:'013',n:'天水圍(輕鐵)',lat:22.4473,lng:114.0076},
-  {id:'014',n:'天澤',       lat:22.4436,lng:114.0044},
-  {id:'016',n:'天恩',       lat:22.4393,lng:114.0003},
-  {id:'017',n:'天富',       lat:22.4347,lng:113.9961},
-  {id:'018',n:'天華',       lat:22.4289,lng:113.9927},
-  {id:'020',n:'天瑞',       lat:22.4231,lng:113.9900},
-  {id:'021',n:'元朗(輕鐵)', lat:22.4455,lng:114.0224},
-  {id:'022',n:'教育路',     lat:22.4479,lng:114.0233},
-  {id:'024',n:'朗屏',       lat:22.4488,lng:114.0310},
-  {id:'025',n:'頌大',       lat:22.4561,lng:114.0329},
-  {id:'027',n:'兆康',       lat:22.4112,lng:113.9679},
-  {id:'029',n:'業旺',       lat:22.4075,lng:113.9638},
-  {id:'030',n:'翠豐',       lat:22.4040,lng:113.9614},
-  {id:'031',n:'青松',       lat:22.4147,lng:113.9567},
-];
-
-async function fetchLRTNearby(lat,lng,radius){
-  try{
-    const nearby=LRT_STNS
-      .map(s=>({...s,dist:haverDist(lat,lng,s.lat,s.lng)}))
-      .filter(s=>s.dist<=Math.min(radius,1200))
-      .sort((a,b)=>a.dist-b.dist).slice(0,4);
-    if(!nearby.length)return[];
-    const results=[];
-    await Promise.all(nearby.map(async stn=>{
-      try{
-        const d=await fetch(`${LRT_API}?station_id=${stn.id}`,
-          {signal:AbortSignal.timeout(8000)}).then(r=>r.json());
-        if(d.status!=='1'&&d.status!==1)return;
-        (d.platform_list||[]).forEach(plat=>{
-          (plat.route_list||[]).slice(0,2).forEach(route=>{
-            if(!route.time_en&&!route.time_ch)return;
-            const raw=route.time_en||route.time_ch||'';
-            // time_en is minutes as string ("3") or "即將" 
-            const mins=parseInt(raw);
-            const ts=isNaN(mins)?Date.now():(Date.now()+mins*60000);
-            results.push({
-              type:'lrt',route:String(route.route_no),
-              stopName:stn.n,dest:route.dest_ch||route.dest_en||'',
-              stopId:stn.id,serviceType:'1',
-              _etas:[ts],_first:ts,dist:Math.round(stn.dist),
-            });
-          });
-        });
-      }catch(e){console.warn('[LRT stn]',stn.id,e.message)}
-    }));
-    return results;
-  }catch(e){console.warn('[LRTNearby]',e);return[]}
-}
-
 function exportBusData(){const data={profiles,favsByProfile:{}};profiles.forEach(p=>{data.favsByProfile[p.id]=loadFavs(p.id)});const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`swd-bus-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);showToast('✅ 已匯出巴士資料')}
 function importBusData(event){const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const data=JSON.parse(e.target.result);if(!data.profiles||!data.favsByProfile)throw new Error();if(!confirm(`確定匯入？覆蓋現有 ${data.profiles.length} 個版面。`))return;profiles=data.profiles;saveProfiles(profiles);Object.entries(data.favsByProfile).forEach(([pid,arr])=>saveFavs(pid,arr));activePid=profiles[0]?.id||'';setActivePid(activePid);favs=loadFavs(activePid);renderProfiles();refreshAllETAs();showToast('✅ 匯入成功')}catch{showToast('❌ 檔案格式不正確')}};reader.readAsText(file);event.target.value=''}
 
