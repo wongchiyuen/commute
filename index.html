@@ -797,8 +797,6 @@ function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer(
 
 
 const NEWS_FEEDS = {
-  google: { name:'Google 香港新聞', url:'https://news.google.com/rss?hl=zh-HK&gl=HK&ceid=HK:zh-Hant' },
-  yahoo:  { name:'Yahoo 香港新聞',  url:'https://hk.news.yahoo.com/rss' },
   local:  { name:'RTHK 本地新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
   world:  { name:'RTHK 國際新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
 };
@@ -807,12 +805,11 @@ const TRAFFIC_SOURCES = {
   td:   {
     name:'特別交通消息',
     // data.one.gov.hk has Access-Control-Allow-Origin: * — no proxy needed!
-    direct:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
-    proxy: 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml',
-  },
+    url'https://www.td.gov.hk/tc/special_news/trafficnews.xml',
+},
   rthk: {
-    name:'RTHK 交通',
-    url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml',
+    name:'交通消息',
+    url:'https://resource.data.one.gov.hk/td/tc/specialtrafficnews.xml',
   },
 };
 
@@ -936,8 +933,8 @@ async function fetchTrafficDirect(src){
 // ─────────────────────────────────────────────────────────────────────────────
 //  NEWS RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
-const SRC_LABEL={'google':'Google','yahoo':'Yahoo','local':'RTHK本地','world':'RTHK國際'};
-const SRC_COLOR={'google':'#4285f4','yahoo':'#ff6b35','local':'#5b8fff','world':'#2ed573'};
+const SRC_LABEL={'RTHK本地','world':'RTHK國際'};
+const SRC_COLOR={'local':'#5b8fff','world':'#2ed573'};
 
 function renderFeedItems(items,el,srcKey,showSrc){
   if(!items?.length){
