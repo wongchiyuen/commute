@@ -318,9 +318,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page" id="page-traffic">
   <div class="feed-page">
     <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ttab-all"  onclick="switchTrafficFeed('all')">📋 全部</button>
-      <button class="sub-tab"        id="ttab-td"   onclick="switchTrafficFeed('td')">🚦 特別交通消息</button>
-      <button class="sub-tab"        id="ttab-rthk" onclick="switchTrafficFeed('rthk')">📻 RTHK 交通</button>
+      <button class="sub-tab active" id="ttab-td" onclick="switchTrafficFeed('td')">🚦 交通消息</button>
     </div>
     <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
       <button class="feed-refresh-btn" onclick="reloadTrafficFeed()">↺ 重新載入</button>
@@ -563,6 +561,41 @@ const CLIMATE_STNS = [
 const W_ICONS={50:'☀️',51:'🌤',52:'🌤',53:'⛅',54:'🌥',60:'☁️',61:'🌧',62:'🌧',63:'🌩',64:'⛈',65:'🌩',70:'☀️',71:'🌤',72:'🌤',73:'⛅',74:'🌥',75:'☁️',76:'🌦',77:'🌦',80:'🌧',81:'🌧',82:'🌩',83:'⛈',84:'🌪',85:'🌩',90:'🌡',100:'🌫',101:'🌫'};
 const WARN_MAP={WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴雨',WRAINC:'黑色暴雨',WFIRE:'山火',WFROST:'霜凍',WHOT:'酷熱',WCOLD:'寒冷',WMSGNL:'強烈季候風',WTHUNDER:'雷暴',WL:'山泥傾瀉'};
 const AMB_WARNS=new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
+
+// LWB routes served by Long Win Bus (龍運巴士) under KMB group
+const LWB_ROUTES=new Set(['A11','A12','A21','A22','A22A','A22P','A22S','A23','A28',
+  'A29','A31','A33','A36','A41','A41P','A43','A47','E11','E11A','E11B','E11C','E11P',
+  'E21','E21A','E21P','E22','E22A','E22P','E22S','E23','E23B','E23P','E24','E31',
+  'E32','E33','E34','E34P','E35','E36','E36A','E36B','E36P','E37','E41','E41A',
+  'E42','E42A','E43','E44','E44A','E45','N11','N21','N22','N23','N29','N30','N31',
+  'N35','N36','N40','N41','N42','N43','S1','S52','S56','S64','S1A']);
+
+// NLB routes (新大嶼山巴士) - Lantau routes
+const NLB_ROUTE_PREFIX=['1','2','3','11','23','38','A35','A35P'];
+
+function getOperator(route){
+  if(LWB_ROUTES.has(route))return{name:'龍運',cls:'tp-lwb'};
+  return{name:'九巴',cls:'tp-kmb'};
+}
+
+function showMTRStnInfo(stnName){
+  const stn=MTR_STNS.find(s=>s.n===stnName);
+  if(!stn)return;
+  setDTitle(`🚇 ${stn.n}`);
+  const lineNames=stn.lines.map(l=>MTR_LINE[l]||l);
+  document.getElementById('drawer-body').innerHTML=`
+    <div style="padding:4px 0 16px">
+      <div style="font-size:20px;font-weight:700;color:var(--bright);margin-bottom:6px">${stn.n}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        ${lineNames.map(n=>`<span class="tp tp-mtr" style="font-size:12px;padding:3px 10px">${n}</span>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--mid);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.7">
+        港鐵班次資料需要 GPS 定位。<br>
+        開啟主頁「附近」並啟用港鐵，即可查看 ${stn.n} 站附近班次。
+      </div>
+    </div>`;
+  openOverlay();
+}
 const DAY=['日','一','二','三','四','五','六'];
 const NEARBY_PID='__nearby__';
 const pad=n=>String(n).padStart(2,'0');
@@ -783,15 +816,11 @@ const NEWS_FEEDS = {
 };
 // Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
 const TRAFFIC_SOURCES = {
+  // data.gov.hk TD open data — CORS:* direct fetch
   td: {
     name:'特別交通消息',
-    // data.one.gov.hk CORS:* — direct fetch, no proxy
     direct:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
     proxy: 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml',
-  },
-  rthk: {
-    name:'RTHK 交通',
-    url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml',
   },
 };
 // data.one.gov.hk real-time transport data (CORS:* — direct fetch)
@@ -805,7 +834,7 @@ const DATA_ONE={
 //  NEWS: fetch via rss2json + allorigins fallback chain with 10-min cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-let currentNewsFeed='all', currentTrafficFeed='all';
+let currentNewsFeed='all', currentTrafficFeed='td';
 let newsCache={}, trafficCache={}, wxDetails={};
 const CACHE_TTL=10*60*1000; // 10 minutes
 
@@ -1049,65 +1078,30 @@ function switchTrafficFeed(key){
   currentTrafficFeed=key;
   document.querySelectorAll('[id^=ttab-]').forEach(b=>b.classList.remove('active'));
   document.getElementById('ttab-'+key)?.classList.add('active');
-  renderTrafficFeed();
   ensureTrafficFeedLoaded(key);
 }
-
 async function loadTrafficFeed(key){
-  if(key==='all'){
-    await Promise.all(['td','rthk'].map(k=>loadTrafficFeed(k)));
-    return;
-  }
   const src=TRAFFIC_SOURCES[key];
-  const items=key==='td'?await fetchTrafficDirect(src):await fetchFeed(src.url);
-  if(items){
-    trafficCache[key]={items:items.map(i=>({...i,_src:key})),ts:Date.now()};
-  }else{
-    trafficCache[key]={items:[],ts:Date.now()};
-  }
-}
-
-async function ensureTrafficFeedLoaded(key){
-  if(key==='all'){
-    const missing=['td','rthk'].filter(k=>!cacheValid(k,trafficCache));
-    if(missing.length)await Promise.all(missing.map(k=>loadTrafficFeed(k)));
-  }else{
-    if(!cacheValid(key,trafficCache))await loadTrafficFeed(key);
-  }
+  if(!src)return;
+  document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
+  const items=await fetchTrafficDirect(src);
+  trafficCache[key]={items:items||[],ts:Date.now()};
   renderTrafficFeed();
 }
-
-function getMergedTraffic(){
-  const all=[];
-  ['td','rthk'].forEach(k=>{(trafficCache[k]?.items||[]).forEach(i=>all.push(i))});
-  return all.sort((a,b)=>{
-    const ta=a.pubDate?new Date(a.pubDate).getTime():0;
-    const tb=b.pubDate?new Date(b.pubDate).getTime():0;
-    return tb-ta;
-  });
+async function ensureTrafficFeedLoaded(key){
+  if(cacheValid(key,trafficCache))renderTrafficFeed();
+  else await loadTrafficFeed(key);
 }
-
 function renderTrafficFeed(){
   const el=document.getElementById('traffic-list');
   if(!el)return;
-  const key=currentTrafficFeed;
-  if(key==='all'){
-    const items=getMergedTraffic();
-    if(!items.length&&['td','rthk'].some(k=>!trafficCache[k])){
-      el.innerHTML=`<div class="spinner"></div>`;return;
-    }
-    renderFeedItems(items,el,key,true);
-  }else{
-    if(!trafficCache[key]){el.innerHTML=`<div class="spinner"></div>`;return}
-    renderFeedItems(trafficCache[key].items,el,key,false);
-  }
+  const entry=trafficCache[currentTrafficFeed];
+  if(!entry){el.innerHTML=`<div class="spinner"></div>`;return}
+  renderFeedItems(entry.items,el,currentTrafficFeed,false);
 }
-
 async function reloadTrafficFeed(){
-  if(currentTrafficFeed==='all'){['td','rthk'].forEach(k=>delete trafficCache[k])}
-  else delete trafficCache[currentTrafficFeed];
-  document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
-  await ensureTrafficFeedLoaded(currentTrafficFeed);
+  delete trafficCache[currentTrafficFeed];
+  await loadTrafficFeed(currentTrafficFeed);
 }
 
 function reloadCurrentFeed(){
@@ -1329,8 +1323,8 @@ function fmtEtas(etas,cc,now){
     const tStr=`${pad(dv.getHours())}:${pad(dv.getMinutes())}`;
     if(etaMode==='mins')return`<div class="${cls}">${mStr}</div>`;
     if(etaMode==='clock')return`<div class="${cls}">${tStr}</div>`;
-    // both mode: show mins big, time small below
-    return`<div class="${cls}">${mStr}<span style="font-size:10px;font-weight:400;display:block;opacity:.7">${tStr}</span></div>`;
+    // both mode: "3分(11:45)"
+    return`<div class="${cls}">${mStr}<span style="font-size:11px;font-weight:400;color:var(--mid);margin-left:3px">(${tStr})</span></div>`;
   };
   return(etas[0]?fmt(etas[0],`e1 ${cc}`):'')+(etas[1]?fmt(etas[1],'e2'):'')+(etas[2]?fmt(etas[2],'e3'):'');
 }
@@ -1566,40 +1560,7 @@ function matchesKeyword(raw, type){
   return TRANSPORT_KEYWORDS[type]?.some(k=>raw.toLowerCase().includes(k.toLowerCase()));
 }
 
-// LWB routes served by Long Win Bus (龍運巴士) under KMB group
-const LWB_ROUTES=new Set(['A11','A12','A21','A22','A22A','A22P','A22S','A23','A28',
-  'A29','A31','A33','A36','A41','A41P','A43','A47','E11','E11A','E11B','E11C','E11P',
-  'E21','E21A','E21P','E22','E22A','E22P','E22S','E23','E23B','E23P','E24','E31',
-  'E32','E33','E34','E34P','E35','E36','E36A','E36B','E36P','E37','E41','E41A',
-  'E42','E42A','E43','E44','E44A','E45','N11','N21','N22','N23','N29','N30','N31',
-  'N35','N36','N40','N41','N42','N43','S1','S52','S56','S64','S1A']);
 
-// NLB routes (新大嶼山巴士) - Lantau routes
-const NLB_ROUTE_PREFIX=['1','2','3','11','23','38','A35','A35P'];
-
-function getOperator(route){
-  if(LWB_ROUTES.has(route))return{name:'龍運',cls:'tp-lwb'};
-  return{name:'九巴',cls:'tp-kmb'};
-}
-
-function showMTRStnInfo(stnName){
-  const stn=MTR_STNS.find(s=>s.n===stnName);
-  if(!stn)return;
-  setDTitle(`🚇 ${stn.n}`);
-  const lineNames=stn.lines.map(l=>MTR_LINE[l]||l);
-  document.getElementById('drawer-body').innerHTML=`
-    <div style="padding:4px 0 16px">
-      <div style="font-size:20px;font-weight:700;color:var(--bright);margin-bottom:6px">${stn.n}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        ${lineNames.map(n=>`<span class="tp tp-mtr" style="font-size:12px;padding:3px 10px">${n}</span>`).join('')}
-      </div>
-      <div style="font-size:12px;color:var(--mid);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.7">
-        港鐵班次資料需要 GPS 定位。<br>
-        開啟主頁「附近」並啟用港鐵，即可查看 ${stn.n} 站附近班次。
-      </div>
-    </div>`;
-  openOverlay();
-}
 
 async function doRouteSearch(){
   const raw=(document.getElementById('search-route-inp')?.value||'').trim();
@@ -1701,6 +1662,38 @@ async function doRouteSearch(){
     if(mtrItems.length){
       sections.push(`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrItems.join(''));
     }
+  }
+
+  // ── LRT ───────────────────────────────────────────────────────────────────
+  if(ts.lrt||matchesKeyword(raw,'lrt')){
+    const LRT_ROUTES={'505':'天水圍循環綫','507':'元朗─屯門南','610':'屯門市中心─兆康',
+      '614':'屯門碼頭─元朗','614P':'屯門碼頭─元朗','615':'屯門碼頭─天水圍',
+      '615P':'屯門碼頭─天水圍','705':'天水圍循環綫','706':'天水圍循環綫',
+      '751':'天水圍─元朗','751P':'天水圍─元朗','761P':'天水圍─屯門碼頭'};
+    const lrtMatch=Object.entries(LRT_ROUTES).filter(([no,desc])=>
+      no===q||no.startsWith(q)||desc.includes(qZh)||q==='LRT'||qZh==='輕鐵'
+    );
+    if(lrtMatch.length){
+      const html=`<div class="srch-section-lbl">🚊 輕鐵 LRT</div>`+lrtMatch.map(([no,desc])=>`
+        <div style="background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${no}</div>
+          <div><div style="font-size:13px;font-weight:500;color:var(--bright)">${desc}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">輕鐵 LRT</div></div>
+        </div>`).join('');
+      sections.push(html);
+    }
+  }
+
+  // ── Render results ────────────────────────────────────────────────────────
+  if(!sections.length){
+    const hint=`九巴${ts.ctb||matchesKeyword(raw,'ctb')?' · 城巴':''}${ts.mtr||matchesKeyword(raw,'mtr')?' · 港鐵':''}${ts.lrt||matchesKeyword(raw,'lrt')?' · 輕鐵':''}`;
+    el.innerHTML=`<div style="text-align:center;padding:30px 20px;color:var(--mid)">
+      <div style="font-size:32px;margin-bottom:10px">🔍</div>
+      <div style="font-size:14px;color:var(--bright)">找不到「${raw}」</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:6px;line-height:1.7">已搜尋：${hint}<br>支援中英文及路線號碼</div>
+    </div>`;
+  }else{
+    el.innerHTML=sections.join('');
   }
 }
 // ─── end doRouteSearch ───
