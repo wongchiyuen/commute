@@ -60,12 +60,12 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 /* forecast strip */
 .w-fore{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin-bottom:8px}
 .w-fore::-webkit-scrollbar{display:none}
-.fc{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--bdr);border-radius:9px;padding:6px 9px;flex-shrink:0;min-width:58px}
+.fc{display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:4px 6px;flex-shrink:0;min-width:48px}
 .fc.hl{background:var(--bg4);border-color:var(--amb-bdr)}
-.fc-lbl{font-size:11px;color:var(--mid);font-family:var(--mono)}
-.fc-lbl.named{font-size:12px;font-weight:700;color:var(--amb2)}
-.fc-ico{font-size:20px;margin:1px 0}
-.fc-tt{font-family:var(--mono);font-size:11px;display:flex;gap:4px}
+.fc-lbl{font-size:10px;color:var(--mid);font-family:var(--mono)}
+.fc-lbl.named{font-size:11px;font-weight:700;color:var(--amb2)}
+.fc-ico{font-size:17px;margin:1px 0}
+.fc-tt{font-family:var(--mono);font-size:10px;display:flex;gap:3px}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
 /* extra weather stats row */
 .w-hum-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.28);border-radius:6px;padding:3px 8px;margin-top:4px;cursor:pointer}
@@ -687,7 +687,7 @@ async function loadWeather(){
     const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
     document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
-    document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
+    document.getElementById('w-fore').innerHTML=fcs.slice(0,9).map((f,i)=>{
       const ds=String(f.forecastDate);
       const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
       const hl=i===1||i===2;
@@ -729,21 +729,33 @@ async function loadExtraWeather(){
       const cmax=getClim(maxR),cmin=getClim(minR),cavg=getClim(avgR);
       if(cmax!=null||cmin!=null){wxDetails.climMax=cmax;wxDetails.climMin=cmin;wxDetails.climAvg=cavg;wxDetails.climStn=cstn.n}
     }catch(e){console.warn('[clim]',e)}
-    // Tide
+    // Tide — opendata.php CSV: Month,Date,Time(HHMM),Height(m),Time,Height,...
     try{
       const tstn=nearestOf(TIDE_STNS,lat,lng);
-      const tdata=await fetch(`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${moStr}`).then(r=>r.json());
-      const arr=tdata.data||[];
-      // HKO API returns capital-case fields: Day, Hour, Minute, mMSL, type
-      const today=arr.filter(t=>{
-        const day=parseInt(t.Day??t.day??t.date??0);
-        return day===d;
-      }).map(t=>({
-        type: t.type??t.Type??'',
-        time: `${String(t.Hour??t.hour??'').padStart(2,'0')}:${String(t.Minute??t.minute??'').padStart(2,'0')}`,
-        height: t.mMSL??t.height??t.Height??'--',
-      }));
-      if(today.length){wxDetails.tide=today;wxDetails.tideStn=tstn.n}
+      const csv=await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/opendata.php?dataType=HLT&station=${tstn.code}&year=${y}&rformat=csv`,{signal:AbortSignal.timeout(8000)}).then(r=>r.text());
+      const lines=csv.split('\n').filter(l=>l.trim()&&!l.startsWith('Month'));
+      const today=[];
+      for(const line of lines){
+        const cols=line.trim().split(',');
+        if(parseInt(cols[0])===mo&&parseInt(cols[1])===d){
+          for(let i=2;i<cols.length-1;i+=2){
+            const t=(cols[i]||'').trim();
+            const h=parseFloat((cols[i+1]||'').trim());
+            if(!t||isNaN(h))continue;
+            const ts=t.padStart(4,'0');
+            today.push({time:`${ts.slice(0,2)}:${ts.slice(2,4)}`,height:h});
+          }
+          break;
+        }
+      }
+      // H/L via sorted median: bottom ceil(n/2) = L, rest = H
+      if(today.length){
+        const sorted=[...today].sort((a,b)=>a.height-b.height);
+        const nL=Math.ceil(sorted.length/2);
+        const lSet=new Set(sorted.slice(0,nL).map(t=>t.height));
+        today.forEach(t=>t.type=lSet.has(t.height)?'L':'H');
+        wxDetails.tide=today;wxDetails.tideStn=tstn.n;
+      }
     }catch(e){console.warn('[tide]',e)}
     // Radiation
     try{
@@ -754,6 +766,25 @@ async function loadExtraWeather(){
       }
       if(rdata?.data?.length){const latest=rdata.data[rdata.data.length-1];const rv=num(latest?.value??latest?.radiation);if(rv!=null){wxDetails.radiation=rv;wxDetails.radiationStn=cstn.n}}
     }catch(e){console.warn('[radiation]',e)}
+    // Sunrise / Sunset via sunrise-sunset.org (free, CORS OK, HK timezone)
+    try{
+      const dateStr=`${y}-${moStr}-${String(d).padStart(2,'0')}`;
+      const sr=await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&date=${dateStr}&tzid=Asia/Hong_Kong`,{signal:AbortSignal.timeout(6000)}).then(r=>r.json());
+      if(sr.status==='OK'){
+        const to24=s=>{
+          if(!s)return'';
+          const m=s.match(/(\d+):(\d+)(?::\d+)?\s*(AM|PM)/i);
+          if(!m)return'';
+          let h=parseInt(m[1]);
+          if(m[3].toUpperCase()==='PM'&&h!==12)h+=12;
+          if(m[3].toUpperCase()==='AM'&&h===12)h=0;
+          return`${String(h).padStart(2,'0')}:${m[2]}`;
+        };
+        wxDetails.sunrise=to24(sr.results.sunrise);
+        wxDetails.sunset=to24(sr.results.sunset);
+        wxDetails.dayLength=sr.results.day_length; // seconds
+      }
+    }catch(e){console.warn('[sun]',e)}
   }
 }
 
@@ -776,6 +807,14 @@ function renderWeatherDetailsContent(){
         <div class="wdet-val" style="color:#ff8c5a">${wxDetails.climMax!=null?wxDetails.climMax+'°':'--'}<span style="font-size:14px;color:var(--mid)"> / </span><span style="color:#7ba8ff">${wxDetails.climMin!=null?wxDetails.climMin+'°':'--'}</span></div>
         <div class="wdet-sub">月均最高/最低${wxDetails.climAvg!=null?' · 均 '+wxDetails.climAvg+'°':''}</div></div>`:''}
       ${rad!=null?`<div class="wdet-card wdet-full"><div class="wdet-lbl">昨日輻射量 · ${radStn}</div><div class="wdet-val">${rad} <span style="font-size:12px;font-weight:400;color:var(--mid)">MJ/m²</span></div><div class="wdet-sub">日總太陽輻射</div></div>`:''}
+      ${(wxDetails.sunrise||wxDetails.sunset)?`<div class="wdet-card wdet-full"><div class="wdet-lbl">☀️ 日出 / 🌇 日落</div>
+        <div style="display:flex;gap:16px;align-items:baseline;margin-top:2px">
+          <div><span style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffb347">${wxDetails.sunrise||'--'}</span><span style="font-size:10px;color:var(--mid);margin-left:4px">日出</span></div>
+          <div style="color:var(--bdr2);font-size:18px">→</div>
+          <div><span style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff7b5a">${wxDetails.sunset||'--'}</span><span style="font-size:10px;color:var(--mid);margin-left:4px">日落</span></div>
+        </div>
+        ${wxDetails.dayLength!=null?`<div class="wdet-sub" style="margin-top:4px">日照時數 ${Math.floor(wxDetails.dayLength/3600)}時${Math.floor((wxDetails.dayLength%3600)/60)}分</div>`:''}
+      </div>`:''}
     </div>
     <div class="loc-section-title">🌊 潮汐高度${tideStn?' · '+tideStn:''}</div>
     ${tideHtml}
