@@ -661,9 +661,10 @@ function getAutoTabStatus(){
 // ═══════════════════════════════════
 async function loadWeather(){
   try{
-    const[rhr,flw,warn]=await Promise.all([
+    const[rhr,flw,fnd,warn]=await Promise.all([
       fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=flw&lang=tc`).then(r=>r.json()),
+      fetch(`${HKO}?dataType=fnd&lang=tc`).then(r=>r.json()),
       fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r=>r.json()),
     ]);
     const te=hkoFind(rhr.temperature?.data,selectedStn);
@@ -679,17 +680,18 @@ async function loadWeather(){
     const humBadge=document.getElementById('w-hum-badge');
     if(hv!=null){humBadge.innerHTML=`<span class="w-hum-val">${hv}%</span><span class="w-hum-lbl">濕度</span>`;humBadge.onclick=openWeatherDetails;humBadge.style.display='';}
     else{humBadge.style.display='none'}
-    wxDetails.todayMaxT=num(flw.weatherForecast?.[0]?.forecastMaxtemp);
-    wxDetails.todayMinT=num(flw.weatherForecast?.[0]?.forecastMintemp);
+    // fnd (9-day forecast) has forecastMaxtemp / forecastMintemp; flw does not
+    const fcs=fnd.weatherForecast||[];
+    wxDetails.todayMaxT=num(fcs[0]?.forecastMaxtemp);
+    wxDetails.todayMinT=num(fcs[0]?.forecastMintemp);
     const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
     document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
-    const fcs=flw.weatherForecast||[];
     document.getElementById('w-fore').innerHTML=fcs.slice(0,7).map((f,i)=>{
       const ds=String(f.forecastDate);
       const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
       const hl=i===1||i===2;
-      return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
+      return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.ForecastIcon??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
     }).join('');
     loadExtraWeather();
   }catch(e){console.warn('[weather]',e)}
@@ -732,7 +734,15 @@ async function loadExtraWeather(){
       const tstn=nearestOf(TIDE_STNS,lat,lng);
       const tdata=await fetch(`${HKO_T}?dataType=HLT&lang=tc&station=${tstn.code}&year=${y}&month=${moStr}`).then(r=>r.json());
       const arr=tdata.data||[];
-      const today=arr.filter(t=>parseInt(t.date??t.day??0)===d);
+      // HKO API returns capital-case fields: Day, Hour, Minute, mMSL, type
+      const today=arr.filter(t=>{
+        const day=parseInt(t.Day??t.day??t.date??0);
+        return day===d;
+      }).map(t=>({
+        type: t.type??t.Type??'',
+        time: `${String(t.Hour??t.hour??'').padStart(2,'0')}:${String(t.Minute??t.minute??'').padStart(2,'0')}`,
+        height: t.mMSL??t.height??t.Height??'--',
+      }));
       if(today.length){wxDetails.tide=today;wxDetails.tideStn=tstn.n}
     }catch(e){console.warn('[tide]',e)}
     // Radiation
