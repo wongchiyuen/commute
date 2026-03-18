@@ -826,10 +826,12 @@ const CACHE_TTL=10*60*1000; // 10 minutes
 
 function cacheValid(key, store){
   const e=store[key];
-  return e&&e.ts&&(Date.now()-e.ts<CACHE_TTL)&&e.items?.length;
+  if(!e||!e.ts)return false;
+  if(e._failed)return(Date.now()-e.ts<2*60*1000); // failed → retry after 2min
+  return(Date.now()-e.ts<CACHE_TTL)&&e.items?.length;
 }
 
-async function ft(url,ms=14000){
+async function ft(url,ms=5000){
   return new Promise((res,rej)=>{
     const t=setTimeout(()=>rej(new Error('timeout')),ms);
     fetch(url).then(r=>{clearTimeout(t);res(r)}).catch(e=>{clearTimeout(t);rej(e)});
@@ -860,6 +862,9 @@ function parseXML(text){
 }
 
 async function fetchFeed(url){
+  return Promise.race([_fetchFeedInner(url),new Promise(res=>setTimeout(()=>res(null),20000))]);
+}
+async function _fetchFeedInner(url){
   const enc=encodeURIComponent(url);
   // A: rss2json — best JSON API, handles Google/Yahoo, no CORS issues
   try{
@@ -982,14 +987,25 @@ async function loadNewsFeed(key){
     return;
   }
   const items=await fetchFeed(NEWS_FEEDS[key].url);
-  newsCache[key]={items:items||[],ts:Date.now(),_src:key};
-  if(items)newsCache[key].items=items.map(i=>({...i,_src:key}));
+  if(items){
+    newsCache[key]={items:items.map(i=>({...i,_src:key})),ts:Date.now()};
+  }else{
+    newsCache[key]={items:[],ts:Date.now(),_failed:true};
+  }
 }
 
 async function ensureNewsFeedLoaded(key){
   if(key==='all'){
     const missing=['google','yahoo','local','world'].filter(k=>!cacheValid(k,newsCache));
-    if(missing.length)await Promise.all(missing.map(k=>loadNewsFeed(k)));
+    if(missing.length){
+      // Progressive: render as each source completes
+      missing.forEach(k=>{
+        loadNewsFeed(k).then(()=>{if(currentNewsFeed==='all')renderNewsFeed()});
+      });
+      // If nothing at all loaded yet, show spinner briefly then wait
+      const hasAny=['google','yahoo','local','world'].some(k=>newsCache[k]?.items?.length);
+      if(!hasAny)return; // spinner stays until first .then fires
+    }
   }else{
     if(!cacheValid(key,newsCache))await loadNewsFeed(key);
   }
@@ -1053,14 +1069,20 @@ async function loadTrafficFeed(key){
   if(items){
     trafficCache[key]={items:items.map(i=>({...i,_src:key})),ts:Date.now()};
   }else{
-    trafficCache[key]={items:[],ts:Date.now()};
+    trafficCache[key]={items:[],ts:Date.now(),_failed:true};
   }
 }
 
 async function ensureTrafficFeedLoaded(key){
   if(key==='all'){
     const missing=['td','rthk'].filter(k=>!cacheValid(k,trafficCache));
-    if(missing.length)await Promise.all(missing.map(k=>loadTrafficFeed(k)));
+    if(missing.length){
+      missing.forEach(k=>{
+        loadTrafficFeed(k).then(()=>{if(currentTrafficFeed==='all')renderTrafficFeed()});
+      });
+      const hasAny=['td','rthk'].some(k=>trafficCache[k]?.items?.length);
+      if(!hasAny)return;
+    }
   }else{
     if(!cacheValid(key,trafficCache))await loadTrafficFeed(key);
   }
