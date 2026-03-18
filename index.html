@@ -357,7 +357,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" style="cursor:default">
         <div class="sett-ico">🟢</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">城巴 (CTB)</div><div class="sett-lbl-sub">rt.data.one.gov.hk</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">城巴 (CTB)</div><div class="sett-lbl-sub">rt.data.gov.hk</div></div>
         <label class="toggle"><input type="checkbox" id="toggle-ctb" onchange="saveTransportSettings()" ><span class="toggle-slider"></span></label>
       </div>
       <div class="sett-row" style="cursor:default">
@@ -367,7 +367,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" style="cursor:default">
         <div class="sett-ico">🚊</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">輕鐵 (LRT)</div><div class="sett-lbl-sub">rt.data.one.gov.hk/mtr/lrt</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">輕鐵 (LRT)</div><div class="sett-lbl-sub">rt.data.gov.hk/mtr/lrt</div></div>
         <label class="toggle"><input type="checkbox" id="toggle-lrt" onchange="saveTransportSettings()"><span class="toggle-slider"></span></label>
       </div>
     </div>
@@ -635,7 +635,7 @@ async function autoLocate(){
   if(!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(
     pos=>{nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude;const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather()}document.getElementById('w-loc-lbl').textContent=selectedStn;if(activePid===NEARBY_PID)loadNearby();},
-    async()=>{try{const d=await fetch('https://ip-api.com/json/?fields=lat,lon,status',{signal:AbortSignal.timeout(5000)}).then(r=>r.json());if(d.status==='success'){const near=nearestOf(RHRREAD_STNS,d.lat,d.lon);if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather()}document.getElementById('w-loc-lbl').textContent=selectedStn;}}catch{}},
+    ()=>{/* GPS失敗：沿用上次測站，不使用第三方定位 */},
     {timeout:10000,maximumAge:60000,enableHighAccuracy:false}
   );
 }
@@ -759,33 +759,18 @@ async function loadExtraWeather(){
       }
       if(rdata?.data?.length){const latest=rdata.data[rdata.data.length-1];const rv=num(latest?.value??latest?.radiation);if(rv!=null){wxDetails.radiation=rv;wxDetails.radiationStn=cstn.n}}
     }catch(e){console.warn('[radiation]',e)}
-    // Sunrise / Sunset — HKO climate.php SRS (primary) → sunrise-sunset.org (fallback)
+    // Sunrise / Sunset — HKO opendata.php SRS CSV (data.gov.hk official source)
+    // Format: Month,Day,Sunrise(HHMM),SunTransit(HHMM),Sunset(HHMM)
     try{
-      const dateStr=`${y}-${moStr}-${String(d).padStart(2,'0')}`;
-      let gotSun=false;
-      // Primary: HKO SRS (returns HK local time directly, no conversion needed)
-      try{
-        const srs=await fetch(`${HKO_C}?dataType=SRS&lang=tc&station=HKO&year=${y}&month=${moStr}`,{signal:AbortSignal.timeout(6000)}).then(r=>r.json());
-        const rows=srs.data||[];
-        const row=rows.find(r=>parseInt(r.date??r.day??r.Date??0)===d)||rows[d-1];
-        if(row){
-          // SRS fields: sunrise / sunset (HHMM string) or riseTime / setTime
-          const srField=row.sunrise??row.riseTime??row.SunRise??row.rise??'';
-          const ssField=row.sunset??row.setTime??row.SunSet??row.set??'';
-          const toHHMM=v=>{const s=String(v||'').trim().padStart(4,'0');return s.length>=4?`${s.slice(0,2)}:${s.slice(2,4)}`:''};
-          const rise=toHHMM(srField), set=toHHMM(ssField);
-          if(rise&&set){wxDetails.sunrise=rise;wxDetails.sunset=set;gotSun=true;}
-        }
-      }catch(e){console.warn('[sun-hko]',e)}
-      // Fallback: sunrise-sunset.org (returns UTC, add 8h for HKT)
-      if(!gotSun){
-        const sr=await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&date=${dateStr}&formatted=0`,{signal:AbortSignal.timeout(6000)}).then(r=>r.json());
-        if(sr.status==='OK'){
-          const toHKT=utcStr=>{const u=new Date(utcStr);u.setHours(u.getHours()+8);return`${String(u.getHours()).padStart(2,'0')}:${String(u.getMinutes()).padStart(2,'0')}`;};
-          wxDetails.sunrise=toHKT(sr.results.sunrise);
-          wxDetails.sunset=toHKT(sr.results.sunset);
-          wxDetails.dayLength=sr.results.day_length;
-          gotSun=true;
+      const csv=await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/opendata.php?dataType=SRS&year=${y}&rformat=csv`,{signal:AbortSignal.timeout(6000)}).then(r=>r.text());
+      const lines=csv.split('\n').filter(l=>l.trim()&&!l.startsWith('Month')&&!l.startsWith('#'));
+      for(const line of lines){
+        const cols=line.trim().split(',');
+        if(parseInt(cols[0])===mo&&parseInt(cols[1])===d){
+          const toHHMM=v=>{const s=String(v||'').trim().padStart(4,'0');return`${s.slice(0,2)}:${s.slice(2,4)}`;};
+          const rise=toHHMM(cols[2]),set=toHHMM(cols[4]);
+          if(rise!=='00:00'&&set!=='00:00'){wxDetails.sunrise=rise;wxDetails.sunset=set;}
+          break;
         }
       }
     }catch(e){console.warn('[sun]',e)}
@@ -819,7 +804,6 @@ function renderWeatherDetailsContent(){
           <div style="color:var(--bdr2);font-size:18px">→</div>
           <div><span style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff7b5a">${wxDetails.sunset||'--'}</span><span style="font-size:10px;color:var(--mid);margin-left:4px">日落</span></div>
         </div>
-        ${wxDetails.dayLength!=null?`<div class="wdet-sub" style="margin-top:4px">日照時數 ${Math.floor(wxDetails.dayLength/3600)}時${Math.floor((wxDetails.dayLength%3600)/60)}分</div>`:''}
       </div>`:''}
     </div>
     <div class="loc-section-title">🌊 潮汐高度${tideStn?' · '+tideStn:''}</div>
@@ -1645,7 +1629,7 @@ async function doRouteSearch(){
     try{
       if(!window._ctbRoutes){
         // Fetch all CTB routes (both directions)
-        const d=await fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
+        const d=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
         window._ctbRoutes=d.data||[];
       }
       const matches=window._ctbRoutes.filter(r=>
@@ -1728,8 +1712,8 @@ async function openCTBDetail(route,bound,dest){
   try{
     const dir=bound==='O'||bound==='outbound'?'outbound':'inbound';
     const[sd,si]=await Promise.all([
-      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dir}`).then(r=>r.json()),
-      fetch(`https://rt.data.one.gov.hk/v2/transport/citybus/stop`).then(r=>r.json()),
+      fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dir}`).then(r=>r.json()),
+      fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop`).then(r=>r.json()),
     ]);
     const stops=sd.data||[];
     const stopMap={};(si.data||[]).forEach(s=>stopMap[s.stop]=s.name_tc||s.stop);
@@ -1784,8 +1768,8 @@ function getTransportSettings(){
 }
 
 // CTB / LRT API constants
-const CTB='https://rt.data.one.gov.hk/v2/transport/citybus';
-const LRT_API='https://rt.data.one.gov.hk/v1/transport/mtr/lrt/getSchedule';
+const CTB='https://rt.data.gov.hk/v2/transport/citybus';
+const LRT_API='https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule';
 
 // LRT station list (id, name, coords)
 const LRT_STNS=[
@@ -1832,7 +1816,7 @@ async function fetchLRTNearby(lat,lng,radius){
     return results;
   }catch{return[]}
 }
-const MTR_API='https://rt.data.one.gov.hk/v1/transport/mtr/getSchedule.php';
+const MTR_API='https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php';
 
 // MTR station list (name, line, station code, approx coords)
 const MTR_STNS=[
