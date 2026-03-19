@@ -311,14 +311,14 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page" id="page-news">
   <div class="feed-page">
     <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ntab-all"    onclick="switchNewsFeed('all')">📋 全部</button>
-      <button class="sub-tab"        id="ntab-google" onclick="switchNewsFeed('google')">🔍 Google</button>
-      <button class="sub-tab"        id="ntab-yahoo"  onclick="switchNewsFeed('yahoo')">🔶 Yahoo</button>
-      <button class="sub-tab"        id="ntab-local"  onclick="switchNewsFeed('local')">📻 RTHK本地</button>
-      <button class="sub-tab"        id="ntab-world"  onclick="switchNewsFeed('world')">🌍 RTHK國際</button>
+      <button class="sub-tab active" id="ntab-all"     onclick="switchNewsFeed('all')">📋 全部</button>
+      <button class="sub-tab"        id="ntab-local"   onclick="switchNewsFeed('local')">📻 RTHK本地</button>
+      <button class="sub-tab"        id="ntab-world"   onclick="switchNewsFeed('world')">🌍 RTHK國際</button>
+      <button class="sub-tab"        id="ntab-mingpao" onclick="switchNewsFeed('mingpao')">📰 明報</button>
     </div>
-    <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
-      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 重新載入</button>
+    <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
+      <span id="news-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
+      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 立即更新</button>
     </div>
     <div class="feed-list" id="news-list"><div class="spinner"></div></div>
   </div>
@@ -424,7 +424,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         九巴：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
         城巴：<a href="https://data.one.gov.hk/zh-hant/dataset/citybus-eta" target="_blank">城巴實時到站 API</a><br>
         港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
-        新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台</a>、<a href="https://hk.news.yahoo.com" target="_blank">Yahoo 香港</a><br>
+        新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台（RTHK）</a>、<a href="https://news.mingpao.com" target="_blank">明報即時新聞</a><br>
         交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
         © 2026 生活日常。保留所有權利。
@@ -899,11 +899,11 @@ function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer(
 
 
 const NEWS_FEEDS = {
-  google: { name:'Google 香港新聞', url:'https://news.google.com/rss?hl=zh-HK&gl=HK&ceid=HK:zh-Hant' },
-  yahoo:  { name:'Yahoo 香港新聞',  url:'https://hk.news.yahoo.com/rss' },
-  local:  { name:'RTHK 本地新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
-  world:  { name:'RTHK 國際新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
+  local:   { name:'RTHK 本地新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
+  world:   { name:'RTHK 國際新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
+  mingpao: { name:'明報即時新聞',     url:'https://news.mingpao.com/rss/ins/all.xml' },
 };
+const NEWS_FEED_KEYS = ['local','world','mingpao'];
 // Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
 const TRAFFIC_SOURCES = {
   td:   {
@@ -1043,8 +1043,8 @@ async function fetchTrafficDirect(src){
 // ─────────────────────────────────────────────────────────────────────────────
 //  NEWS RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
-const SRC_LABEL={'google':'Google','yahoo':'Yahoo','local':'RTHK本地','world':'RTHK國際'};
-const SRC_COLOR={'google':'#4285f4','yahoo':'#ff6b35','local':'#5b8fff','world':'#2ed573'};
+const SRC_LABEL={'local':'RTHK本地','world':'RTHK國際','mingpao':'明報'};
+const SRC_COLOR={'local':'#5b8fff','world':'#2ed573','mingpao':'#f0a500'};
 
 function renderFeedItems(items,el,srcKey,showSrc){
   if(!items?.length){
@@ -1058,7 +1058,8 @@ function renderFeedItems(items,el,srcKey,showSrc){
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button onclick="reloadCurrentFeed()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 18px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button>
         ${srcKey==='local'||srcKey==='all'?`<a href="https://news.rthk.hk" target="_blank" style="background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);color:#7ba8ff;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK 網站</a>`:''}
-        ${srcKey==='google'||srcKey==='all'?`<a href="https://news.google.com/home?hl=zh-HK" target="_blank" style="background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);color:#4285f4;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 Google 新聞</a>`:''}
+        ${srcKey==='world'||srcKey==='all'?`<a href="https://news.rthk.hk/rthk/ch/component/k2/categories.htm?catCode=2" target="_blank" style="background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.3);color:#2ed573;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK國際</a>`:''}
+        ${srcKey==='mingpao'||srcKey==='all'?`<a href="https://news.mingpao.com" target="_blank" style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--amb2);border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 明報網站</a>`:''}
       </div>
     </div>`;
     return;
@@ -1085,7 +1086,7 @@ function switchNewsFeed(key){
 
 async function loadNewsFeed(key){
   if(key==='all'){
-    await Promise.all(['google','yahoo','local','world'].map(k=>loadNewsFeed(k)));
+    await Promise.all(NEWS_FEED_KEYS.map(k=>loadNewsFeed(k)));
     return;
   }
   const items=await fetchFeed(NEWS_FEEDS[key].url);
@@ -1098,14 +1099,14 @@ async function loadNewsFeed(key){
 
 async function ensureNewsFeedLoaded(key){
   if(key==='all'){
-    const missing=['google','yahoo','local','world'].filter(k=>!cacheValid(k,newsCache));
+    const missing=NEWS_FEED_KEYS.filter(k=>!cacheValid(k,newsCache));
     if(missing.length){
       // Progressive: render as each source completes
       missing.forEach(k=>{
         loadNewsFeed(k).then(()=>{if(currentNewsFeed==='all')renderNewsFeed()});
       });
       // If nothing at all loaded yet, show spinner briefly then wait
-      const hasAny=['google','yahoo','local','world'].some(k=>newsCache[k]?.items?.length);
+      const hasAny=NEWS_FEED_KEYS.some(k=>newsCache[k]?.items?.length);
       if(!hasAny)return; // spinner stays until first .then fires
     }
   }else{
@@ -1116,7 +1117,7 @@ async function ensureNewsFeedLoaded(key){
 
 function getMergedNews(){
   const all=[];
-  ['google','yahoo','local','world'].forEach(k=>{(newsCache[k]?.items||[]).forEach(i=>all.push(i))});
+  NEWS_FEED_KEYS.forEach(k=>{(newsCache[k]?.items||[]).forEach(i=>all.push(i))});
   return all.sort((a,b)=>{
     const ta=a.pubDate?new Date(a.pubDate).getTime():0;
     const tb=b.pubDate?new Date(b.pubDate).getTime():0;
@@ -1130,7 +1131,7 @@ function renderNewsFeed(){
   const key=currentNewsFeed;
   if(key==='all'){
     const items=getMergedNews();
-    if(!items.length&&['google','yahoo','local','world'].some(k=>!newsCache[k])){
+    if(!items.length&&NEWS_FEED_KEYS.some(k=>!newsCache[k])){
       el.innerHTML=`<div class="spinner"></div>`;return;
     }
     renderFeedItems(items,el,key,true);
@@ -1141,10 +1142,12 @@ function renderNewsFeed(){
 }
 
 async function reloadNewsFeed(){
-  if(currentNewsFeed==='all'){['google','yahoo','local','world'].forEach(k=>delete newsCache[k])}
+  if(currentNewsFeed==='all'){NEWS_FEED_KEYS.forEach(k=>delete newsCache[k])}
   else delete newsCache[currentNewsFeed];
   document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
+  _updateNewsBadge('載入中…');
   await ensureNewsFeedLoaded(currentNewsFeed);
+  _updateNewsBadge();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1228,6 +1231,39 @@ function reloadCurrentFeed(){
   const pg=document.querySelector('.page.active')?.id;
   if(pg==='page-news')reloadNewsFeed();
   else if(pg==='page-traffic')reloadTrafficFeed();
+}
+
+// ── News auto-update badge ────────────────────────────────────────────────────
+let _newsAutoCountdown=0, _newsAutoTimer=null;
+const NEWS_AUTO_INTERVAL_SEC=5*60; // 5分鐘
+
+function _updateNewsBadge(msg){
+  const el=document.getElementById('news-auto-badge');
+  if(!el)return;
+  if(msg){el.textContent=msg;return;}
+  const ts=Math.max(0,_newsAutoCountdown);
+  const mm=String(Math.floor(ts/60)).padStart(2,'0');
+  const ss=String(ts%60).padStart(2,'0');
+  el.textContent=`⟳ ${mm}:${ss} 後自動更新`;
+}
+
+function _startNewsAutoRefresh(){
+  if(_newsAutoTimer)clearInterval(_newsAutoTimer);
+  _newsAutoCountdown=NEWS_AUTO_INTERVAL_SEC;
+  _updateNewsBadge();
+  _newsAutoTimer=setInterval(async()=>{
+    _newsAutoCountdown--;
+    if(_newsAutoCountdown<=0){
+      _newsAutoCountdown=NEWS_AUTO_INTERVAL_SEC;
+      // Only auto-refresh if news page is active
+      if(document.querySelector('.page.active')?.id==='page-news'){
+        _updateNewsBadge('更新中…');
+        NEWS_FEED_KEYS.forEach(k=>delete newsCache[k]);
+        await ensureNewsFeedLoaded(currentNewsFeed);
+      }
+    }
+    _updateNewsBadge();
+  },1000);
 }
 
 // ═══════════════════════════════════
@@ -2440,6 +2476,7 @@ loadWeather();
 if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs();
 setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
+_startNewsAutoRefresh();
 
 // PWA
 const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
