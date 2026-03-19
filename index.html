@@ -943,37 +943,58 @@ async function ft(url,ms=5000){
 function parseXML(text){
   if(!text||text.length<80)return null;
   try{
-    const clean=text.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/,'').trim();
+    // Strip BOM, XML declaration, and common encoding declarations
+    const clean=text
+      .replace(/^\uFEFF/,'')
+      .replace(/<\?xml[^>]*\?>/g,'')
+      .replace(/encoding="[^"]*"/gi,'encoding="UTF-8"')
+      .trim();
     const xml=new DOMParser().parseFromString(clean,'text/xml');
-    if(xml.querySelector('parsererror'))return null;
+    // Check for parse error (Firefox uses <parsererror>, Chrome uses <parsererror xmlns=...>)
+    const pe=xml.querySelector('parsererror,parsererror\\:parsererror');
+    if(pe)return null;
     const items=[...xml.querySelectorAll('item,entry')];
     if(!items.length)return null;
-    return items.slice(0,60).map(item=>{
-      const gs=t=>item.querySelector(t)?.textContent?.trim().replace(/<!\[CDATA\[|\]\]>/g,'')||'';
-      const link=item.querySelector('link')?.textContent?.trim()||
-                 item.querySelector('link')?.getAttribute('href')||
+    return items.slice(0,80).map(item=>{
+      // Helper: get text content, stripping CDATA markers and HTML tags
+      const gs=t=>{
+        const el=item.querySelector(t);
+        if(!el)return'';
+        return(el.textContent||el.innerHTML||'')
+          .replace(/<!\[CDATA\[|\]\]>/g,'')
+          .replace(/<[^>]+>/g,' ')
+          .replace(/\s+/g,' ')
+          .trim();
+      };
+      // Link: try <link>, then href attribute, then <guid>
+      const linkEl=item.querySelector('link');
+      const link=linkEl?.textContent?.trim()||
+                 linkEl?.getAttribute('href')||
                  item.querySelector('guid')?.textContent?.trim()||'';
-      const desc=(gs('description')||gs('summary')||gs('content')).replace(/<!\[CDATA\[|\]\]>/g,'').replace(/<[^>]+>/g,'').trim().slice(0,240);
+      const desc=(gs('description')||gs('summary')||gs('content')).slice(0,280);
       return{
-        title:gs('title').replace(/<!\[CDATA\[|\]\]>/g,'').trim(),
-        link, description:desc,
-        pubDate:gs('pubDate')||gs('published')||gs('updated'),
+        title:gs('title'),
+        link,
+        description:desc,
+        pubDate:gs('pubDate')||gs('published')||gs('updated')||gs('dc\\:date'),
       };
     }).filter(i=>i.title&&i.title.length>1);
   }catch(e){return null}
 }
 
-async function fetchFeed(url){
-  return Promise.race([_fetchFeedInner(url),new Promise(res=>setTimeout(()=>res(null),20000))]);
-}
-async function _fetchFeedInner(url){
-  const enc=encodeURIComponent(url);
-  // A: rss2json — best JSON API, handles Google/Yahoo, no CORS issues
-  try{
-    const res=await ft(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`);
-    const j=await res.json();
-    if(j.status==='ok'&&j.items?.length>0){
-      console.log('[feed] rss2json ok:', j.items.length, url);
+// Fetch one proxy and return parsed items, or throw
+async function _tryProxy(label, fetchPromise, isJson){
+  const res = await fetchPromise;
+  if(isJson){
+    const j = await res.json();
+    // allorigins /get wrapper
+    if(j?.status?.http_code===200 && j.contents?.length>100){
+      const items=parseXML(j.contents);
+      if(items?.length){console.log(`[feed-${label}] ok:`,items.length);return items;}
+    }
+    // rss2json format
+    if(j.status==='ok' && j.items?.length>0){
+      console.log(`[feed-${label}] rss2json ok:`,j.items.length);
       return j.items.map(i=>({
         title:(i.title||'').replace(/<[^>]+>/g,'').trim(),
         link:i.link||i.guid||'',
@@ -981,47 +1002,64 @@ async function _fetchFeedInner(url){
         description:(i.description||i.content||'').replace(/<[^>]+>/g,'').trim().slice(0,240),
       })).filter(i=>i.title);
     }
-    if(j.status==='error')console.warn('[feed] rss2json error:',j.message);
-  }catch(e){console.warn('[feed-A]',e.message)}
+    throw new Error('json-empty');
+  }
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  const items = parseXML(text);
+  if(!items?.length) throw new Error('no-items');
+  console.log(`[feed-${label}] ok:`,items.length);
+  return items;
+}
 
-  // B: allorigins /get — returns JSON {contents, status}
-  try{
-    const j=await ft(`https://api.allorigins.win/get?url=${enc}`).then(r=>r.json());
-    if(j?.status?.http_code===200&&j.contents?.length>100){
-      const items=parseXML(j.contents);
-      if(items?.length){console.log('[feed-B] allorigins/get ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-B]',e.message)}
+async function fetchFeed(url){
+  const enc=encodeURIComponent(url);
+  const SIG=AbortSignal.timeout?AbortSignal.timeout(12000):undefined;
+  const opt=SIG?{signal:SIG}:{};
 
-  // C: corsproxy.io
-  try{
-    const res=await ft(`https://corsproxy.io/?${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-C] corsproxy ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-C]',e.message)}
+  // Build list of concurrent attempts
+  const attempts=[
+    // rss2json – great for standard RSS
+    _tryProxy('rss2json',
+      fetch(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`,opt),true),
+    // allorigins /get – JSON wrapper
+    _tryProxy('ao-get',
+      fetch(`https://api.allorigins.win/get?url=${enc}`,opt),true),
+    // corsproxy.io – raw XML
+    _tryProxy('corsproxy',
+      fetch(`https://corsproxy.io/?url=${enc}`,opt),false),
+    // allorigins /raw – raw XML
+    _tryProxy('ao-raw',
+      fetch(`https://api.allorigins.win/raw?url=${enc}`,opt),false),
+    // codetabs – raw XML
+    _tryProxy('codetabs',
+      fetch(`https://api.codetabs.com/v1/proxy?quest=${url}`,opt),false),
+    // htmldriven cors proxy
+    _tryProxy('htmldriven',
+      fetch(`https://cors-proxy.htmldriven.com/?url=${enc}`,opt),false),
+    // thingproxy
+    _tryProxy('thingproxy',
+      fetch(`https://thingproxy.freeboard.io/fetch/${url}`,opt),false),
+    // direct fetch (works if site has CORS *)
+    _tryProxy('direct',
+      fetch(url,{...opt,mode:'cors'}),false),
+  ];
 
-  // D: allorigins /raw
-  try{
-    const res=await ft(`https://api.allorigins.win/raw?url=${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-D] allorigins/raw ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-D]',e.message)}
-
-  // E: codetabs proxy
-  try{
-    const res=await ft(`https://api.codetabs.com/v1/proxy?quest=${enc}`);
-    if(res.ok){
-      const items=parseXML(await res.text());
-      if(items?.length){console.log('[feed-E] codetabs ok:',items.length);return items}
-    }
-  }catch(e){console.warn('[feed-E]',e.message)}
-
-  console.warn('[feed] ALL failed for', url);
-  return null;
+  // Race: return first successful result
+  return new Promise(resolve=>{
+    let done=false, remaining=attempts.length;
+    attempts.forEach(p=>p.then(items=>{
+      if(!done&&items?.length){done=true;resolve(items);}
+    }).catch(()=>{}).finally(()=>{
+      remaining--;
+      if(remaining===0&&!done){
+        console.warn('[feed] ALL proxies failed for',url);
+        resolve(null);
+      }
+    }));
+    // Hard 18s timeout
+    setTimeout(()=>{if(!done){done=true;resolve(null);}},18000);
+  });
 }
 
 // Traffic: try direct fetch first (data.one.gov.hk has CORS:*)
