@@ -1749,23 +1749,32 @@ async function doRouteSearch(){
               const d=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stop.stop}/all`).then(r=>r.json());
               const rNos=new Set((d.data||[]).map(e=>e.route));
               rNos.forEach(rno=>{
-                window._ctbRoutes.filter(r=>r.route===rno).forEach(r=>{
-                  if(!ctbMatches.find(x=>x.route===r.route&&x.bound===r.bound))ctbMatches.push(r);
-                });
+                // 城巴 API 無 bound，每條路線只一筆，用 route 去重
+                if(!ctbMatches.find(x=>x.route===rno)){
+                  const found=window._ctbRoutes.find(r=>r.route===rno);
+                  if(found)ctbMatches.push(found);
+                }
               });
             }catch{}
           }));
         }
       }
       if(ctbMatches.length){
+        // CTB API 無 bound 欄位——每條路線只有一筆記錄
+        // 為每條路線合成「去程(O)」和「回程(I)」兩個方向
         const grouped={};
         ctbMatches.forEach(r=>{
-          if(!grouped[r.route])grouped[r.route]=[];
-          if(!grouped[r.route].find(x=>x.bound===r.bound))grouped[r.route].push(r);
+          const rno=r.route;
+          if(!grouped[rno]){
+            grouped[rno]=[
+              {route:rno,bound:'O',dest_tc:r.dest_tc||'',orig_tc:r.orig_tc||'',dest_en:r.dest_en||'',orig_en:r.orig_en||''},
+              {route:rno,bound:'I',dest_tc:r.orig_tc||'',orig_tc:r.dest_tc||'',dest_en:r.orig_en||'',orig_en:r.dest_en||''},
+            ];
+          }
         });
         const html=Object.entries(grouped).slice(0,10).map(([route,dirs])=>
           routeCard(route,dirs,'rgba(46,213,115,.1)','rgba(46,213,115,.3)','#2ed573','城巴 CTB',
-            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound||"O")}','${esc(d.dest_tc||"")}')`)
+            (d)=>`openCTBDetail('${esc(d.route)}','${esc(d.bound)}','${esc(d.dest_tc||"")}')`)
         ).join('');
         if(html)sections.push(`<div class="srch-section-lbl">🟢 ${ctbStnHint?'城巴 CTB · '+ctbStnHint:'城巴 CTB'}</div>`+html);
       }
@@ -1899,6 +1908,18 @@ async function openCTBDetail(route,bound,dest){
   openOverlay();
   try{
     const dir=bound==='O'||bound==='outbound'?'outbound':'inbound';
+    // 取路線資訊（起終點名）
+    let routeDest=dest, routeOrig='';
+    if(!routeDest){
+      try{
+        const ri=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route/ctb/${route}`).then(r=>r.json());
+        const rd=ri.data;
+        if(rd){
+          routeDest=dir==='outbound'?(rd.dest_tc||rd.dest_en||''):(rd.orig_tc||rd.orig_en||'');
+          routeOrig=dir==='outbound'?(rd.orig_tc||rd.orig_en||''):(rd.dest_tc||rd.dest_en||'');
+        }
+      }catch{}
+    }
     const sd=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/${route}/${dir}`).then(r=>r.json());
     const rawStops=sd.data||[];
 
@@ -1907,13 +1928,13 @@ async function openCTBDetail(route,bound,dest){
       <div class="route-detail-hdr">
         <div class="route-detail-badge" style="color:#2ed573;background:rgba(46,213,115,.1);border-color:rgba(46,213,115,.3)">${route}</div>
         <div class="route-detail-info">
-          <div class="route-detail-dest">往 ${dest||'(目的地)'} <span style="font-size:10px;color:var(--mid)">[城巴]</span></div>
+          <div class="route-detail-dest">往 ${routeDest||dest||'(目的地)'} <span style="font-size:10px;color:var(--mid)">[城巴]</span></div>
           <div class="route-detail-orig">${namedStops.length} 個站</div>
         </div>
       </div>
       <div class="dir-tab-row">
-        <div class="dir-tab${dir==='outbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','O','${esc(dest)}')">往 ${dest||'外'}（去程）</div>
-        <div class="dir-tab${dir==='inbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','I','${esc(dest)}')">（回程）</div>
+        <div class="dir-tab${dir==='outbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','O','')">去程</div>
+        <div class="dir-tab${dir==='inbound'?' active':''}" onclick="openCTBDetail('${esc(route)}','I','')">回程</div>
       </div>
       <div class="route-stop-list">${namedStops.map((s,i)=>`
         <div class="rsl-item" onclick="_openCTBStopEta('${s.stopId}','${esc(s.name)}','${route}','${esc(dest||'')}','${dir==='outbound'?'O':'I'}')">
