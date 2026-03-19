@@ -1687,10 +1687,11 @@ async function doRouteSearch(){
     );
     if(mtrMatch.length){
       const html=`<div class="srch-section-lbl">🔴 港鐵 MTR</div>`+mtrMatch.map(([code,name])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,71,87,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${code}</div>
-          <div><div style="font-size:14px;font-weight:500;color:var(--bright)">${name}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">港鐵 MTR · 點附近站可見班次</div></div>
+        <div onclick="openMTRLineDetail('${code}')" style="cursor:pointer;background:var(--bg2);border:1px solid rgba(255,71,87,.25);border-radius:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;overflow:hidden;transition:border-color .15s" ontouchstart="this.style.borderColor='rgba(255,71,87,.6)'" ontouchend="this.style.borderColor='rgba(255,71,87,.25)'">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ff8a96;background:rgba(255,71,87,.12);border-right:1px solid rgba(255,71,87,.3);padding:14px 14px;flex-shrink:0;align-self:stretch;display:flex;align-items:center">${code}</div>
+          <div style="flex:1;padding:13px 14px 13px 0"><div style="font-size:14px;font-weight:600;color:var(--bright)">${name}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">🔴 港鐵 MTR · 點擊查看站點及班次</div></div>
+          <div style="color:var(--dim);font-size:18px;padding-right:12px">›</div>
         </div>`).join('');
       sections.push(html);
     }
@@ -1710,10 +1711,11 @@ async function doRouteSearch(){
     );
     if(lrtMatch.length){
       const html=`<div class="srch-section-lbl">🚊 輕鐵 LRT</div>`+lrtMatch.map(([no,desc])=>`
-        <div style="background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;padding:13px 15px;display:flex;align-items:center;gap:12px">
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:8px;padding:4px 12px;flex-shrink:0">${no}</div>
-          <div><div style="font-size:13px;font-weight:500;color:var(--bright)">${desc}</div>
-          <div style="font-size:11px;color:var(--mid);margin-top:2px">輕鐵 LRT</div></div>
+        <div onclick="openLRTRouteDetail('${no}','${esc(desc)}')" style="cursor:pointer;background:var(--bg2);border:1px solid rgba(255,165,0,.25);border-radius:12px;margin-bottom:8px;display:flex;align-items:center;overflow:hidden;transition:border-color .15s" ontouchstart="this.style.borderColor='rgba(255,165,0,.6)'" ontouchend="this.style.borderColor='rgba(255,165,0,.25)'">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#ffaa33;background:rgba(255,165,0,.1);border-right:1px solid rgba(255,165,0,.3);padding:14px 12px;flex-shrink:0;align-self:stretch;display:flex;align-items:center">${no}</div>
+          <div style="flex:1;padding:13px 12px 13px 12px"><div style="font-size:13px;font-weight:600;color:var(--bright)">${desc}</div>
+          <div style="font-size:11px;color:var(--mid);margin-top:2px">🚊 輕鐵 LRT · 點擊查看站點及班次</div></div>
+          <div style="color:var(--dim);font-size:18px;padding-right:12px">›</div>
         </div>`).join('');
       sections.push(html);
     }
@@ -1769,6 +1771,202 @@ async function openCTBDetail(route,bound,dest){
   }catch(e){document.getElementById('drawer-body').innerHTML=`<div class="msg">載入失敗：${e.message}</div>`}
 }
 
+
+// ═══════════════════════════════════
+//  MTR LINE DETAIL
+// ═══════════════════════════════════
+async function openMTRLineDetail(lineCode){
+  const lineName=MTR_LINE[lineCode]||lineCode;
+  setDTitle(`🔴 ${lineName}`);
+  const el=document.getElementById('drawer-body');
+  el.innerHTML=`<div class="spinner"></div>`;
+  openOverlay();
+
+  const stations=MTR_LINE_STATIONS[lineCode]||[];
+  if(!stations.length){
+    el.innerHTML=`<div class="msg">暫無此綫站點資料</div>`;
+    return;
+  }
+
+  // Fetch ETA for ALL stations (parallel)
+  el.innerHTML=`
+    <div class="route-detail-hdr">
+      <div class="route-detail-badge" style="color:#ff8a96;background:rgba(255,71,87,.12);border-color:rgba(255,71,87,.35)">${lineCode}</div>
+      <div class="route-detail-info">
+        <div class="route-detail-dest">${lineName}</div>
+        <div class="route-detail-orig">港鐵 MTR · ${stations.length} 個站 · 載入班次中…</div>
+      </div>
+    </div>
+    <div id="mtr-station-list" class="route-stop-list">${stations.map((s,i)=>`
+      <div class="rsl-item" onclick="_openMTRStaEta('${lineCode}','${s.c}','${esc(s.n)}')">
+        <div class="rsl-line"></div>
+        <div class="rsl-dot${i===0?' first':i===stations.length-1?' last':''}"></div>
+        <div class="rsl-seq">${i+1}</div>
+        <div class="rsl-name">${s.n}</div>
+        <div class="rsl-eta" id="mtr-eta-${lineCode}-${s.c}"><span style="color:var(--dim);font-size:11px">…</span></div>
+      </div>`).join('')}
+    </div>`;
+
+  // Fetch ETAs in parallel
+  await Promise.all(stations.map(async s=>{
+    try{
+      const d=await fetch(`${MTR_API}?line=${lineCode}&sta=${s.c}`).then(r=>r.json());
+      if(d.status!==0)return;
+      const key=`${lineCode}-${s.c}`;
+      const dirs=d.data?.[key];
+      if(!dirs)return;
+      const now=Date.now();
+      const allTrains=[...(dirs.UP||[]),(dirs.DOWN||[])].flatMap(t=>[t]);
+      // Get next UP and DOWN trains
+      const upTrain=(dirs.UP||[])[0];
+      const dnTrain=(dirs.DOWN||[])[0];
+      const fmt=tr=>{
+        if(!tr)return null;
+        const ts=new Date(tr.time).getTime();
+        const m=Math.round((ts-now)/60000);
+        if(m<0)return null;
+        return m<=1?'即將':m+'分';
+      };
+      const u=fmt(upTrain),dn=fmt(dnTrain);
+      const etaEl=document.getElementById(`mtr-eta-${lineCode}-${s.c}`);
+      if(!etaEl)return;
+      if(!u&&!dn){etaEl.innerHTML=`<span style="color:var(--dim);font-size:10px">無班次</span>`;return;}
+      etaEl.innerHTML=[
+        u?`<span class="rsl-eta${parseInt(u)<3?' soon':parseInt(u)<9?' coming':''}" style="font-size:12px">↑${u}</span>`:'',
+        dn?`<span class="rsl-eta" style="font-size:12px;color:var(--blu)">↓${dn}</span>`:'',
+      ].filter(Boolean).join(' ');
+    }catch{}
+  }));
+}
+
+async function _openMTRStaEta(lineCode,staCode,staName){
+  setDTitle(`${staName}`);
+  const el=document.getElementById('drawer-body');
+  el.innerHTML=`<button class="back-link" onclick="openMTRLineDetail('${lineCode}')">‹ ${MTR_LINE[lineCode]||lineCode}</button><div class="spinner"></div>`;
+  try{
+    const d=await fetch(`${MTR_API}?line=${lineCode}&sta=${staCode}`).then(r=>r.json());
+    const key=`${lineCode}-${staCode}`;
+    const dirs=d.data?.[key];
+    const now=Date.now();
+    const fmtDir=(trains,dirLabel)=>{
+      if(!trains||!trains.length)return`<div style="color:var(--mid);font-size:12px;padding:10px 0">${dirLabel}：暫無班次</div>`;
+      return`<div style="margin-bottom:12px">
+        <div style="font-size:10px;color:var(--dim);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono);margin-bottom:6px">${dirLabel}</div>
+        ${trains.slice(0,3).map(tr=>{
+          const ts=new Date(tr.time).getTime();
+          const m=Math.round((ts-now)/60000);
+          const cc=m<=2?'sc':m<=8?'cc':'oc';
+          const t=new Date(tr.time);
+          return`<div style="display:flex;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--bdr)">
+            <div class="e1 ${cc}" style="font-size:28px">${m<=0?'即將':m+'分'}</div>
+            <div style="font-size:12px;color:var(--mid)">${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}</div>
+            <div style="flex:1;font-size:12px;color:var(--mid);text-align:right">${tr.dest||''} 月台${tr.plat||''}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    };
+    el.innerHTML=`<button class="back-link" onclick="openMTRLineDetail('${lineCode}')">‹ ${MTR_LINE[lineCode]||lineCode}</button>
+      <div style="font-size:16px;font-weight:600;color:var(--bright);margin:8px 0 4px">🔴 ${staName}</div>
+      <div style="font-size:12px;color:var(--mid);margin-bottom:14px">${MTR_LINE[lineCode]||lineCode} · ${lineCode}-${staCode}</div>
+      ${dirs?fmtDir(dirs.UP,'上行 ↑')+fmtDir(dirs.DOWN,'下行 ↓'):'<div class="msg">暫無班次資料</div>'}
+      <div style="height:8px"></div>`;
+  }catch(e){
+    el.innerHTML=`<button class="back-link" onclick="openMTRLineDetail('${lineCode}')">‹ 返回</button><div class="msg">載入失敗</div>`;
+  }
+}
+
+// ═══════════════════════════════════
+//  LRT ROUTE DETAIL
+// ═══════════════════════════════════
+// 輕鐵路線站點（data.gov.hk / MTR 開放數據）
+const LRT_ROUTE_STOPS={
+  '505':['016','014','013','020','017','018','016'],
+  '507':['021','022','024','025','027','006','007','003'],
+  '610':['003','007','006','027','029','030','031'],
+  '614':['003','004','007','006','027','029','025','022','021'],
+  '614P':['003','004','007','006','027','029','025','022','021'],
+  '615':['003','004','007','006','027','018','017','020','013'],
+  '615P':['003','004','007','006','027','018','017','020','013'],
+  '705':['013','016','018','017','020','013'],
+  '706':['013','020','017','018','016','013'],
+  '751':['013','014','016','024','022','021'],
+  '751P':['013','014','016','024','022','021'],
+  '761P':['003','006','007','009','010','012','018','017','020','013'],
+};
+
+async function openLRTRouteDetail(routeNo,routeDesc){
+  const stopsIds=LRT_ROUTE_STOPS[routeNo]||[];
+  const stnMap={};
+  LRT_STNS.forEach(s=>stnMap[s.id]=s.n);
+  setDTitle(`🚊 輕鐵 ${routeNo}`);
+  const el=document.getElementById('drawer-body');
+  el.innerHTML=`<div class="spinner"></div>`;
+  openOverlay();
+
+  // Build stop list (with potential duplicates for circular routes)
+  const stopObjs=stopsIds.map(id=>({id,n:stnMap[id]||'站'+id}));
+
+  el.innerHTML=`
+    <div class="route-detail-hdr">
+      <div class="route-detail-badge" style="color:#ffaa33;background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.35)">${routeNo}</div>
+      <div class="route-detail-info">
+        <div class="route-detail-dest">${routeDesc||''}</div>
+        <div class="route-detail-orig">輕鐵 LRT · 點擊站名查看即時班次</div>
+      </div>
+    </div>
+    <div class="route-stop-list">${stopObjs.map((s,i)=>`
+      <div class="rsl-item" onclick="_openLRTStaEta('${s.id}','${esc(s.n)}','${routeNo}','${esc(routeDesc||'')}')">
+        <div class="rsl-line"></div>
+        <div class="rsl-dot${i===0?' first':i===stopObjs.length-1?' last':''}"></div>
+        <div class="rsl-seq">${i+1}</div>
+        <div class="rsl-name">${s.n} <span style="font-size:10px;color:var(--dim);font-family:var(--mono)">#${s.id}</span></div>
+        <div style="color:var(--dim);font-size:14px">›</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:rgba(91,143,255,.07);border:1px solid rgba(91,143,255,.2);border-radius:10px;font-size:11px;color:var(--mid);line-height:1.7">
+      💡 點擊任何站名可查看即時班次<br>
+      資料來源：港鐵輕鐵實時數據 API（rt.data.gov.hk）
+    </div>`;
+}
+
+async function _openLRTStaEta(stationId,stationName,routeNo,routeDesc){
+  setDTitle(`${stationName}`);
+  const el=document.getElementById('drawer-body');
+  el.innerHTML=`<button class="back-link" onclick="openLRTRouteDetail('${routeNo}','${esc(routeDesc)}')">‹ 輕鐵 ${routeNo}</button><div class="spinner"></div>`;
+  try{
+    const d=await fetch(`${LRT_API}?station_id=${stationId}`).then(r=>r.json());
+    if(d.status!=='1'&&d.status!==1){
+      el.innerHTML=`<button class="back-link" onclick="openLRTRouteDetail('${routeNo}','${esc(routeDesc)}')">‹ 返回</button><div class="msg">暫無班次資料</div>`;
+      return;
+    }
+    const platforms=d.platform_list||[];
+    const rows=[];
+    platforms.forEach(plat=>{
+      (plat.route_list||[]).forEach(r=>{
+        const mins=r.time_en==='Arriving'?0:parseInt(r.time_en);
+        rows.push({route:r.route_no,dest:r.dest_ch||r.dest_en||'',plat:plat.platform_id,mins:isNaN(mins)?null:mins,timeStr:r.time_ch||r.time_en||''});
+      });
+    });
+    rows.sort((a,b)=>(a.mins??99)-(b.mins??99));
+    el.innerHTML=`<button class="back-link" onclick="openLRTRouteDetail('${routeNo}','${esc(routeDesc)}')">‹ 輕鐵 ${routeNo}</button>
+      <div style="font-size:16px;font-weight:600;color:var(--bright);margin:8px 0 4px">🚊 ${stationName}</div>
+      <div style="font-size:12px;color:var(--mid);margin-bottom:14px">輕鐵站 #${stationId}</div>
+      ${rows.length?rows.map(r=>{
+        const cc=r.mins===null?'oc':r.mins<=2?'sc':r.mins<=8?'cc':'oc';
+        return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bdr)">
+          <div class="e1 ${cc}" style="font-size:24px">${r.mins===null?r.timeStr:r.mins<=0?'即將':r.mins+'分'}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--amb2)">${r.route}</div>
+            <div style="font-size:12px;color:var(--mid)">往 ${r.dest}</div>
+          </div>
+          <div style="font-size:11px;color:var(--dim)">月台 ${r.plat}</div>
+        </div>`;
+      }).join(''):`<div class="msg">暫無班次資料</div>`}
+      <div style="height:8px"></div>`;
+  }catch(e){
+    el.innerHTML=`<button class="back-link" onclick="openLRTRouteDetail('${routeNo}','${esc(routeDesc)}')">‹ 返回</button><div class="msg">載入失敗：${e.message}</div>`;
+  }
+}
 
 // ═══════════════════════════════════
 //  TRANSPORT SETTINGS (CTB / MTR)
@@ -1875,7 +2073,19 @@ const MTR_STNS=[
   {n:'牛頭角',lines:['KTL'],codes:{KTL:'NTK'},lat:22.316,lng:114.219},
   {n:'觀塘',lines:['KTL'],codes:{KTL:'KWT'},lat:22.312,lng:114.226},
 ];
-const MTR_LINE={TWL:'荃灣綫',ISL:'港島綫',KTL:'觀塘綫',EAL:'東鐵綫',TKL:'將軍澳綫',TCL:'東涌綫',AEL:'機場快綫',SIL:'南港島綫',MAL:'馬鞍山綫',WRL:'西鐵綫'};
+const MTR_LINE={TWL:'荃灣綫',ISL:'港島綫',KTL:'觀塘綫',EAL:'東鐵綫',TKL:'將軍澳綫',TCL:'東涌綫',AEL:'機場快綫',SIL:'南港島綫',TML:'屯馬綫'};
+// 港鐵各綫站點（rt.data.gov.hk 站碼）
+const MTR_LINE_STATIONS={
+  TWL:[{c:'TSW',n:'荃灣'},{c:'TWH',n:'大窩口'},{c:'KWH',n:'葵興'},{c:'KWF',n:'葵芳'},{c:'LAK',n:'荔景'},{c:'MEF',n:'美孚'},{c:'LCK',n:'茘枝角'},{c:'CSW',n:'長沙灣'},{c:'SSP',n:'深水埗'},{c:'PRE',n:'太子'},{c:'MOK',n:'旺角'},{c:'YMT',n:'油麻地'},{c:'JOR',n:'佐敦'},{c:'TST',n:'尖沙咀'},{c:'ADM',n:'金鐘'},{c:'CEN',n:'中環'}],
+  ISL:[{c:'KET',n:'堅尼地城'},{c:'HKU',n:'香港大學'},{c:'SYP',n:'西營盤'},{c:'SHW',n:'上環'},{c:'CEN',n:'中環'},{c:'ADM',n:'金鐘'},{c:'WAC',n:'灣仔'},{c:'CWB',n:'銅鑼灣'},{c:'TIH',n:'天后'},{c:'FOR',n:'炮台山'},{c:'NOP',n:'北角'},{c:'QUB',n:'鰂魚涌'},{c:'TAK',n:'太古'},{c:'SWH',n:'筲箕灣'},{c:'HFC',n:'杏花邨'},{c:'CHW',n:'柴灣'}],
+  KTL:[{c:'WHA',n:'黃埔'},{c:'HUH',n:'紅磡'},{c:'HOM',n:'何文田'},{c:'YMT',n:'油麻地'},{c:'MOK',n:'旺角'},{c:'PRE',n:'太子'},{c:'SKM',n:'石硤尾'},{c:'KOT',n:'九龍塘'},{c:'LOF',n:'樂富'},{c:'WTS',n:'黃大仙'},{c:'DIH',n:'鑽石山'},{c:'CHH',n:'彩虹'},{c:'HAH',n:'坑口'},{c:'TKO',n:'將軍澳'},{c:'TIK',n:'調景嶺'}],
+  TKL:[{c:'NOP',n:'北角'},{c:'QUB',n:'鰂魚涌'},{c:'YAT',n:'油塘'},{c:'TIK',n:'調景嶺'},{c:'TKO',n:'將軍澳'},{c:'HAH',n:'坑口'},{c:'POA',n:'寶琳'},{c:'LHP',n:'康城(支線)'}],
+  TCL:[{c:'HOK',n:'香港'},{c:'KOL',n:'九龍'},{c:'KOW',n:'柯士甸'},{c:'NAC',n:'南昌'},{c:'OLY',n:'奧運'},{c:'MEF',n:'美孚'},{c:'TWW',n:'荃灣西'},{c:'TSY',n:'青衣'},{c:'YOL',n:'欣澳'},{c:'TUC',n:'東涌'}],
+  AEL:[{c:'HOK',n:'香港'},{c:'KOL',n:'九龍'},{c:'TSY',n:'青衣'},{c:'AWE',n:'博覽館'},{c:'AIR',n:'機場'}],
+  EAL:[{c:'HUH',n:'紅磡'},{c:'MKK',n:'旺角東'},{c:'HOM',n:'何文田'},{c:'KOT',n:'九龍塘'},{c:'TAW',n:'大圍'},{c:'SHT',n:'沙田'},{c:'FOT',n:'火炭'},{c:'UNI',n:'大學'},{c:'TAP',n:'大埔墟'},{c:'TWO',n:'太和'},{c:'FAN',n:'粉嶺'},{c:'SHS',n:'上水'},{c:'LOW',n:'羅湖'},{c:'LMC',n:'落馬洲'}],
+  SIL:[{c:'ADM',n:'金鐘'},{c:'OCP',n:'海洋公園'},{c:'LET',n:'利東'},{c:'WHC',n:'黃竹坑'},{c:'SOH',n:'海怡半島'}],
+  TML:[{c:'TUM',n:'屯門'},{c:'SIH',n:'兆康'},{c:'TIS',n:'天水圍'},{c:'LON',n:'朗屏'},{c:'YUL',n:'元朗'},{c:'KSR',n:'錦上路'},{c:'TWW',n:'荃灣西'},{c:'MEF',n:'美孚'},{c:'NAC',n:'南昌'},{c:'AUS',n:'柯士甸'},{c:'ETS',n:'尖東'},{c:'HUH',n:'紅磡'},{c:'HIK',n:'顯田'},{c:'TAW',n:'大圍'},{c:'CKT',n:'圓洲角'},{c:'SHM',n:'沙田圍'},{c:'STK',n:'石門'},{c:'MOS',n:'馬場'},{c:'WKS',n:'烏溪沙'}],
+};
 
 async function fetchMTRNearby(lat,lng){
   const stn=nearestOf(MTR_STNS,lat,lng);
