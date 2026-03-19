@@ -311,10 +311,11 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page" id="page-news">
   <div class="feed-page">
     <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ntab-all"     onclick="switchNewsFeed('all')">📋 全部</button>
-      <button class="sub-tab"        id="ntab-local"   onclick="switchNewsFeed('local')">📻 RTHK本地</button>
-      <button class="sub-tab"        id="ntab-world"   onclick="switchNewsFeed('world')">🌍 RTHK國際</button>
-      <button class="sub-tab"        id="ntab-mingpao" onclick="switchNewsFeed('mingpao')">📰 明報</button>
+      <button class="sub-tab active" id="ntab-all"   onclick="switchNewsFeed('all')">📋 全部</button>
+      <button class="sub-tab"        id="ntab-local" onclick="switchNewsFeed('local')">📻 RTHK本地</button>
+      <button class="sub-tab"        id="ntab-world" onclick="switchNewsFeed('world')">🌍 RTHK國際</button>
+      <button class="sub-tab"        id="ntab-hket"  onclick="switchNewsFeed('hket')">💹 經濟日報</button>
+      <button class="sub-tab"        id="ntab-govhk" onclick="switchNewsFeed('govhk')">🏛️ 政府新聞</button>
     </div>
     <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
       <span id="news-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
@@ -424,7 +425,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         九巴：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb" target="_blank">九巴開放數據 API</a><br>
         城巴：<a href="https://data.one.gov.hk/zh-hant/dataset/citybus-eta" target="_blank">城巴實時到站 API</a><br>
         港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
-        新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台（RTHK）</a>、<a href="https://news.mingpao.com" target="_blank">明報即時新聞</a><br>
+        新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台（RTHK）</a>、<a href="https://www.hket.com/rss" target="_blank">香港經濟日報</a>、<a href="https://www.news.gov.hk/chi/index.html" target="_blank">政府新聞處</a><br>
         交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
         © 2026 生活日常。保留所有權利。
@@ -899,11 +900,12 @@ function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer(
 
 
 const NEWS_FEEDS = {
-  local:   { name:'RTHK 本地新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
-  world:   { name:'RTHK 國際新聞',   url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
-  mingpao: { name:'明報即時新聞',     url:'https://news.mingpao.com/rss/ins/all.xml' },
+  local:  { name:'RTHK 本地新聞',  url:'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
+  world:  { name:'RTHK 國際新聞',  url:'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
+  hket:   { name:'經濟日報 港聞',  url:'https://www.hket.com/rss/hongkong' },
+  govhk:  { name:'政府新聞處',     url:'https://www.news.gov.hk/rss/news/topstories_tc.xml' },
 };
-const NEWS_FEED_KEYS = ['local','world','mingpao'];
+const NEWS_FEED_KEYS = ['local','world','hket','govhk'];
 // Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
 const TRAFFIC_SOURCES = {
   td:   {
@@ -1081,8 +1083,8 @@ async function fetchTrafficDirect(src){
 // ─────────────────────────────────────────────────────────────────────────────
 //  NEWS RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
-const SRC_LABEL={'local':'RTHK本地','world':'RTHK國際','mingpao':'明報'};
-const SRC_COLOR={'local':'#5b8fff','world':'#2ed573','mingpao':'#f0a500'};
+const SRC_LABEL={'local':'RTHK本地','world':'RTHK國際','hket':'經濟日報','govhk':'政府新聞'};
+const SRC_COLOR={'local':'#5b8fff','world':'#2ed573','hket':'#f0a500','govhk':'#c084fc'};
 
 function renderFeedItems(items,el,srcKey,showSrc){
   if(!items?.length){
@@ -1096,8 +1098,9 @@ function renderFeedItems(items,el,srcKey,showSrc){
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button onclick="reloadCurrentFeed()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 18px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button>
         ${srcKey==='local'||srcKey==='all'?`<a href="https://news.rthk.hk" target="_blank" style="background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.3);color:#7ba8ff;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK 網站</a>`:''}
-        ${srcKey==='world'||srcKey==='all'?`<a href="https://news.rthk.hk/rthk/ch/component/k2/categories.htm?catCode=2" target="_blank" style="background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.3);color:#2ed573;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK國際</a>`:''}
-        ${srcKey==='mingpao'||srcKey==='all'?`<a href="https://news.mingpao.com" target="_blank" style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--amb2);border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 明報網站</a>`:''}
+        ${srcKey==='world'||srcKey==='all'?`<a href="https://news.rthk.hk/rthk/ch/latest-news/world-news.htm" target="_blank" style="background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.3);color:#2ed573;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 RTHK國際</a>`:''}
+        ${srcKey==='hket'||srcKey==='all'?`<a href="https://www.hket.com" target="_blank" style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--amb2);border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 經濟日報</a>`:''}
+        ${srcKey==='govhk'||srcKey==='all'?`<a href="https://www.news.gov.hk/chi/index.html" target="_blank" style="background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.3);color:#c084fc;border-radius:9px;padding:9px 18px;font-size:13px;font-family:var(--sans);text-decoration:none">🔗 政府新聞處</a>`:''}
       </div>
     </div>`;
     return;
