@@ -60,13 +60,20 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 /* forecast strip */
 .w-fore{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin-bottom:8px}
 .w-fore::-webkit-scrollbar{display:none}
-.fc{display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:4px 6px;flex-shrink:0;min-width:48px}
+.fc{display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:5px 6px 6px;flex-shrink:0;min-width:66px}
 .fc.hl{background:var(--bg4);border-color:var(--amb-bdr)}
-.fc-lbl{font-size:10px;color:var(--mid);font-family:var(--mono)}
-.fc-lbl.named{font-size:11px;font-weight:700;color:var(--amb2)}
-.fc-ico{font-size:17px;margin:1px 0}
-.fc-tt{font-family:var(--mono);font-size:10px;display:flex;gap:3px}
+.fc-date{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--bright);line-height:1.2}
+.fc-date.named{color:var(--amb2)}
+.fc-day{font-size:9px;color:var(--mid);line-height:1.1;margin-bottom:1px}
+.fc-day.named{color:var(--amb2);font-weight:600}
+.fc-ico{font-size:18px;margin:2px 0 1px}
+.fc-tt{font-family:var(--mono);font-size:10px;display:flex;gap:2px;align-items:baseline}
 .fc-hi{color:#ff8c5a}.fc-lo{color:var(--blu)}
+.fc-sep{color:var(--dim);font-size:9px}
+.fc-rh{font-family:var(--mono);font-size:9px;color:#7ba8ff;margin-top:1px}
+.fc-psr{font-size:9px;color:var(--mid);margin-top:1px;display:flex;align-items:center;gap:2px}
+.fc-psr-dot{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.fc-psr-dot.low{background:#2ed573}.fc-psr-dot.medlow{background:#7ba8ff}.fc-psr-dot.med{background:#f0a500}.fc-psr-dot.medhigh{background:#ff7b5a}.fc-psr-dot.high{background:#ff4757}
 /* extra weather stats row */
 .w-hum-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(91,143,255,.1);border:1px solid rgba(91,143,255,.28);border-radius:6px;padding:3px 8px;margin-top:4px;cursor:pointer}
 .w-hum-val{font-family:var(--mono);font-size:16px;font-weight:700;color:#7ba8ff;line-height:1}
@@ -722,9 +729,25 @@ async function loadWeather(){
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
     document.getElementById('w-fore').innerHTML=fcs.slice(0,9).map((f,i)=>{
       const ds=String(f.forecastDate);
-      const lbl=i===0?'今日':i===1?'明天':i===2?'後天':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
-      const hl=i===1||i===2;
-      return`<div class="fc${hl?' hl':''}"><div class="fc-lbl${hl?' named':''}">${lbl}</div><div class="fc-ico">${W_ICONS[f.forecastWeather??f.ForecastIcon??f.forecastIcon]??'🌡'}</div><div class="fc-tt"><span class="fc-hi">${num(f.forecastMaxtemp)??'--'}°</span><span class="fc-lo">${num(f.forecastMintemp)??'--'}°</span></div></div>`;
+      const dateLbl=i===0?'今日':i===1?'明日':i===2?'後日':`${ds.slice(4,6)}/${ds.slice(6,8)}`;
+      const weekLbl=f.week||(i===0?`星期${DAY[new Date().getDay()]}`:i===1?`星期${DAY[(new Date().getDay()+1)%7]}`:i===2?`星期${DAY[(new Date().getDay()+2)%7]}`:'');
+      const hl=i===0||i===1||i===2;
+      const maxT=num(f.forecastMaxtemp)??'--';
+      const minT=num(f.forecastMintemp)??'--';
+      const maxRH=num(f.forecastMaxrh)??null;
+      const minRH=num(f.forecastMinrh)??null;
+      const rhStr=maxRH!=null&&minRH!=null?`${minRH}-${maxRH}%`:maxRH!=null?`${maxRH}%`:'';
+      const psr=f.PSR||'';
+      const psrDotClass=psr==='低'?'low':psr==='中低'?'medlow':psr==='中'?'med':psr==='中高'?'medhigh':psr==='高'?'high':'low';
+      const psrHtml=psr?`<div class="fc-psr"><span class="fc-psr-dot ${psrDotClass}"></span>${psr}</div>`:'';
+      return`<div class="fc${hl?' hl':''}">
+        <div class="fc-date${hl?' named':''}">${dateLbl}</div>
+        <div class="fc-day${hl?' named':''}">${weekLbl}</div>
+        <div class="fc-ico">${W_ICONS[f.forecastWeather??f.ForecastIcon??f.forecastIcon]??'🌡'}</div>
+        <div class="fc-tt"><span class="fc-lo">${minT}°</span><span class="fc-sep">|</span><span class="fc-hi">${maxT}°</span></div>
+        ${rhStr?`<div class="fc-rh">💧${rhStr}</div>`:''}
+        ${psrHtml}
+      </div>`;
     }).join('');
     loadExtraWeather();
   }catch(e){console.warn('[weather]',e)}
