@@ -145,6 +145,32 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .empty-text{font-size:15px;margin-bottom:4px}
 .empty-sub{font-size:12px;color:var(--dim);line-height:1.6}
 
+/* ══ BUS CARD V2 ══ */
+.bus-card-v2{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden;animation:slideIn .2s ease both;position:relative;user-select:none;transition:border-color .15s,opacity .15s}
+.bus-card-v2::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dim);border-radius:12px 0 0 12px;transition:background .25s}
+.bus-card-v2.soon::before{background:var(--red)}.bus-card-v2.coming::before{background:var(--amb)}.bus-card-v2.ok::before{background:var(--grn)}
+.bus-card-v2.card-ghost{opacity:.25}.bus-card-v2.card-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04)}.bus-card-v2.card-slot::before{background:transparent}
+.bcv2-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);padding:10px 7px;min-width:68px;max-width:68px;flex-shrink:0}
+.bcv2-route-no{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--amb2);letter-spacing:-1px;line-height:1;text-align:center;word-break:break-all}
+.bcv2-co-name{font-size:9px;color:var(--mid);margin-top:3px;line-height:1.4;text-align:center;white-space:nowrap}
+.bcv2-mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:9px 6px 9px 10px}
+.bcv2-dest-lbl{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;color:var(--bright)}
+.bcv2-stop-lbl{font-size:11px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bcv2-etas{display:flex;flex-direction:column;justify-content:center;padding:7px 10px 7px 2px;flex-shrink:0;gap:2px;min-width:118px}
+.bcv2-eta-row{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.bcv2-eta-co{font-size:9px;color:var(--dim);flex-shrink:0;min-width:22px;text-align:left}
+.bcv2-eta-time{font-family:var(--mono);font-size:11px;color:var(--mid);flex-shrink:0;min-width:38px;text-align:right}
+.bcv2-eta-mins{font-family:var(--mono);font-size:11px;font-weight:600;border-radius:5px;padding:1px 6px;text-align:center;flex-shrink:0;min-width:32px}
+.bcv2-eta-mins.sc{background:rgba(255,71,87,.18);color:var(--red)}
+.bcv2-eta-mins.cc{background:rgba(240,165,0,.13);color:var(--amb2)}
+.bcv2-eta-mins.oc{color:var(--grn)}
+.bcv2-eta-row.e-first .bcv2-eta-time{font-size:13px;color:var(--bright)}
+.bcv2-eta-row.e-first .bcv2-eta-mins{font-size:14px;font-weight:700;padding:2px 7px}
+.bcv2-eta-row.e-first .bcv2-eta-co{font-size:10px;color:var(--amb2)}
+.bcv2-rm-btn{display:flex;align-items:center;background:none;border:none;color:var(--dim);font-size:17px;padding:0 10px;cursor:pointer;flex-shrink:0;transition:color .15s;align-self:stretch}
+.bcv2-rm-btn:active{color:var(--red)}
+.bcv2-drag-hdl{display:flex;align-items:center;justify-content:center;padding:0 5px;color:var(--dim);font-size:16px;cursor:grab;flex-shrink:0;touch-action:none;letter-spacing:-2px}
+
 /* ══ NEWS & TRAFFIC PAGES ══ */
 .feed-page{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .sub-tab-bar{flex-shrink:0;display:flex;background:var(--bg2);border-bottom:1px solid var(--bdr);padding:8px 12px;gap:7px;overflow-x:auto;scrollbar-width:none}
@@ -329,7 +355,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     <div class="bus-hdr">
       <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
       <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
-      <button class="eta-mode-btn mins" id="eta-mode-btn" onclick="toggleEtaMode()">⏱ 距離</button>
     </div>
     <div class="dist-row" id="dist-row" style="display:none">
       <span class="dist-lbl">距離：</span>
@@ -625,6 +650,19 @@ const WARN_MAP={WTCSGNL:'熱帶氣旋',WRAINA:'黃色暴雨',WRAINB:'紅色暴�
 const AMB_WARNS=new Set(['WHOT','WCOLD','WFROST','WTHUNDER']);
 const DAY=['日','一','二','三','四','五','六'];
 const NEARBY_PID='__nearby__';
+const _fareCache={};
+async function fetchKMBFare(route,dir,svcType){
+  const bound=(dir==='O'||dir==='outbound')?'outbound':'inbound';
+  const key=`kmb_${route}_${bound}_${svcType}`;
+  if(_fareCache[key]!==undefined)return _fareCache[key];
+  try{
+    const d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+    const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
+    const maxFare=fares.length?Math.max(...fares):null;
+    _fareCache[key]=maxFare!==null?Math.round(maxFare*10)/10:null;
+    return _fareCache[key];
+  }catch{_fareCache[key]=null;return null;}
+}
 const pad=n=>String(n).padStart(2,'0');
 
 function haverDist(la1,ln1,la2,ln2){
@@ -1928,12 +1966,7 @@ async function doRefresh(){
 // ═══════════════════════════════════
 //  ETA MODE
 // ═══════════════════════════════════
-function toggleEtaMode(){
-  etaMode=etaMode==='mins'?'clock':'mins';localStorage.setItem('eta_mode',etaMode);
-  const btn=document.getElementById('eta-mode-btn');
-  if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}
-  if(activePid===NEARBY_PID)loadNearby();else renderBusList();
-}
+function toggleEtaMode(){/* removed - v2 always shows time+mins */}
 
 // ═══════════════════════════════════
 //  DISTANCE SELECTOR
@@ -2020,25 +2053,106 @@ document.addEventListener('touchend',()=>{if(TD.idx===-1)return;if(TD.on){TD.clo
 // ═══════════════════════════════════
 //  ETA FORMATTING (vertical)
 // ═══════════════════════════════════
+// fmtEtas kept for legacy call compatibility (not used in v2 cards)
 function fmtEtas(etas,cc,now){
-  const fmt=(ts,cls)=>{
-    if(etaMode==='mins'){const m=Math.round((ts-now)/60000);return`<div class="${cls}">${m<=0?'即將':m+'分'}</div>`}
-    const dv=new Date(ts);return`<div class="${cls}">${pad(dv.getHours())}:${pad(dv.getMinutes())}</div>`;
-  };
-  return(etas[0]?fmt(etas[0],`e1 ${cc}`):'')+(etas[1]?fmt(etas[1],'e2'):'')+(etas[2]?fmt(etas[2],'e3'):'');
+  return(etas||[]).slice(0,3).map((ts,i)=>{
+    const m=Math.round((ts-now)/60000);const dv=new Date(ts);
+    const cls=i===0?`e1 ${cc}`:i===1?'e2':'e3';
+    return`<div class="${cls}">${m<=0?'即將':m+'分'}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+//  BUS CARD V2 RENDERER
+// ═══════════════════════════════════
+function renderBusCardV2({route,dest,stopName,dist,fare,companyType,etasWithType,idx,dragIdx,clickFn,removeFn}){
+  const now=Date.now();
+  const validEtas=(etasWithType||[]).filter(e=>e.ts>now-30000).slice(0,3);
+  const firstM=validEtas.length?Math.round((validEtas[0].ts-now)/60000):null;
+  const urgency=firstM===null?'':firstM<=2?'soon':firstM<=8?'coming':'ok';
+  const isCTB=companyType==='ctb',isLRT=companyType==='lrt',isMTR=companyType==='mtr',isJoint=companyType==='joint';
+  const coLabel=isJoint?'九巴+城巴':isCTB?'城巴':isLRT?'輕鐵':isMTR?'港鐵':'九巴';
+  const badgeBg=isCTB?'rgba(46,213,115,.1)':isLRT?'rgba(255,165,0,.1)':isMTR?'rgba(255,71,87,.12)':'var(--amb-bg)';
+  const badgeBdr=isCTB?'rgba(46,213,115,.3)':isLRT?'rgba(255,165,0,.35)':isMTR?'rgba(255,71,87,.35)':'var(--amb-bdr)';
+  const routeCol=isCTB?'#2ed573':isLRT?'#ffaa33':isMTR?'#ff8a96':'var(--amb2)';
+  let etaHtml='';
+  if(!validEtas.length){
+    etaHtml=`<div style="font-family:var(--mono);font-size:11px;color:var(--dim)">無班次</div>`;
+  }else{
+    etaHtml=validEtas.map((e,i)=>{
+      const m=Math.round((e.ts-now)/60000);
+      const dv=new Date(e.ts);
+      const timeStr=`${pad(dv.getHours())}:${pad(dv.getMinutes())}`;
+      const minStr=m<=0?'即將':m+'分';
+      const mc=m<=2?'sc':m<=8?'cc':'oc';
+      const coTag=isJoint?(e.type==='ctb'?'城巴':e.type==='lrt'?'輕':e.type==='mtr'?'港鐵':'九巴'):'';
+      return`<div class="bcv2-eta-row${i===0?' e-first':''}">
+        ${isJoint?`<span class="bcv2-eta-co">${coTag}</span>`:''}
+        <span class="bcv2-eta-time">${timeStr}</span>
+        <span class="bcv2-eta-mins ${mc}">${minStr}</span>
+      </div>`;
+    }).join('');
+  }
+  const distStr=dist?`${dist}m`:'';
+  const fareStr=fare!=null?`($${fare})`:'';
+  const stopInfo=stopName+(distStr?` - ${distStr}`:'')+(fareStr?`  ${fareStr}`:'');
+  const dragHtml=dragIdx!==undefined?`<div class="bcv2-drag-hdl" ontouchstart="busDragStart(event,${dragIdx})">⠿</div>`:'';
+  const rmHtml=removeFn?`<button class="bcv2-rm-btn" onclick="${removeFn}">×</button>`:'';
+  const clickAttr=clickFn?`onclick="${clickFn}"`:'';
+  return`<div class="bus-card-v2 ${urgency}" style="animation-delay:${idx*.04}s" ${clickAttr}>
+    ${dragHtml}
+    <div class="bcv2-badge" style="background:${badgeBg};border-color:${badgeBdr}">
+      <div class="bcv2-route-no" style="color:${routeCol}">${route}</div>
+      <div class="bcv2-co-name">${coLabel}</div>
+    </div>
+    <div class="bcv2-mid">
+      <div class="bcv2-dest-lbl">往 ${dest}</div>
+      <div class="bcv2-stop-lbl">${stopInfo}</div>
+    </div>
+    <div class="bcv2-etas">${etaHtml}</div>
+    ${rmHtml}
+  </div>`;
 }
 
 // ═══════════════════════════════════
 //  NEARBY
 // ═══════════════════════════════════
 async function fetchAllStops(){if(allStops)return allStops;const data=await fetch(`${KMB}/stop`).then(r=>r.json());allStops=data.data||[];return allStops}
+// ── CTB nearby raw data helper ─────────────────────────────────────────────
+async function _fetchCTBNearbyRaw(lat,lng,radius){
+  if(!window._ctbStops){
+    try{const d=await fetch(`${CTB}/stop`).then(r=>r.json());window._ctbStops=d.data||[];}catch{window._ctbStops=[];}
+  }
+  const nearbyCTB=(window._ctbStops||[])
+    .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude||0),parseFloat(s.long||s.longitude||0))}))
+    .filter(s=>s.dist<=radius&&!isNaN(s.dist)&&s.dist>0)
+    .sort((a,b)=>a.dist-b.dist).slice(0,8);
+  const now=Date.now();const results=[];
+  await Promise.all(nearbyCTB.map(async stop=>{
+    try{
+      const d=await fetch(`${CTB}/eta/CTB/${stop.stop}/all`).then(r=>r.json());
+      const seen=new Set();
+      (d.data||[]).forEach(e=>{
+        if(!e.eta)return;const ts=new Date(e.eta).getTime();
+        if(ts<now-30000)return;
+        const key=`${e.route}_${e.dir||'O'}`;
+        if(!seen.has(key)){
+          seen.add(key);
+          results.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc||stop.stop,stopId:stop.stop,dist:Math.round(stop.dist),dir:e.dir||'O',etasWithType:[{ts,type:'ctb'}]});
+        }else{
+          const ex=results.find(r=>r.route===e.route&&r.stopId===stop.stop);
+          if(ex&&ex.etasWithType.length<3)ex.etasWithType.push({ts,type:'ctb'});
+        }
+      });
+    }catch{}
+  }));
+  return results;
+}
+
 async function loadNearby(){
   const el=document.getElementById('bus-list');el.innerHTML=`<div class="spinner"></div>`;
   if(!nearbyLat){
-    if(!navigator.geolocation){
-      el.innerHTML=`<div class="msg">此裝置不支援定位</div>`;return
-    }
-    // Show a friendly prompt explaining why location is needed
+    if(!navigator.geolocation){el.innerHTML=`<div class="msg">此裝置不支援定位</div>`;return}
     el.innerHTML=`<div class="msg" style="padding:30px 20px">
       <div style="font-size:32px;margin-bottom:12px">📍</div>
       <div style="font-size:15px;color:var(--bright);margin-bottom:8px">需要位置權限</div>
@@ -2053,67 +2167,118 @@ async function loadNearby(){
     const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,12);
     if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
-    const now=Date.now();const rows=[];
-    etaResults.forEach((res,i)=>{const stop=nearby[i];const seen=new Set();(res.data||[]).forEach(e=>{if(!e.eta)return;const ts=new Date(e.eta).getTime();if(ts<now-30000)return;const key=`${e.route}_${e.dir}_${stop.stop}`;if(!seen.has(key)){seen.add(key);rows.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,_etas:[ts]})}else{const ex=rows.find(r=>r.route===e.route&&r.dir===e.dir&&r.stopId===stop.stop);if(ex&&ex._etas.length<3)ex._etas.push(ts)}})});
-    // Optionally add CTB/MTR results
-    const ts=getTransportSettings();
-    if(ts.ctb){
-      try{const ctbRows=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbRows)}catch{}
+    const now=Date.now();
+    // routeMap key = route+dir, value = display row data
+    const routeMap=new Map();
+    etaResults.forEach((res,i)=>{
+      const stop=nearby[i];
+      (res.data||[]).forEach(e=>{
+        if(!e.eta)return;const ts=new Date(e.eta).getTime();
+        if(ts<now-30000)return;
+        const key=`${e.route}_${e.dir}`;
+        if(!routeMap.has(key)){
+          routeMap.set(key,{route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,companyType:'kmb',etasWithType:[{ts,type:'kmb'}],fare:null});
+        }else{
+          const ex=routeMap.get(key);
+          if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===ts))ex.etasWithType.push({ts,type:'kmb'});
+        }
+      });
+    });
+    // CTB
+    const ts_s=getTransportSettings();
+    if(ts_s.ctb){
+      try{
+        const ctbRows=await _fetchCTBNearbyRaw(nearbyLat,nearbyLng,nearbyDist);
+        ctbRows.forEach(r=>{
+          // Try to match with existing KMB entry (joint route)
+          const matchKey=routeMap.has(`${r.route}_O`)?`${r.route}_O`:routeMap.has(`${r.route}_I`)?`${r.route}_I`:null;
+          if(matchKey){
+            const ex=routeMap.get(matchKey);ex.companyType='joint';
+            r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
+            ex.etasWithType.sort((a,b)=>a.ts-b.ts);
+          }else{
+            const newKey=`${r.route}_CTB_${r.stopId}`;
+            if(!routeMap.has(newKey)){
+              routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
+            }else{
+              const ex=routeMap.get(newKey);
+              r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
+            }
+          }
+        });
+      }catch(e){console.warn('[CTB nearby v2]',e);}
     }
-    if(ts.mtr){
-      try{const mtrRows=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrRows)}catch{}
+    // MTR
+    if(ts_s.mtr){
+      try{
+        const mtrRows=await fetchMTRNearby(nearbyLat,nearbyLng);
+        mtrRows.forEach((r,i)=>{
+          routeMap.set(`MTR_${r.route}_${r.dest}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'U',companyType:'mtr',etasWithType:r._etas.map(ts=>({ts,type:'mtr'})),fare:null});
+        });
+      }catch(e){console.warn('[MTR nearby]',e);}
     }
-
-    // Add CTB / MTR if enabled in settings
-    const _ts=getTransportSettings();
-    if(_ts.ctb){try{const ctbR=await fetchCTBNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...ctbR)}catch(e){console.warn('[CTB]',e)}}
-    if(_ts.mtr){try{const mtrR=await fetchMTRNearby(nearbyLat,nearbyLng);rows.push(...mtrR)}catch(e){console.warn('[MTR]',e)}}
-    if(_ts.lrt){try{const lrtR=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);rows.push(...lrtR)}catch(e){console.warn('[LRT]',e)}}
-
-    rows.sort((a,b)=>a._etas[0]-b._etas[0]);
+    // LRT
+    if(ts_s.lrt){
+      try{
+        const lrtRows=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);
+        lrtRows.forEach((r,i)=>{
+          routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'lrt',etasWithType:r._etas.map(ts=>({ts,type:'lrt'})),fare:null});
+        });
+      }catch(e){console.warn('[LRT nearby]',e);}
+    }
+    let rows=[...routeMap.values()].filter(r=>r.etasWithType.length>0);
+    rows.sort((a,b)=>a.etasWithType[0].ts-b.etasWithType[0].ts);
     if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
-    const now2=Date.now();
-    el.innerHTML=rows.slice(0,25).map((r,i)=>{
-      const m=Math.round((r._etas[0]-now2)/60000);
-      const urgency=m<=2?'soon':m<=8?'coming':'ok';
-      const cc=m<=2?'sc':m<=8?'cc':'oc';
-      const isMTR=r.type==='mtr';
-      const isCTB=r.type==='ctb';
-      const isLRT=r.type==='lrt';
-      const badgeStyle=isMTR?'background:rgba(255,71,87,.12);color:#ff8a96;border-color:rgba(255,71,87,.35);'
-                      :isCTB?'background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.3);'
-                      :isLRT?'background:rgba(255,165,0,.1);color:#ffaa33;border-color:rgba(255,165,0,.3);':'';
-      const typeTag=isMTR?`<span style="font-size:9px;background:rgba(255,71,87,.15);color:#ff8a96;border-radius:4px;padding:1px 5px;margin-left:4px">MTR</span>`
-                   :isCTB?`<span style="font-size:9px;background:rgba(46,213,115,.12);color:#2ed573;border-radius:4px;padding:1px 5px;margin-left:4px">CTB</span>`
-                   :isLRT?`<span style="font-size:9px;background:rgba(255,165,0,.12);color:#ffaa33;border-radius:4px;padding:1px 5px;margin-left:4px">輕鐵</span>`:'';
-      const clickFn=isMTR?'':`onclick="openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')"`;
-      return`<div class="bus-card ${urgency}" style="animation-delay:${i*.03}s" ${clickFn}><div class="bus-badge" style="${badgeStyle}">${r.route}</div><div class="bus-info"><div class="bus-stop">${r.stopName}${typeTag}<span class="nearby-dist">${r.dist}m</span></div><div class="bus-dest">往 ${r.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${fmtEtas(r._etas,cc,now2)}</div></div></div>`;
-    }).join('');
-  }catch(e){console.warn('[nearby]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
+    const renderRows=rows.slice(0,25);
+    el.innerHTML=renderRows.map((r,i)=>renderBusCardV2({
+      ...r,idx:i,
+      clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null,
+    })).join('');
+    // Fetch fares in background and update stop labels
+    renderRows.forEach((r,i)=>{
+      if(r.companyType==='kmb'||r.companyType==='joint'){
+        fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{
+          if(fare==null)return;
+          const cards=el.querySelectorAll('.bus-card-v2');
+          if(cards[i]){const sl=cards[i].querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${fare})`;}}
+        });
+      }
+    });
+  }catch(e){console.warn('[nearby v2]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
-
 // ═══════════════════════════════════
 //  SAVED ROUTES
 // ═══════════════════════════════════
-async function fetchOneETA(fav){try{const data=await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());fav._etas=(data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());fav._first=fav._etas[0]??null;fav._err=false}catch{fav._etas=[];fav._first=null;fav._err=true}}
+async function fetchOneETA(fav){
+  try{
+    const data=await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r=>r.json());
+    fav._etas=(data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());
+    fav._first=fav._etas[0]??null;fav._err=false;
+  }catch{fav._etas=[];fav._first=null;fav._err=true;}
+  // Fetch fare lazily (KMB only)
+  if((fav.type==='kmb'||!fav.type)&&fav._fare==null){
+    fetchKMBFare(fav.route,'O',fav.serviceType).then(fare=>{if(fare!=null)fav._fare=fare;});
+  }
+}
 async function refreshAllETAs(){if(activePid===NEARBY_PID){loadNearby();return}favs=loadFavs(activePid);if(!favs.length){renderBusList();return}await Promise.all(favs.map(fetchOneETA));renderBusList()}
 function renderBusList(){
   const el=document.getElementById('bus-list');
   if(!favs.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">未有路線</div><div class="empty-sub">點擊「加路線」搜尋九巴班次</div></div>`;return}
-  const now=Date.now();
   el.innerHTML=favs.map((f,i)=>{
-    const m=f._first!=null?Math.round((f._first-now)/60000):null;
-    const urgency=m===null?'':m<=2?'soon':m<=8?'coming':'ok';
-    const cc=m===null?'oc':m<=2?'sc':m<=8?'cc':'oc';
-    let ec='';if(f._err)ec=`<div class="e-none">無數據</div>`;else if(!f._etas?.length)ec=`<div class="e-none">無班次</div>`;else ec=fmtEtas(f._etas,cc,now);
-    const tLabel=f.type==='ctb'?'<span style="font-size:9px;color:#2ed573;margin-left:4px">城巴</span>':f.type==='mtr'?'<span style="font-size:9px;color:#ff8a96;margin-left:4px">港鐵</span>':f.type==='lrt'?'<span style="font-size:9px;color:#ffaa33;margin-left:4px">輕鐵</span>':'<span style="font-size:9px;color:var(--dim);margin-left:4px">九巴</span>';
-    return`<div class="bus-card ${urgency}" style="animation-delay:${i*.04}s" onclick="openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')"><div class="drag-handle" ontouchstart="busDragStart(event,${i})">⠿</div><div class="bus-badge">${f.route}${tLabel}</div><div class="bus-info"><div class="bus-stop">${f.stopName}</div><div class="bus-dest">往 ${f.dest}</div></div><div class="bus-eta-wrap"><div class="eta-col">${ec}</div></div><button class="bus-rm" onclick="removeFav(event,${i})">×</button></div>`;
+    const coType=f.type==='ctb'?'ctb':f.type==='mtr'?'mtr':f.type==='lrt'?'lrt':'kmb';
+    const etasWithType=(f._etas||[]).map(ts=>({ts,type:coType}));
+    return renderBusCardV2({
+      route:f.route,dest:f.dest,stopName:f.stopName,dist:null,fare:f._fare??null,
+      companyType:coType,etasWithType,idx:i,dragIdx:i,
+      clickFn:`openBusDetail('${esc(f.route)}','${f.serviceType}','${esc(f.dest)}','${f.stopId}')`,
+      removeFn:`removeFav(event,${i})`,
+    });
   }).join('');
 }
 function removeFav(e,i){e.stopPropagation();if(!confirm(`確定移除「${favs[i]?.route} 往 ${favs[i]?.dest}」？`))return;favs.splice(i,1);saveFavs(activePid,favs);renderBusList()}
 let BD={on:false,idx:-1,to:-1,clone:null,startY:0,startTop:0,cardH:0};
-function busDragStart(e,idx){e.stopPropagation();const card=document.querySelectorAll('.bus-card')[idx];if(!card)return;const rect=card.getBoundingClientRect();BD={on:true,idx,to:idx,startY:e.touches[0].clientY,startTop:rect.top,cardH:rect.height+9,clone:null};const cl=card.cloneNode(true);cl.className='float-clone';cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;border-radius:12px`;document.body.appendChild(cl);BD.clone=cl;card.classList.add('card-ghost')}
-document.addEventListener('touchmove',e=>{if(!BD.on)return;const dy=e.touches[0].clientY-BD.startY;BD.clone.style.top=(BD.startTop+dy)+'px';const ni=Math.max(0,Math.min(favs.length-1,BD.idx+Math.round(dy/BD.cardH)));if(ni!==BD.to){BD.to=ni;document.querySelectorAll('.bus-card').forEach((c,i)=>c.classList.toggle('card-slot',i===ni&&i!==BD.idx))}},{passive:true});
+function busDragStart(e,idx){e.stopPropagation();const card=document.querySelectorAll('.bus-card-v2')[idx];if(!card)return;const rect=card.getBoundingClientRect();BD={on:true,idx,to:idx,startY:e.touches[0].clientY,startTop:rect.top,cardH:rect.height+9,clone:null};const cl=card.cloneNode(true);cl.className='float-clone';cl.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;border-radius:12px`;document.body.appendChild(cl);BD.clone=cl;card.classList.add('card-ghost')}
+document.addEventListener('touchmove',e=>{if(!BD.on)return;const dy=e.touches[0].clientY-BD.startY;BD.clone.style.top=(BD.startTop+dy)+'px';const ni=Math.max(0,Math.min(favs.length-1,BD.idx+Math.round(dy/BD.cardH)));if(ni!==BD.to){BD.to=ni;document.querySelectorAll('.bus-card-v2').forEach((c,i)=>c.classList.toggle('card-slot',i===ni&&i!==BD.idx))}},{passive:true});
 document.addEventListener('touchend',()=>{if(!BD.on)return;BD.clone?.remove();BD.on=false;const{idx,to}=BD;BD.idx=-1;BD.to=-1;if(idx!==to){const item=favs.splice(idx,1)[0];favs.splice(to,0,item);saveFavs(activePid,favs);fetchOneETA(favs[to]).then(renderBusList)}else renderBusList()});
 
 // ═══════════════════════════════════
@@ -3021,7 +3186,6 @@ function setDTitle(t){document.getElementById('drawer-title').textContent=t}
 // ═══════════════════════════════════
 //  INIT
 // ═══════════════════════════════════
-(()=>{const btn=document.getElementById('eta-mode-btn');if(etaMode==='mins'){btn.textContent='⏱ 距離';btn.classList.add('mins')}else{btn.textContent='🕐 時間';btn.classList.remove('mins')}})();
 syncDistPills();
 loadTransportSettings();
 checkAutoTab();   // sets activePid based on time rules (or NEARBY_PID)
