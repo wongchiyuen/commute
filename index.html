@@ -37,6 +37,13 @@
 ║        - 附近路線 fare 請求改為 200ms 間隔發出                 ║
 ║          避免 KMB API rate limiting (原本25個同時發)           ║
 ║        - fare fetch timeout 由 6s 增至 10s                   ║
+║                                                              ║
+║  v1.5  車費+自訂距離再改進                                    ║
+║        - fetchKMBFare: 網絡錯誤不快取，404才快取null          ║
+║          允許下次重試，解決一次失敗永久消失問題                 ║
+║        - 附近路線改為先等車費(最多4秒)再渲染，確保顯示          ║
+║        - 自訂距離改為 range slider 滑桿，步進值友好            ║
+║          覆蓋式面板顯示，取消/確定按鈕                         ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -405,13 +412,6 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <button class="dist-pill" data-m="3000" onclick="setDist(3000)">3km</button>
       <button class="dist-pill" data-m="5000" onclick="setDist(5000)">5km</button>
       <button class="dist-pill" id="dist-custom-pill" onclick="openCustomDist()">自訂</button>
-      <div id="dist-custom-wrap" style="display:none;align-items:center;gap:4px;flex-shrink:0">
-        <input id="dist-custom-inp" type="number" min="50" max="50000" step="50"
-          style="width:72px;background:var(--bg3);border:1px solid var(--amb-bdr);border-radius:8px;padding:3px 7px;color:var(--txt);font-family:var(--mono);font-size:13px;outline:none"
-          placeholder="米" onkeydown="if(event.key==='Enter')confirmCustomDist()">
-        <button onclick="confirmCustomDist()" style="background:var(--amb);color:#000;border:none;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)">確定</button>
-        <button onclick="cancelCustomDist()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);border-radius:7px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:var(--sans)">✕</button>
-      </div>
     </div>
     <div class="bus-list" id="bus-list"></div>
   </div>
@@ -704,12 +704,24 @@ async function fetchKMBFare(route,dir,svcType){
   const key=`kmb_${route}_${bound}_${svcType}`;
   if(_fareCache[key]!==undefined)return _fareCache[key];
   try{
-    const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),10000);let d;try{d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}finally{clearTimeout(_ft);}
+    const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),10000);
+    let resp;
+    try{resp=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal});}
+    finally{clearTimeout(_ft);}
+    // 404 = route has no fare data; cache as null permanently
+    if(resp.status===404){_fareCache[key]=null;return null;}
+    // Other HTTP errors = transient; don't cache, allow retry
+    if(!resp.ok)return null;
+    const d=await resp.json();
     const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
     const maxFare=fares.length?Math.max(...fares):null;
     _fareCache[key]=maxFare!==null?Math.round(maxFare*10)/10:null;
     return _fareCache[key];
-  }catch{_fareCache[key]=null;return null;}
+  }catch(e){
+    // Network/abort/timeout errors: don't cache, allow retry next time
+    if(e?.name==='AbortError'||e?.name==='TypeError')return null;
+    _fareCache[key]=null;return null;
+  }
 }
 const pad=n=>String(n).padStart(2,'0');
 
@@ -2074,22 +2086,59 @@ function syncDistPills(){
   document.querySelectorAll('.dist-pill[data-m]').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist));
   const cp=document.getElementById('dist-custom-pill');
   if(cp)cp.classList.toggle('active',!isStd);
+  // Update custom-pill text to show current custom value
+  if(cp&&!isStd)cp.textContent=_distLabel(nearbyDist);
+  else if(cp)cp.textContent='自訂';
 }
+// Custom distance — shown as overlay panel with range slider
+const _DIST_STEPS=[100,200,300,500,750,1000,1500,2000,3000,5000,8000,10000,15000,20000];
+function _distLabel(m){return m>=1000?(m/1000)+'km':m+'m';}
 function openCustomDist(){
-  document.getElementById('dist-custom-wrap').style.display='flex';
-  document.getElementById('dist-custom-pill').style.display='none';
-  const inp=document.getElementById('dist-custom-inp');
-  if(inp){inp.value=nearbyDist;inp.focus();inp.select();}
+  // Build a fixed overlay panel above the dist-row
+  let ov=document.getElementById('dist-slider-ov');
+  if(!ov){
+    ov=document.createElement('div');ov.id='dist-slider-ov';
+    ov.style.cssText='position:fixed;bottom:calc(var(--nav-h) + 8px);left:0;right:0;z-index:40;display:flex;justify-content:center;padding:0 12px';
+    ov.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:14px;padding:14px 16px 12px;width:100%;max-width:480px;box-shadow:0 6px 28px rgba(0,0,0,.6)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--mid)">自訂距離</span>
+        <span id="dist-slider-lbl" style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--amb2)"></span>
+      </div>
+      <input id="dist-slider-inp" type="range" min="0" max="${_DIST_STEPS.length-1}" step="1"
+        style="width:100%;accent-color:var(--amb);height:4px;cursor:pointer;margin-bottom:10px"
+        oninput="_distSliderUpdate(this.value)">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="_distSliderCancel()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:var(--sans)">取消</button>
+        <button onclick="_distSliderConfirm()" style="background:var(--amb);color:#000;border:none;border-radius:8px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans)">確定</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+  // Set slider to nearest step
+  const curIdx=_DIST_STEPS.reduce((best,v,i)=>Math.abs(v-nearbyDist)<Math.abs(_DIST_STEPS[best]-nearbyDist)?i:best,0);
+  const inp=document.getElementById('dist-slider-inp');
+  if(inp)inp.value=curIdx;
+  _distSliderUpdate(curIdx);
+  ov.style.display='flex';
 }
-function confirmCustomDist(){
-  const v=parseInt(document.getElementById('dist-custom-inp')?.value||'0');
-  if(v>=50&&v<=50000){setDist(v);}
-  cancelCustomDist();
+function _distSliderUpdate(idx){
+  const v=_DIST_STEPS[parseInt(idx)];
+  const lbl=document.getElementById('dist-slider-lbl');
+  if(lbl)lbl.textContent=_distLabel(v);
 }
-function cancelCustomDist(){
-  document.getElementById('dist-custom-wrap').style.display='none';
-  document.getElementById('dist-custom-pill').style.display='';
+function _distSliderConfirm(){
+  const inp=document.getElementById('dist-slider-inp');
+  if(inp){const v=_DIST_STEPS[parseInt(inp.value)];setDist(v);}
+  _distSliderClose();
 }
+function _distSliderCancel(){_distSliderClose();}
+function _distSliderClose(){
+  const ov=document.getElementById('dist-slider-ov');
+  if(ov)ov.style.display='none';
+}
+// keep old names as stubs for safety
+function confirmCustomDist(){_distSliderConfirm();}
+function cancelCustomDist(){_distSliderClose();}
 
 // ═══════════════════════════════════
 //  PROFILES
@@ -2383,20 +2432,24 @@ async function loadNearby(){
     rows.sort((a,b)=>a.etasWithType[0].ts-b.etasWithType[0].ts);
     if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
     const renderRows=rows.slice(0,25);
+    // Pre-fetch fares for all KMB/joint rows, wait up to 4s
+    const fareRowsIdx=renderRows.map((r,i)=>({r,i})).filter(({r})=>r.companyType==='kmb'||r.companyType==='joint');
+    const fareTimeout=new Promise(res=>setTimeout(res,4000));
+    await Promise.race([
+      Promise.all(fareRowsIdx.map(({r})=>
+        fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{r.fare=fare;}).catch(()=>{})
+      )),
+      fareTimeout
+    ]);
     el.innerHTML=renderRows.map((r,i)=>renderBusCardV2({
       ...r,idx:i,
       clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null,
     })).join('');
-    // Fetch fares — staggered 200ms apart, find card by data-fare-key
-    const fareRows=renderRows.filter(r=>r.companyType==='kmb'||r.companyType==='joint');
-    fareRows.forEach((r,fi)=>{
-      setTimeout(()=>{
-        fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{
-          if(fare==null)return;
-          const card=document.querySelector(`.bus-card-v2[data-fare-key="${r.route}_${r.companyType}"]`);
-          if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${fare})`;}}
-        });
-      },fi*200);
+    // Any fares that arrived late — update DOM via data-fare-key
+    fareRowsIdx.forEach(({r})=>{
+      if(r.fare==null)return;
+      const card=document.querySelector(`.bus-card-v2[data-fare-key="${r.route}_${r.companyType}"]`);
+      if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${r.fare})`;}}
     });
   }catch(e){console.warn('[nearby v2]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
