@@ -30,6 +30,13 @@
 ║          未授權才顯示「允許位置使用」按鈕                       ║
 ║        - _gpsInFlight guard 防止重複發 GPS request            ║
 ║        - init 改為由 autoLocate 控制 loadNearby 呼叫時機      ║
+║                                                              ║
+║  v1.4  車費顯示修復                                           ║
+║        - card 加 data-fare-key 屬性，穩定 DOM 定位            ║
+║          取代易失效的 positional index cards[i]               ║
+║        - 附近路線 fare 請求改為 200ms 間隔發出                 ║
+║          避免 KMB API rate limiting (原本25個同時發)           ║
+║        - fare fetch timeout 由 6s 增至 10s                   ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -697,7 +704,7 @@ async function fetchKMBFare(route,dir,svcType){
   const key=`kmb_${route}_${bound}_${svcType}`;
   if(_fareCache[key]!==undefined)return _fareCache[key];
   try{
-    const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),6000);let d;try{d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal}).then(r=>r.json());}finally{clearTimeout(_ft);}
+    const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),10000);let d;try{d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}finally{clearTimeout(_ft);}
     const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
     const maxFare=fares.length?Math.max(...fares):null;
     _fareCache[key]=maxFare!==null?Math.round(maxFare*10)/10:null;
@@ -2211,7 +2218,7 @@ function renderBusCardV2({route,dest,stopName,dist,fare,companyType,etasWithType
   const dragHtml=dragIdx!==undefined?`<div class="bcv2-drag-hdl" ontouchstart="busDragStart(event,${dragIdx})">⠿</div>`:'';
   const rmHtml=removeFn?`<button class="bcv2-rm-btn" onclick="${removeFn}">×</button>`:'';
   const clickAttr=clickFn?`onclick="${clickFn}"`:'';
-  return`<div class="bus-card-v2 ${urgency}" style="animation-delay:${idx*.04}s" ${clickAttr}>
+  return`<div class="bus-card-v2 ${urgency}" data-fare-key="${route}_${companyType}" style="animation-delay:${idx*.04}s" ${clickAttr}>
     ${dragHtml}
     <div class="bcv2-badge" style="background:${badgeBg};border-color:${badgeBdr}">
       <div class="bcv2-route-no" style="color:${routeCol};font-size:${route.length<=3?'24px':route.length===4?'19px':'15px'}">${route}</div>
@@ -2380,15 +2387,16 @@ async function loadNearby(){
       ...r,idx:i,
       clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null,
     })).join('');
-    // Fetch fares in background and update stop labels
-    renderRows.forEach((r,i)=>{
-      if(r.companyType==='kmb'||r.companyType==='joint'){
+    // Fetch fares — staggered 200ms apart, find card by data-fare-key
+    const fareRows=renderRows.filter(r=>r.companyType==='kmb'||r.companyType==='joint');
+    fareRows.forEach((r,fi)=>{
+      setTimeout(()=>{
         fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{
           if(fare==null)return;
-          const cards=el.querySelectorAll('.bus-card-v2');
-          if(cards[i]){const sl=cards[i].querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${fare})`;}}
+          const card=document.querySelector(`.bus-card-v2[data-fare-key="${r.route}_${r.companyType}"]`);
+          if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${fare})`;}}
         });
-      }
+      },fi*200);
     });
   }catch(e){console.warn('[nearby v2]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
@@ -2406,12 +2414,8 @@ async function fetchOneETA(fav){
     fetchKMBFare(fav.route,'O',fav.serviceType).then(fare=>{
       if(fare==null)return;
       fav._fare=fare;
-      const idx=favs.indexOf(fav);if(idx<0)return;
-      const cards=document.getElementById('bus-list')?.querySelectorAll('.bus-card-v2');
-      if(cards&&cards[idx]){
-        const sl=cards[idx].querySelector('.bcv2-stop-lbl');
-        if(sl)sl.textContent=fav.stopName+`  ($${fare})`;
-      }
+      const card=document.querySelector(`.bus-card-v2[data-fare-key="${fav.route}_kmb"]`);
+      if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl)sl.textContent=fav.stopName+`  ($${fare})`;}
     });
   }
 }
