@@ -1345,132 +1345,243 @@ function _restartTrafficAutoRefresh() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PASSENGER NOTICES: KMB, CTB (城巴), MTR
-//  Sources:
-//    KMB: search.kmb.hk/KMBWebSite/Function/FunctionRequest.ashx?action=getAnnounce
-//         (unofficial KMB internal API, via CORS proxy; same source as BusETA app)
-//    CTB: citybus.com.hk – no structured API; provide direct link
-//    MTR: mtr.com.hk – service adjustment RSS / link
+//
+//  ⚠️  為何 BusETA App 可以、網頁版不行？
+//  BusETA 是原生 Android App（OkHttp / HttpURLConnection），
+//  不受瀏覽器「同源政策 (CORS)」限制，可直接呼叫任何 HTTP endpoint。
+//  網頁版只能使用有 CORS 回應標頭的 API，否則必須經過第三方代理。
+//
+//  解決策略（依優先次序）：
+//  1. JSONP — 用 <script> 標籤繞過 CORS（不需代理）
+//  2. proxy.cors.sh — 穩定免費代理
+//  3. allorigins.win、codetabs、yacdn — 備用代理
+//  4. 優雅降級 — 顯示官方直達連結
 // ─────────────────────────────────────────────────────────────────────────────
 
-let passengerNotices = [];   // [{co, title, content, date, url, routes}]
+let passengerNotices = [];
 let _noticesLoaded = false;
 
-// ── KMB notices: try multiple CORS proxy routes ───────────────────────────────
 const KMB_ANNOUNCE_BASE = 'https://search.kmb.hk/KMBWebSite/Function/FunctionRequest.ashx';
 const KMB_ANNOUNCE_PDF  = 'https://search.kmb.hk/KMBWebSite/AnnouncementPicture.ashx';
 
+// ── Utility: JSONP (繞過 CORS 最乾淨的方法，不需第三方代理) ─────────────────
+function fetchJSONP(url, cbParam = 'callback', timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const fn = '_jp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    let done = false;
+    const cleanup = () => { try { script.remove(); } catch{} delete window[fn]; };
+    const timer = setTimeout(() => { if(!done){done=true;cleanup();reject(new Error('jsonp timeout')); } }, timeoutMs);
+    window[fn] = (data) => {
+      if(done) return; done=true; clearTimeout(timer); cleanup(); resolve(data);
+    };
+    script.onerror = () => { if(!done){done=true;clearTimeout(timer);cleanup();reject(new Error('jsonp load error'));} };
+    script.src = url + (url.includes('?')?'&':'?') + cbParam + '=' + fn;
+    document.head.appendChild(script);
+  });
+}
+
+// ── Utility: 統一代理鏈（按可靠性排序）────────────────────────────────────────
+async function fetchViaProxyChain(targetUrl, parseJson = true, timeoutMs = 7000) {
+  const enc = encodeURIComponent(targetUrl);
+  const proxies = [
+    // proxy.cors.sh — 最穩定，無需帳號，明確支援 JSON
+    { url: `https://proxy.cors.sh/${targetUrl}`, headers: { 'x-cors-api-key': 'temp_' } },
+    // allorigins raw — 直接返回原始內容
+    { url: `https://api.allorigins.win/raw?url=${enc}` },
+    // allorigins get — JSON 包裝
+    { url: `https://api.allorigins.win/get?url=${enc}`, unwrapJson: true },
+    // codetabs
+    { url: `https://api.codetabs.com/v1/proxy?quest=${targetUrl}` },
+    // yacdn
+    { url: `https://yacdn.org/proxy/${targetUrl}` },
+    // corsproxy.io (free tier 可能受限)
+    { url: `https://corsproxy.io/?url=${enc}` },
+    // thingproxy (100KB 限制)
+    { url: `https://thingproxy.freeboard.io/fetch/${targetUrl}` },
+  ];
+  for (const px of proxies) {
+    try {
+      const opts = px.headers ? { headers: px.headers } : {};
+      const r = await Promise.race([
+        fetch(px.url, opts),
+        new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs)),
+      ]);
+      if (!r.ok) continue;
+      let text = await r.text();
+      // Unwrap allorigins /get JSON wrapper
+      if (px.unwrapJson || (text.trim().startsWith('{') && text.includes('"contents"'))) {
+        try { const j = JSON.parse(text); text = j.contents || text; } catch {}
+      }
+      if (!text || text.length < 10) continue;
+      if (parseJson) {
+        try { return JSON.parse(text); } catch { continue; }
+      }
+      return text;
+    } catch(e) { /* try next */ }
+  }
+  return null;
+}
+
+// ── KMB 乘客通告 ─────────────────────────────────────────────────────────────
+// 策略：JSONP → JSON proxy chain → HTML scrape fallback
 async function fetchKMBNotices() {
   const target = `${KMB_ANNOUNCE_BASE}?action=getAnnounce&lang=tc`;
-  const proxied = [
-    `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${target}`,
-  ];
-  for (const url of proxied) {
-    try {
-      const r = await Promise.race([
-        fetch(url),
-        new Promise((_,rej) => setTimeout(() => rej('timeout'), 7000)),
-      ]);
-      if (!r.ok) continue;
-      let text = await r.text();
-      // allorigins /get wrapper
-      if (text.trim().startsWith('{') && text.includes('"contents"')) {
-        try { text = JSON.parse(text).contents || text; } catch {}
+
+  // 1) JSONP — 最可靠（不需代理），如果 KMB server 支援
+  try {
+    const data = await fetchJSONP(target, 'callback', 6000);
+    const list = data?.data || data?.result?.data || data?.announcementList || [];
+    if (list.length) {
+      console.log('[kmb-notice] JSONP ok:', list.length);
+      return _parseKMBList(list);
+    }
+  } catch(e) { console.log('[kmb-notice] JSONP failed:', e.message); }
+
+  // 2) Proxy chain (JSON)
+  try {
+    const data = await fetchViaProxyChain(target, true, 8000);
+    if (data) {
+      const list = data.data || data.result?.data || data.announcementList || [];
+      if (list.length) {
+        console.log('[kmb-notice] proxy ok:', list.length);
+        return _parseKMBList(list);
       }
-      const j = JSON.parse(text);
-      const list = j.data || j.result?.data || j.announcementList || [];
-      if (!list.length) continue;
-      console.log('[kmb-notice] ok:', list.length, 'notices');
-      return list.map(item => ({
-        co: 'kmb',
-        title: (item.title || item.announcementTitle || item.subject || '').trim(),
-        content: (item.content || item.announcementContent || item.description || '').trim(),
-        date: item.date || item.publishDate || item.created || '',
-        url: item.url ? `${KMB_ANNOUNCE_PDF}?url=${item.url}` : (item.pdfUrl || item.link || ''),
-        routes: item.routeList || item.routes || [],
-      })).filter(i => i.title || i.content);
+    }
+  } catch(e) { console.log('[kmb-notice] proxy failed:', e.message); }
+
+  // 3) Try alternate KMB announcement page HTML parse
+  try {
+    const html = await fetchViaProxyChain('https://www.kmb.hk/tc/news/announcement.html', false, 8000);
+    if (html && html.length > 500) {
+      const notices = _scrapeKMBAnnouncementHtml(html);
+      if (notices.length) {
+        console.log('[kmb-notice] HTML scrape ok:', notices.length);
+        return notices;
+      }
+    }
+  } catch(e) { console.log('[kmb-notice] HTML scrape failed:', e.message); }
+
+  return null;
+}
+
+function _parseKMBList(list) {
+  return list.map(item => ({
+    co: 'kmb',
+    title: (item.title || item.announcementTitle || item.subject || '').replace(/<[^>]+>/g,'').trim(),
+    content: (item.content || item.announcementContent || item.description || '').replace(/<[^>]+>/g,'').trim(),
+    date: item.date || item.publishDate || item.created || '',
+    url: item.url ? `${KMB_ANNOUNCE_PDF}?url=${encodeURIComponent(item.url)}` : (item.pdfUrl || item.link || ''),
+    routes: (item.routeList || item.routes || []).map(r => typeof r === 'string' ? r : r.route || '').filter(Boolean),
+  })).filter(i => i.title || i.content);
+}
+
+function _scrapeKMBAnnouncementHtml(html) {
+  // Simple pattern: look for announcement titles in the HTML
+  const notices = [];
+  const titleRe = /<(?:h\d|div|li)[^>]*class="[^"]*(?:title|heading|announcement)[^"]*"[^>]*>(.*?)<\/(?:h\d|div|li)>/gis;
+  for (const m of html.matchAll(titleRe)) {
+    const title = m[1].replace(/<[^>]+>/g,'').trim();
+    if (title && title.length > 5 && title.length < 200) {
+      notices.push({ co:'kmb', title, content:'', date:'', url:'', routes:[] });
+    }
+    if (notices.length >= 10) break;
+  }
+  return notices;
+}
+
+// ── CTB 城巴乘客通告 ──────────────────────────────────────────────────────────
+// 城巴 API 需要 syscode 動態簽名，難以在純前端複製；
+// 嘗試已知 endpoint，失敗則提供直達連結
+async function fetchCTBNotices() {
+  const endpoints = [
+    'https://www.citybus.com.hk/sinfoapi/getAnnouncement?lang=tc',
+    'https://www.citybus.com.hk/tc/news-and-promotions/latest-news/',
+  ];
+  for (const target of endpoints) {
+    try {
+      const data = await fetchViaProxyChain(target, false, 7000);
+      if (!data) continue;
+      // Try JSON parse first
+      try {
+        const j = JSON.parse(data);
+        const list = j.data || j.result || j.notices || j.items || [];
+        if (list.length) {
+          return list.map(item => ({
+            co: 'ctb',
+            title: (item.title || item.subject || item.TITLE || '').replace(/<[^>]+>/g,'').trim(),
+            content: (item.content || item.detail || item.CONTENT || item.description || '').replace(/<[^>]+>/g,'').trim(),
+            date: item.date || item.PUBLISH_DATE || '',
+            url: item.url || item.URL || item.link || '',
+            routes: (item.routeList || item.routes || []).map(r => typeof r==='string'?r:r.route||'').filter(Boolean),
+          })).filter(i => i.title || i.content);
+        }
+      } catch {}
+      // HTML scrape fallback
+      if (data.includes('<html') || data.includes('<!DOCTYPE')) {
+        const notices = _scrapeGenericNewsHtml(data, 'ctb');
+        if (notices.length) { console.log('[ctb-notice] HTML ok:', notices.length); return notices; }
+      }
     } catch(e) { /* try next */ }
   }
   return null;
 }
 
-// ── CTB/MTR RSS notices (service adjustment notices via RSS) ──────────────────
-// CTB publishes service notices on their website; we use the RSS feed as proxy
-// MTR publishes via an RSS-like feed
-async function fetchCTBNotices() {
-  // CTB official service notice RSS (unofficial; best available public endpoint)
-  const urls = [
-    'https://www.citybus.com.hk/sinfoapi/getAnnouncement?lang=tc',
-    'https://mobile.nwstbus.com.hk/api6/noticelist.php?syscode=1&lang=C',
+// ── MTR 港鐵服務消息 ──────────────────────────────────────────────────────────
+async function fetchMTRNotices() {
+  const endpoints = [
+    { url: 'https://www.mtr.com.hk/ch/alert/realtime_informations.json', json: true },
+    { url: 'https://www.mtr.com.hk/ch/alert/message.json', json: true },
+    { url: 'https://www.mtr.com.hk/ch/alert/', json: false },
   ];
-  for (const target of urls) {
-    const proxied = [
-      `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-    ];
-    for (const url of proxied) {
-      try {
-        const r = await Promise.race([
-          fetch(url),
-          new Promise((_,rej) => setTimeout(() => rej('timeout'), 6000)),
-        ]);
-        if (!r.ok) continue;
-        let text = await r.text();
-        if (text.trim().startsWith('{') && text.includes('"contents"')) {
-          try { text = JSON.parse(text).contents || text; } catch {}
-        }
-        const j = JSON.parse(text);
-        const list = j.data || j.result || j.notices || j.items || [];
-        if (!list.length) continue;
-        console.log('[ctb-notice] ok:', list.length, 'notices via', url.slice(0,40));
-        return list.map(item => ({
-          co: 'ctb',
-          title: (item.title || item.subject || item.TITLE || '').trim(),
-          content: (item.content || item.detail || item.CONTENT || item.description || '').trim(),
-          date: item.date || item.PUBLISH_DATE || '',
-          url: item.url || item.URL || item.link || '',
-          routes: item.routeList || item.routes || [],
-        })).filter(i => i.title || i.content);
-      } catch(e) { /* try next */ }
+  for (const ep of endpoints) {
+    try {
+      const data = await fetchViaProxyChain(ep.url, false, 7000);
+      if (!data) continue;
+      if (ep.json) {
+        try {
+          const j = JSON.parse(data);
+          const list = j.status || j.data || j.alerts || j.messages || [];
+          if (list.length) {
+            return list.map(item => ({
+              co: 'mtr',
+              title: (item.title_c || item.titlec || item.title || '').replace(/<[^>]+>/g,'').trim() || '港鐵服務通知',
+              content: (item.content_c || item.contentc || item.content || item.message_c || '').replace(/<[^>]+>/g,'').trim(),
+              date: item.date || item.update_date || '',
+              url: item.url || '',
+              routes: item.line ? [item.line] : (item.lines || []),
+            })).filter(i => i.title || i.content);
+          }
+        } catch {}
+      }
+      if (!ep.json && (data.includes('<html') || data.includes('<!DOCTYPE'))) {
+        const notices = _scrapeGenericNewsHtml(data, 'mtr');
+        if (notices.length) { console.log('[mtr-notice] HTML ok:', notices.length); return notices; }
+      }
+    } catch(e) { /* try next */ }
+  }
+  return null;
+}
+
+function _scrapeGenericNewsHtml(html, co) {
+  const notices = [];
+  // Match typical news item patterns
+  const patterns = [
+    /<(?:h[23]|a)[^>]*>([\u4e00-\u9fff\w][^<]{8,150})<\/(?:h[23]|a)>/gi,
+    /class="[^"]*(?:news|notice|title|item-title)[^"]*"[^>]*>([\u4e00-\u9fff][^<]{5,150})</gi,
+  ];
+  const seen = new Set();
+  for (const re of patterns) {
+    for (const m of html.matchAll(re)) {
+      const t = m[1].replace(/<[^>]+>/g,'').trim();
+      if (t && t.length > 8 && !seen.has(t)) {
+        seen.add(t);
+        notices.push({ co, title: t, content:'', date:'', url:'', routes:[] });
+        if (notices.length >= 8) return notices;
+      }
     }
   }
-  return null;
-}
-
-// ── MTR service disruption notices via RSS ────────────────────────────────────
-async function fetchMTRNotices() {
-  const mtrRss = 'https://www.mtr.com.hk/ch/alert/realtime_informations.json';
-  const proxied = [
-    `https://corsproxy.io/?url=${encodeURIComponent(mtrRss)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(mtrRss)}`,
-  ];
-  for (const url of proxied) {
-    try {
-      const r = await Promise.race([
-        fetch(url),
-        new Promise((_,rej) => setTimeout(() => rej('timeout'), 6000)),
-      ]);
-      if (!r.ok) continue;
-      let text = await r.text();
-      if (text.trim().startsWith('{') && text.includes('"contents"')) {
-        try { text = JSON.parse(text).contents || text; } catch {}
-      }
-      const j = JSON.parse(text);
-      const list = j.status || j.data || j.alerts || [];
-      if (!list.length) continue;
-      console.log('[mtr-notice] ok:', list.length);
-      return list.map(item => ({
-        co: 'mtr',
-        title: (item.title_c || item.title || '港鐵服務消息').trim(),
-        content: (item.content_c || item.content || '').trim(),
-        date: item.date || '',
-        url: '',
-        routes: item.line ? [item.line] : [],
-      })).filter(i => i.title || i.content);
-    } catch(e) { /* try next */ }
-  }
-  return null;
+  return notices;
 }
 
 // ── Main loader ───────────────────────────────────────────────────────────────
@@ -1478,39 +1589,43 @@ async function loadPassengerNotices(force = false) {
   if (_noticesLoaded && !force) return passengerNotices;
   _noticesLoaded = true;
   const [kmb, ctb, mtr] = await Promise.all([
-    fetchKMBNotices(),
-    fetchCTBNotices(),
-    fetchMTRNotices(),
+    fetchKMBNotices().catch(() => null),
+    fetchCTBNotices().catch(() => null),
+    fetchMTRNotices().catch(() => null),
   ]);
   passengerNotices = [
     ...(kmb || []),
     ...(ctb || []),
     ...(mtr || []),
   ];
-  console.log('[notices] total:', passengerNotices.length);
-  return passengerNotices;
+  console.log('[notices] total:', passengerNotices.length, '| kmb:', (kmb||[]).length, '| ctb:', (ctb||[]).length, '| mtr:', (mtr||[]).length);
+  return { kmb, ctb, mtr };
 }
 
 // ── Card renderer ─────────────────────────────────────────────────────────────
 function renderNoticeCard(item, idx) {
-  const coLabel = {kmb:'🚌 九巴 KMB', ctb:'🟢 城巴 CTB', mtr:'🔴 港鐵 MTR', lwb:'🚌 龍運 LWB'}[item.co] || '📢 通告';
-  const cardClass = `pn-${item.co}`;
-  const coClass = item.co;
-  const contentId = `pn-content-${idx}`;
-  const btnId = `pn-btn-${idx}`;
-  const hasLong = (item.content || '').length > 100;
-  const routeTags = (item.routes || []).slice(0, 6).map(r =>
-    `<span class="pn-route-tag">${r}</span>`).join('');
-  const dateStr = item.date ? (() => {
-    const d = new Date(item.date);
-    if (isNaN(d)) return item.date.slice(0, 10);
-    return `${d.getMonth()+1}/${d.getDate()}`;
-  })() : '';
+  const coMeta = {
+    kmb: { label:'🚌 九巴 KMB', cls:'kmb' },
+    ctb: { label:'🟢 城巴 CTB', cls:'ctb' },
+    mtr: { label:'🔴 港鐵 MTR', cls:'mtr' },
+    lwb: { label:'🚌 龍運 LWB', cls:'lwb' },
+  }[item.co] || { label:'📢 通告', cls:'kmb' };
 
-  return `<div class="pn-card ${cardClass}" style="animation-delay:${idx*.025}s">
+  const contentId = `pn-c-${idx}`;
+  const btnId = `pn-b-${idx}`;
+  const hasLong = (item.content || '').length > 120;
+  const routeTags = (item.routes || []).slice(0, 8).map(r => `<span class="pn-route-tag">${r}</span>`).join('');
+  const dateStr = (() => {
+    if (!item.date) return '';
+    const d = new Date(item.date);
+    if (isNaN(d)) return String(item.date).slice(0, 10);
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  })();
+
+  return `<div class="pn-card pn-${item.co}" style="animation-delay:${idx*.025}s">
     <div class="pn-inner">
       <div class="pn-hdr">
-        <span class="pn-co-badge ${coClass}">${coLabel}</span>
+        <span class="pn-co-badge ${coMeta.cls}">${coMeta.label}</span>
         ${dateStr ? `<span class="pn-date">${dateStr}</span>` : ''}
       </div>
       <div class="pn-title">${item.title || '乘客通告'}</div>
@@ -1532,51 +1647,88 @@ function togglePnContent(cid, bid) {
   if (btn) btn.textContent = exp ? '收起 ▴' : '展開 ▾';
 }
 
+// ── Fallback block when API unavailable ───────────────────────────────────────
+function _noticeErrBlock(co, reason, linkUrl, linkLabel) {
+  const coInfo = {
+    kmb: { icon:'🚌', name:'九巴 (KMB)', color:'rgba(232,0,61,.1)', border:'rgba(232,0,61,.25)', textColor:'#ff4f82' },
+    ctb: { icon:'🟢', name:'城巴 (CTB)', color:'rgba(46,213,115,.08)', border:'rgba(46,213,115,.22)', textColor:'#2ed573' },
+    mtr: { icon:'🔴', name:'港鐵 (MTR)', color:'rgba(255,71,87,.08)', border:'rgba(255,71,87,.22)', textColor:'#ff8a96' },
+  }[co] || { icon:'📢', name:'通告', color:'var(--bg3)', border:'var(--bdr)', textColor:'var(--mid)' };
+  return `<div style="background:${coInfo.color};border:1px solid ${coInfo.border};border-radius:10px;padding:14px 16px;margin-bottom:8px">
+    <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:10px">${reason}</div>
+    <a href="${linkUrl}" target="_blank"
+       style="display:inline-flex;align-items:center;gap:6px;background:${coInfo.color};border:1px solid ${coInfo.border};
+              color:${coInfo.textColor};border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;
+              text-decoration:none;font-family:var(--sans)">
+      ${coInfo.icon} 前往${coInfo.name}官方通告頁
+    </a>
+  </div>`;
+}
+
 // ── Render notice tab ─────────────────────────────────────────────────────────
 async function renderNoticeTab(el) {
-  el.innerHTML = '<div class="spinner"></div>';
-  await loadPassengerNotices();
+  el.innerHTML = `<div style="text-align:center;padding:20px">
+    <div class="spinner" style="margin:0 auto 10px"></div>
+    <div style="font-size:12px;color:var(--dim)">正在嘗試 JSONP → 代理鏈…</div>
+  </div>`;
 
-  const kmbItems = passengerNotices.filter(i => i.co === 'kmb');
-  const ctbItems = passengerNotices.filter(i => i.co === 'ctb');
-  const mtrItems = passengerNotices.filter(i => i.co === 'mtr');
-
+  const results = await loadPassengerNotices();
+  const kmbItems = (results?.kmb || []);
+  const ctbItems = (results?.ctb || []);
+  const mtrItems = (results?.mtr || []);
+  let idx = 0;
   let html = '';
 
-  // KMB section
+  // ── 說明橫幅 ──────────────────────────────────────────────────────────────
+  html += `<div style="background:rgba(91,143,255,.07);border:1px solid rgba(91,143,255,.2);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:var(--mid);line-height:1.7">
+    <span style="color:#7ba8ff;font-weight:600">ℹ️ 關於乘客通告</span><br>
+    各巴士公司通告 API 均無 CORS 標頭，網頁版需經代理取得。
+    BusETA 等原生 App 則不受此限制，可直接呼叫。<br>
+    本頁使用 JSONP + 多代理鏈，盡力取得最新通告。
+  </div>`;
+
+  // ── KMB ───────────────────────────────────────────────────────────────────
   html += `<div class="pn-section-hdr">🚌 九巴 (KMB) 乘客通告</div>`;
   if (kmbItems.length) {
-    html += kmbItems.map((item, i) => renderNoticeCard(item, i)).join('');
+    html += kmbItems.map(item => renderNoticeCard(item, idx++)).join('');
   } else {
-    html += `<div class="pn-err">
-      <div class="pn-err-txt">未能從九巴伺服器取得通告<br>（API 需經代理，可能受網絡限制）</div>
-      <a class="pn-err-link" href="https://www.kmb.hk/tc/news/announcement.html" target="_blank">🔗 前往九巴通告頁面</a>
-    </div>`;
+    html += _noticeErrBlock('kmb',
+      '嘗試方法：JSONP → proxy.cors.sh → allorigins → codetabs → yacdn → corsproxy.io<br>所有代理均未能取得回應，可能因：① 九巴 API 封鎖代理 IP ② 代理服務繁忙',
+      'https://www.kmb.hk/tc/news/announcement.html', '九巴官方通告');
   }
 
-  // CTB section
+  // ── CTB ───────────────────────────────────────────────────────────────────
   html += `<div class="pn-section-hdr" style="margin-top:14px">🟢 城巴 (CTB) 乘客通告</div>`;
   if (ctbItems.length) {
-    html += ctbItems.map((item, i) => renderNoticeCard(item, kmbItems.length + i)).join('');
+    html += ctbItems.map(item => renderNoticeCard(item, idx++)).join('');
   } else {
-    html += `<div class="pn-err">
-      <div class="pn-err-txt">城巴未提供公開通告 API<br>請到官方網頁查看最新消息</div>
-      <a class="pn-err-link" href="https://www.citybus.com.hk/tc/news-and-promotions/latest-news/" target="_blank">🔗 前往城巴消息頁面</a>
-    </div>`;
+    html += _noticeErrBlock('ctb',
+      '城巴通告 API 需要動態 syscode 簽名，純網頁版無法複製此機制（BusETA 透過反向工程 App 取得）',
+      'https://www.citybus.com.hk/tc/news-and-promotions/latest-news/', '城巴最新消息');
   }
 
-  // MTR section
+  // ── MTR ───────────────────────────────────────────────────────────────────
   html += `<div class="pn-section-hdr" style="margin-top:14px">🔴 港鐵 (MTR) 服務消息</div>`;
   if (mtrItems.length) {
-    html += mtrItems.map((item, i) => renderNoticeCard(item, kmbItems.length + ctbItems.length + i)).join('');
+    html += mtrItems.map(item => renderNoticeCard(item, idx++)).join('');
   } else {
-    html += `<div class="pn-err">
-      <div class="pn-err-txt">港鐵服務消息<br>請到官方網頁查看最新動態</div>
-      <a class="pn-err-link" href="https://www.mtr.com.hk/ch/customer/services/index.html" target="_blank">🔗 前往港鐵服務消息</a>
-    </div>`;
+    html += _noticeErrBlock('mtr',
+      '港鐵服務消息 JSON API 無 CORS 標頭，代理嘗試失敗',
+      'https://www.mtr.com.hk/ch/alert/', '港鐵實時服務消息');
   }
 
+  // ── 底部重試按鈕 ──────────────────────────────────────────────────────────
+  html += `<div style="text-align:center;padding:16px 0 4px">
+    <button onclick="_retryNotices()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重新嘗試載入通告</button>
+  </div>`;
+
   el.innerHTML = html;
+}
+
+function _retryNotices() {
+  _noticesLoaded = false;
+  passengerNotices = [];
+  renderNoticeTab(document.getElementById('traffic-list'));
 }
 
 // ── Legacy shims (keep switchPage compatibility) ──────────────────────────────
