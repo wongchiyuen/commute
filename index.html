@@ -156,6 +156,36 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .feed-refresh-btn{background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:var(--sans);padding:0 2px}
 .feed-refresh-btn:active{color:var(--amb)}
 
+/* ══ TRAFFIC CARD V2 (運輸署特別交通消息第二代) ══ */
+.tc-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden;animation:slideIn .2s ease both;position:relative;cursor:pointer;transition:border-color .15s}
+.tc-card:active{border-color:var(--amb-bdr)}
+.tc-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px}
+.tc-card.tc-new::before{background:var(--red)}
+.tc-card.tc-updated::before{background:var(--amb)}
+.tc-card.tc-closed::before{background:var(--grn);opacity:.5}
+.tc-card.tc-closed{opacity:.6}
+.tc-inner{padding:10px 13px 10px 16px}
+.tc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap}
+.tc-type-badge{font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;background:rgba(255,71,87,.13);color:#ff8a96;border:1px solid rgba(255,71,87,.28);white-space:nowrap}
+.tc-type-badge.tc-t-works{background:rgba(240,165,0,.12);color:var(--amb2);border-color:rgba(240,165,0,.28)}
+.tc-type-badge.tc-t-transit{background:rgba(46,213,115,.1);color:#2ed573;border-color:rgba(46,213,115,.25)}
+.tc-type-badge.tc-t-other{background:rgba(91,143,255,.1);color:#7ba8ff;border-color:rgba(91,143,255,.22)}
+.tc-type-badge.tc-t-rthk{background:rgba(91,143,255,.1);color:#7ba8ff;border-color:rgba(91,143,255,.22)}
+.tc-status-badge{font-size:10px;font-weight:600;border-radius:5px;padding:2px 7px;white-space:nowrap}
+.tc-status-badge.st-new{background:rgba(255,71,87,.15);color:#ff8a96}
+.tc-status-badge.st-updated{background:rgba(240,165,0,.15);color:var(--amb2)}
+.tc-status-badge.st-closed{background:rgba(46,213,115,.12);color:#2ed573}
+.tc-time{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:auto;white-space:nowrap;flex-shrink:0}
+.tc-heading{font-size:14px;font-weight:600;color:var(--bright);margin-bottom:3px;line-height:1.45}
+.tc-location{font-size:12px;color:var(--mid);margin-bottom:5px;line-height:1.5}
+.tc-content{font-size:13px;color:var(--txt);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.tc-content.expanded{-webkit-line-clamp:unset;display:block}
+.tc-footer{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+.tc-district{font-size:10px;color:var(--dim);font-family:var(--mono);background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;padding:2px 7px;white-space:nowrap}
+.tc-expand-btn{margin-left:auto;font-size:11px;color:var(--amb);background:none;border:none;cursor:pointer;font-family:var(--sans);padding:2px 0;flex-shrink:0}
+.tc-count-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:#fff;border-radius:8px;font-size:10px;font-weight:700;font-family:var(--mono);min-width:18px;height:18px;padding:0 5px;margin-left:4px;vertical-align:middle}
+
+
 /* ══ SETTINGS ══ */
 .settings-scroll{flex:1;overflow-y:auto;padding:14px 14px 20px}
 .sett-section-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:18px 0 8px;padding-left:2px}
@@ -329,13 +359,18 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <!-- ══ TRAFFIC ══ -->
 <div class="page" id="page-traffic">
   <div class="feed-page">
-    <div class="sub-tab-bar">
-      <button class="sub-tab active" id="ttab-all"  onclick="switchTrafficFeed('all')">📋 全部</button>
-      <button class="sub-tab"        id="ttab-td"   onclick="switchTrafficFeed('td')">🚦 特別交通消息</button>
-      <button class="sub-tab"        id="ttab-rthk" onclick="switchTrafficFeed('rthk')">📻 RTHK 交通</button>
+    <div class="sub-tab-bar" id="traffic-cat-bar">
+      <button class="sub-tab active" id="ttab-all"      onclick="switchTrafficCat('all')">📋 全部</button>
+      <button class="sub-tab"        id="ttab-accident" onclick="switchTrafficCat('accident')">🚗 交通意外</button>
+      <button class="sub-tab"        id="ttab-works"    onclick="switchTrafficCat('works')">🚧 道路工程</button>
+      <button class="sub-tab"        id="ttab-transit"  onclick="switchTrafficCat('transit')">🚌 公共交通</button>
+      <button class="sub-tab"        id="ttab-new"      onclick="switchTrafficCat('new')">🆕 最新/更新</button>
+      <button class="sub-tab"        id="ttab-closed"   onclick="switchTrafficCat('closed')">✅ 完結</button>
     </div>
-    <div style="flex-shrink:0;padding:4px 12px 0;display:flex;justify-content:flex-end">
-      <button class="feed-refresh-btn" onclick="reloadTrafficFeed()">↺ 重新載入</button>
+    <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
+      <span id="traffic-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
+      <span id="traffic-src-lbl" style="font-size:10px;color:var(--dim);font-family:var(--mono)"></span>
+      <button class="feed-refresh-btn" onclick="reloadTrafficV2()">↺ 更新</button>
     </div>
     <div class="feed-list" id="traffic-list"><div class="spinner"></div></div>
   </div>
@@ -427,7 +462,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         城巴：<a href="https://data.one.gov.hk/zh-hant/dataset/citybus-eta" target="_blank">城巴實時到站 API</a><br>
         港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
         新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台（RTHK）本地、大中華、國際、財經、體育</a><br>
-        交通：<a href="https://www.td.gov.hk" target="_blank">運輸署</a><br>
+        交通：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_19-special-traffic-news-v2" target="_blank">運輸署特別交通消息第二代 (v2 XML)</a>、<a href="https://www.rthk.hk" target="_blank">香港電台（RTHK）</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
         © 2026 生活日常。保留所有權利。
       </div>
@@ -661,7 +696,7 @@ function switchPage(name){
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='news')ensureNewsFeedLoaded(currentNewsFeed);
-  if(name==='traffic')ensureTrafficFeedLoaded(currentTrafficFeed);
+  if(name==='traffic')ensureTrafficFeedLoaded(currentTrafficCat);
   if(name==='settings'){document.getElementById('sett-stn-sub').textContent=selectedStn;renderAutoTabSettings();loadTodayHistory();loadTransportSettings()}
 }
 
@@ -910,12 +945,6 @@ const NEWS_FEEDS = {
 const NEWS_FEED_KEYS = ['local','china','world','finance','sport'];
 // Traffic: TD direct XML (data.one.gov.hk has CORS:*), RTHK via proxy
 const TRAFFIC_SOURCES = {
-  td:   {
-    name:'特別交通消息',
-    // data.one.gov.hk has Access-Control-Allow-Origin: * — no proxy needed!
-    direct:'https://resource.data.one.gov.hk/td/special-traffic-news-tc.xml',
-    proxy: 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml',
-  },
   rthk: {
     name:'RTHK 交通',
     url:'https://programme.rthk.hk/channel/radio/trafficnews/rss.xml',
@@ -923,11 +952,473 @@ const TRAFFIC_SOURCES = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  TRAFFIC V2: 運輸署特別交通消息第二代 (TD Special Traffic News v2)
+//  Data spec: http://static.data.gov.hk/td/special-traffic-news/en/Data_Specification_for_STN_Eng_v4.0.pdf
+//  Fields: INCIDENT_NUMBER, INCIDENT_HEADING_CN, INCIDENT_DETAIL_CN,
+//          LOCATION_CN, DISTRICT_CN, DIRECTION_CN, ANNOUNCEMENT_DATE,
+//          INCIDENT_STATUS_CN (最新情況/更新情況/完結), CONTENT_CN,
+//          NEAR_LANDMARK_CN, ID, LATITUDE, LONGITUDE
+// ─────────────────────────────────────────────────────────────────────────────
+
+let trafficV2Data  = [];   // parsed TD v2 items
+let trafficRthkData = [];  // RTHK items (RSS)
+let currentTrafficCat = 'all';
+let _trafficAutoCountdown = 0, _trafficAutoTimer = null;
+const TRAFFIC_AUTO_INTERVAL_SEC = 2 * 60; // 2-min refresh
+
+// ── XML parser — handles BOTH XML schemas from TD ────────────────────────────
+// Schema A (resource.data.one.gov.hk): msgID, ChinText, CurrentStatus (number), ReferenceDate
+// Schema B (td.gov.hk/trafficnews.xml): INCIDENT_NUMBER, INCIDENT_HEADING_CN, CONTENT_CN, INCIDENT_STATUS_CN
+function parseTDTrafficV2XML(xmlText) {
+  if (!xmlText || xmlText.length < 100) return null;
+  try {
+    const clean = xmlText.replace(/^\uFEFF/, '').trim();
+    const xml = new DOMParser().parseFromString(clean, 'text/xml');
+    if (xml.querySelector('parseerror') || xml.querySelector('parsererror')) return null;
+
+    // Use getElementsByTagName — works regardless of namespace
+    const messages = [...(xml.getElementsByTagName('message').length
+      ? xml.getElementsByTagName('message')
+      : xml.getElementsByTagName('Message'))];
+    if (!messages.length) return null;
+
+    const gText = (el, ...tags) => {
+      for (const tag of tags) {
+        // Try with and without namespace
+        const found = el.getElementsByTagName(tag)[0];
+        if (found) return (found.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+      }
+      return '';
+    };
+
+    return messages.map(m => {
+      // ── Schema A: resource.data.one.gov.hk ──
+      const msgId    = gText(m, 'msgID', 'MSGID');
+      const chinText = gText(m, 'ChinText', 'CHINTEXT');
+      const chinShort= gText(m, 'ChinShort', 'CHINSHORT');
+      const engText  = gText(m, 'EngText', 'ENGTEXT');
+      const refDate  = gText(m, 'ReferenceDate', 'REFERENCEDATE');
+      const statusNum= parseInt(gText(m, 'CurrentStatus', 'CURRENTSTATUS') || '0');
+      const districts= [...m.getElementsByTagName('District')].map(d => d.textContent.trim()).filter(Boolean);
+
+      // ── Schema B: td.gov.hk (v2 spec) ──
+      const incNo    = gText(m, 'INCIDENT_NUMBER', 'ID');
+      const headCN   = gText(m, 'INCIDENT_HEADING_CN');
+      const detailCN = gText(m, 'INCIDENT_DETAIL_CN');
+      const locCN    = gText(m, 'LOCATION_CN');
+      const dirCN    = gText(m, 'DIRECTION_CN');
+      const distCN   = gText(m, 'DISTRICT_CN');
+      const statusCN = gText(m, 'INCIDENT_STATUS_CN');
+      const contentCN= gText(m, 'CONTENT_CN');
+      const annDate  = gText(m, 'ANNOUNCEMENT_DATE');
+      const nearLM   = gText(m, 'NEAR_LANDMARK_CN');
+
+      // Detect which schema
+      const isSchemaA = !!chinText || !!msgId;
+
+      if (isSchemaA) {
+        // Map CurrentStatus number to status text
+        // 1=最新情況, 2=更新情況, 3=完結  (inferred from data)
+        // Also check content text for "已解封"/"已恢復" keywords
+        const isResolved = /現已解封|現已重開|現已開放|已恢復正常|已解除|已撤銷/u.test(chinText);
+        let derivedStatus;
+        if (statusNum === 1) derivedStatus = '最新情況';
+        else if (statusNum === 2) derivedStatus = isResolved ? '完結' : '更新情況';
+        else derivedStatus = isResolved ? '完結' : '更新情況';
+
+        // Derive incident type from content
+        const typeText = chinText;
+
+        return {
+          _src: 'td_v2',
+          id: msgId || String(Math.random()),
+          headingCN: chinShort || chinText.split('\n')[0].slice(0, 60),
+          detailCN: typeText,  // used for category classification
+          contentCN: chinText,
+          locationCN: '',
+          directionCN: '',
+          districtCN: districts.join('、'),
+          statusCN: derivedStatus,
+          nearLandmarkCN: '',
+          announcementDate: refDate,
+          lat: null, lng: null,
+        };
+      } else {
+        // Schema B (v2 spec)
+        return {
+          _src: 'td_v2',
+          id: incNo || gText(m, 'ID'),
+          headingCN: headCN,
+          detailCN: detailCN,
+          contentCN: contentCN,
+          locationCN: locCN,
+          directionCN: dirCN,
+          districtCN: distCN,
+          statusCN: statusCN,
+          nearLandmarkCN: nearLM,
+          announcementDate: annDate,
+          lat: parseFloat(gText(m, 'LATITUDE')) || null,
+          lng: parseFloat(gText(m, 'LONGITUDE')) || null,
+        };
+      }
+    }).filter(i => i.headingCN || i.contentCN);
+  } catch(e) { console.warn('[td-v2-xml]', e); return null; }
+}
+
+// ── Classify incident into category ──────────────────────────────────────────
+function getTrafficCat(item) {
+  if (item._src !== 'td_v2') return 'rthk';
+  // Use all available text fields for keyword matching
+  const text = [item.detailCN, item.headingCN, item.contentCN, item.locationCN].join(' ');
+  if (/交通意外|車禍|碰撞|車輛相撞/.test(text)) return 'accident';
+  if (/車輛故障|道路工程|道路維修|緊急維修|水管|管道|工程|挖掘|高空墮物|封路|管制/.test(text)) return 'works';
+  if (/巴士|小巴|公共交通|鐵路|港鐵|輕鐵|電車|渡輪|高速鐵路|運輸|服務|班次|列車|車次/.test(text)) return 'transit';
+  return 'other';
+}
+
+// ── Fetch TD v2 XML (try multiple endpoints) ─────────────────────────────────
+async function fetchTDV2XML() {
+  const urls = [
+    // data.one.gov.hk CORS:* direct endpoints
+    'https://resource.data.one.gov.hk/td/tc/specialtrafficnews.xml',
+    'https://resource.data.one.gov.hk/td/en/specialtrafficnews.xml',
+    // www.td.gov.hk structured XML (may need proxy)
+    'https://www.td.gov.hk/tc/special_news/trafficnews.xml',
+  ];
+  const proxyPrefixes = [
+    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://api.codetabs.com/v1/proxy?quest=${u}`,
+  ];
+
+  // Try direct first
+  for (const url of urls) {
+    try {
+      const r = await Promise.race([
+        fetch(url, {mode:'cors'}),
+        new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+      ]);
+      if (r.ok) {
+        const text = await r.text();
+        const items = parseTDTrafficV2XML(text);
+        if (items?.length) {
+          console.log('[td-v2] direct ok:', url, items.length);
+          return items;
+        }
+      }
+    } catch(e) { /* try next */ }
+  }
+
+  // Try via proxies for the td.gov.hk URL
+  const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
+  for (const mkUrl of proxyPrefixes) {
+    try {
+      const r = await Promise.race([
+        fetch(mkUrl(tdUrl)),
+        new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+      ]);
+      if (!r.ok) continue;
+      let text = await r.text();
+      // allorigins /get returns JSON wrapper
+      if (text.startsWith('{')) {
+        try { const j = JSON.parse(text); text = j.contents || j.body || text; } catch {}
+      }
+      const items = parseTDTrafficV2XML(text);
+      if (items?.length) {
+        console.log('[td-v2] proxy ok:', mkUrl(tdUrl).slice(0,40), items.length);
+        return items;
+      }
+    } catch(e) { /* try next */ }
+  }
+
+  // Final fallback: try old RSS
+  try {
+    const rssUrl = 'https://www.td.gov.hk/tc/special_news/spnews_rss.xml';
+    const items = await fetchFeed(rssUrl);
+    if (items?.length) {
+      console.log('[td-v2] rss fallback ok:', items.length);
+      // Convert RSS items to minimal v2 format
+      return items.map(i => ({
+        _src: 'td_v2',
+        id: i.link || String(Math.random()),
+        headingCN: i.title || '',
+        detailCN: '',
+        locationCN: '',
+        directionCN: '',
+        districtCN: '',
+        statusCN: '最新情況',
+        contentCN: i.description || '',
+        nearLandmarkCN: '',
+        announcementDate: i.pubDate || '',
+        lat: null, lng: null,
+        _rss: true,
+      }));
+    }
+  } catch(e) {}
+
+  return null;
+}
+
+// ── Main loader ──────────────────────────────────────────────────────────────
+async function loadTDTrafficV2() {
+  document.getElementById('traffic-src-lbl').textContent = '載入中…';
+  const [v2Items, rthkItems] = await Promise.all([
+    fetchTDV2XML(),
+    fetchFeed(TRAFFIC_SOURCES.rthk.url).catch(() => null),
+  ]);
+
+  trafficV2Data = v2Items || [];
+  trafficRthkData = (rthkItems || []).map(i => ({...i, _src:'rthk'}));
+
+  const srcParts = [];
+  if (trafficV2Data.length) srcParts.push(`運輸署(${trafficV2Data.length})`);
+  if (trafficRthkData.length) srcParts.push(`RTHK(${trafficRthkData.length})`);
+  document.getElementById('traffic-src-lbl').textContent = srcParts.join(' · ') || '無資料';
+
+  renderTrafficV2();
+}
+
+async function reloadTrafficV2() {
+  trafficV2Data = [];
+  trafficRthkData = [];
+  document.getElementById('traffic-list').innerHTML = '<div class="spinner"></div>';
+  _updateTrafficBadge('更新中…');
+  await loadTDTrafficV2();
+  _updateTrafficBadge();
+  _restartTrafficAutoRefresh();
+}
+
+// ── Category switch ──────────────────────────────────────────────────────────
+function switchTrafficCat(cat) {
+  currentTrafficCat = cat;
+  document.querySelectorAll('#traffic-cat-bar .sub-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('ttab-' + cat)?.classList.add('active');
+  renderTrafficV2();
+}
+
+// ── Time formatter — handles both Schema A and B date formats ────────────────
+function fmtTrafficTime(dateStr) {
+  if (!dateStr) return '';
+  // Schema A format: "2026/3/20 下午 01:55:17" or " 2026/3/20 下午 01:55:17"
+  const schemaA = dateStr.trim().match(/(\d{4})\/(\d+)\/(\d+)\s*(上午|下午)?\s*(\d+):(\d+)/);
+  if (schemaA) {
+    const [,y,mo,d,ampm,h,min] = schemaA;
+    let hour = parseInt(h);
+    if (ampm === '下午' && hour < 12) hour += 12;
+    if (ampm === '上午' && hour === 12) hour = 0;
+    const dt = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), hour, parseInt(min));
+    const diff = Math.round((Date.now() - dt.getTime()) / 60000);
+    if (diff < 1) return '剛才';
+    if (diff < 60) return diff + '分前';
+    if (diff < 1440) return `${hour}:${String(parseInt(min)).padStart(2,'0')}`;
+    return `${mo}/${d}`;
+  }
+  // Schema B / ISO format
+  const dt = new Date(dateStr);
+  if (isNaN(dt)) return '';
+  const diff = Math.round((Date.now() - dt.getTime()) / 60000);
+  if (diff < 1) return '剛才';
+  if (diff < 60) return diff + '分前';
+  if (diff < 1440) return `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  return `${dt.getMonth()+1}/${dt.getDate()}`;
+}
+
+// ── Card renderer for v2 TD items ────────────────────────────────────────────
+function renderTDV2Card(item, idx) {
+  const cat = getTrafficCat(item);
+  const statusRaw = item.statusCN || '';
+  let statusClass = 'st-new', statusLabel = '🆕 最新', cardClass = 'tc-new';
+  if (statusRaw.includes('更新') || statusRaw === 'UPDATED') { statusClass='st-updated'; statusLabel='🔄 更新'; cardClass='tc-updated'; }
+  else if (statusRaw.includes('完結') || statusRaw === 'CLOSED') { statusClass='st-closed'; statusLabel='✅ 完結'; cardClass='tc-closed'; }
+
+  const typeLabel = {accident:'🚗 交通意外', works:'🚧 道路/工程', transit:'🚌 公共交通', other:'📋 其他'}[cat] || '📋 其他';
+  const typeClass = {accident:'', works:'tc-t-works', transit:'tc-t-transit', other:'tc-t-other'}[cat] || 'tc-t-other';
+
+  // Schema A: headingCN = first line of ChinShort, contentCN = full ChinText
+  // Schema B: headingCN = INCIDENT_HEADING_CN, contentCN = CONTENT_CN
+  const heading = item.headingCN || item.contentCN?.split('\n')[0]?.slice(0,80) || '特別交通消息';
+  const content = (item.contentCN || '').trim().replace(/\r\n|\r/g, '\n');
+  // Only show content if it meaningfully differs from heading
+  const showContent = content && content !== heading && content.length > heading.length;
+
+  const loc = [item.locationCN, item.directionCN && '往'+item.directionCN, item.nearLandmarkCN && '近'+item.nearLandmarkCN].filter(Boolean).join('　');
+  const timeStr = fmtTrafficTime(item.announcementDate);
+  const contentId = `tc-content-${idx}`;
+  const btnId = `tc-btn-${idx}`;
+  const hasLong = content.length > 100;
+
+  return `<div class="tc-card ${cardClass}" style="animation-delay:${idx*.025}s">
+    <div class="tc-inner">
+      <div class="tc-hdr">
+        <span class="tc-type-badge ${typeClass}">${typeLabel}</span>
+        <span class="tc-status-badge ${statusClass}">${statusLabel}</span>
+        ${timeStr ? `<span class="tc-time">${timeStr}</span>` : ''}
+      </div>
+      <div class="tc-heading">${heading}</div>
+      ${loc ? `<div class="tc-location">📍 ${loc}</div>` : ''}
+      ${showContent ? `<div class="tc-content" id="${contentId}">${content}</div>` : ''}
+      <div class="tc-footer">
+        ${item.districtCN ? `<span class="tc-district">${item.districtCN}</span>` : ''}
+        ${showContent && hasLong ? `<button class="tc-expand-btn" id="${btnId}" onclick="toggleTcContent('${contentId}','${btnId}')">展開 ▾</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Card renderer for RTHK RSS items ─────────────────────────────────────────
+function renderRthkCard(item, idx) {
+  const timeStr = relTime(item.pubDate);
+  const desc = (item.description || '').trim();
+  return `<a class="tc-card tc-new" href="${item.link||'#'}" target="_blank" style="animation-delay:${idx*.025}s;text-decoration:none;color:inherit">
+    <div class="tc-inner">
+      <div class="tc-hdr">
+        <span class="tc-type-badge tc-t-rthk">📻 RTHK 交通</span>
+        ${timeStr ? `<span class="tc-time">${timeStr}</span>` : ''}
+      </div>
+      <div class="tc-heading">${item.title||''}</div>
+      ${desc ? `<div class="tc-content" style="-webkit-line-clamp:3">${desc}</div>` : ''}
+    </div>
+  </a>`;
+}
+
+function toggleTcContent(contentId, btnId) {
+  const el = document.getElementById(contentId);
+  const btn = document.getElementById(btnId);
+  if (!el) return;
+  const expanded = el.classList.toggle('expanded');
+  if (btn) btn.textContent = expanded ? '收起 ▴' : '展開 ▾';
+}
+
+// ── Main render ──────────────────────────────────────────────────────────────
+function renderTrafficV2() {
+  const el = document.getElementById('traffic-list');
+  if (!el) return;
+  const cat = currentTrafficCat;
+
+  // Filter TD v2 items
+  let tdItems = trafficV2Data;
+  if (cat === 'accident') tdItems = tdItems.filter(i => getTrafficCat(i) === 'accident');
+  else if (cat === 'works') tdItems = tdItems.filter(i => getTrafficCat(i) === 'works');
+  else if (cat === 'transit') tdItems = tdItems.filter(i => getTrafficCat(i) === 'transit');
+  else if (cat === 'new') tdItems = tdItems.filter(i => !(i.statusCN||'').includes('完結'));
+  else if (cat === 'closed') tdItems = tdItems.filter(i => (i.statusCN||'').includes('完結'));
+  else if (cat === 'rthk') { tdItems = []; }
+
+  // Sort: NEW first, then UPDATED, then CLOSED; within group: newest first
+  const statusOrder = (s) => s.includes('完結') ? 2 : s.includes('更新') ? 1 : 0;
+  const timeSafe = s => { try { return new Date(s).getTime() || 0 } catch { return 0 } };
+  tdItems = [...tdItems].sort((a,b) => {
+    const so = statusOrder(a.statusCN||'') - statusOrder(b.statusCN||'');
+    if (so !== 0) return so;
+    return timeSafe(b.announcementDate) - timeSafe(a.announcementDate);
+  });
+
+  // Show RTHK only in "all" or "rthk" tab
+  const rthkItems = (cat === 'all' || cat === 'rthk') ? trafficRthkData : [];
+
+  const total = tdItems.length + rthkItems.length;
+
+  // Update tab count badges
+  if (cat === 'all') {
+    const newCount = trafficV2Data.filter(i => !(i.statusCN||'').includes('完結')).length;
+    const countEl = document.getElementById('ttab-all');
+    if (countEl) countEl.innerHTML = newCount > 0
+      ? `📋 全部<span class="tc-count-badge">${newCount}</span>`
+      : '📋 全部';
+  }
+
+  if (!total && !trafficV2Data.length && !trafficRthkData.length) {
+    // Still loading
+    return;
+  }
+
+  if (!total) {
+    const labels = {accident:'交通意外',works:'道路工程',transit:'公共交通',new:'最新/更新',closed:'完結',rthk:'RTHK交通'};
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🚦</div>
+      <div class="empty-text">目前沒有「${labels[cat]||''}」消息</div>
+      <div class="empty-sub">交通暢順，繼續留意最新消息</div>
+    </div>`;
+    return;
+  }
+
+  // Render section headers when showing all
+  let html = '';
+  if (cat === 'all' && tdItems.length && rthkItems.length) {
+    html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:4px 2px 8px">🚦 運輸署特別交通消息</div>`;
+  }
+  html += tdItems.map((item, i) => renderTDV2Card(item, i)).join('');
+
+  if (rthkItems.length) {
+    if (cat === 'all' && tdItems.length) {
+      html += `<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:12px 2px 8px">📻 RTHK 交通廣播</div>`;
+    }
+    html += rthkItems.map((item, i) => renderRthkCard(item, tdItems.length + i)).join('');
+  }
+
+  if (!html) {
+    el.innerHTML = `<div style="text-align:center;padding:30px 20px;color:var(--mid)">
+      <div style="font-size:32px;margin-bottom:12px">🚦</div>
+      <div style="font-size:14px">無法載入交通消息</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:6px;line-height:1.7">請檢查網絡連線後重試</div>
+      <button onclick="reloadTrafficV2()" style="margin-top:14px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:9px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML = html;
+}
+
+// ── Auto-refresh for traffic ──────────────────────────────────────────────────
+function _updateTrafficBadge(msg) {
+  const el = document.getElementById('traffic-auto-badge');
+  if (!el) return;
+  if (msg) { el.textContent = msg; return; }
+  const ts = Math.max(0, _trafficAutoCountdown);
+  const mm = String(Math.floor(ts/60)).padStart(2,'0');
+  const ss = String(ts%60).padStart(2,'0');
+  el.textContent = `⟳ ${mm}:${ss} 後自動更新`;
+}
+
+function _restartTrafficAutoRefresh() {
+  if (_trafficAutoTimer) clearInterval(_trafficAutoTimer);
+  _trafficAutoCountdown = TRAFFIC_AUTO_INTERVAL_SEC;
+  _updateTrafficBadge();
+  _trafficAutoTimer = setInterval(async () => {
+    _trafficAutoCountdown--;
+    if (_trafficAutoCountdown <= 0) {
+      _trafficAutoCountdown = TRAFFIC_AUTO_INTERVAL_SEC;
+      if (document.querySelector('.page.active')?.id === 'page-traffic') {
+        _updateTrafficBadge('更新中…');
+        await loadTDTrafficV2();
+      }
+    }
+    _updateTrafficBadge();
+  }, 1000);
+}
+
+
+// ── Legacy shims (keep switchPage compatibility) ──────────────────────────────
+function switchTrafficFeed(key) { switchTrafficCat(key === 'td' ? 'all' : key); }
+async function ensureTrafficFeedLoaded(key) {
+  if (!trafficV2Data.length && !trafficRthkData.length) {
+    document.getElementById('traffic-list').innerHTML = '<div class="spinner"></div>';
+    await loadTDTrafficV2();
+    _restartTrafficAutoRefresh();
+  } else {
+    renderTrafficV2();
+  }
+}
+async function reloadTrafficFeed() { await reloadTrafficV2(); }
+function renderTrafficFeed() { renderTrafficV2(); }
+function getMergedTraffic() { return [...trafficV2Data, ...trafficRthkData]; }
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  NEWS: fetch via rss2json + allorigins fallback chain with 10-min cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-let currentNewsFeed='all', currentTrafficFeed='all';
-let newsCache={}, trafficCache={}, wxDetails={};
+let currentNewsFeed='all';
+let newsCache={}, wxDetails={};
+// trafficV2Data, trafficRthkData, currentTrafficCat defined in traffic v2 section above
 const CACHE_TTL=10*60*1000; // 10 minutes
 
 function cacheValid(key, store){
@@ -1066,22 +1557,6 @@ async function fetchFeed(url){
   });
 }
 
-// Traffic: try direct fetch first (data.one.gov.hk has CORS:*)
-async function fetchTrafficDirect(src){
-  // Try the data.one.gov.hk URL directly first — no proxy needed
-  if(src.direct){
-    try{
-      const res=await ft(src.direct);
-      if(res.ok){
-        const items=parseXML(await res.text());
-        if(items?.length){console.log('[traffic] direct ok:',items.length);return items}
-      }
-    }catch(e){console.warn('[traffic-direct]',e.message)}
-  }
-  // Fall back to RSS proxy chain
-  return fetchFeed(src.proxy||src.url);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  NEWS RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1194,87 +1669,10 @@ async function reloadNewsFeed(){
   _updateNewsBadge();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  TRAFFIC RENDERING
-// ─────────────────────────────────────────────────────────────────────────────
-const TSRC_LABEL={'td':'運輸署','rthk':'RTHK'};
-const TSRC_COLOR={'td':'#f0a500','rthk':'#5b8fff'};
-
-function switchTrafficFeed(key){
-  currentTrafficFeed=key;
-  document.querySelectorAll('[id^=ttab-]').forEach(b=>b.classList.remove('active'));
-  document.getElementById('ttab-'+key)?.classList.add('active');
-  renderTrafficFeed();
-  ensureTrafficFeedLoaded(key);
-}
-
-async function loadTrafficFeed(key){
-  if(key==='all'){
-    await Promise.all(['td','rthk'].map(k=>loadTrafficFeed(k)));
-    return;
-  }
-  const src=TRAFFIC_SOURCES[key];
-  const items=key==='td'?await fetchTrafficDirect(src):await fetchFeed(src.url);
-  if(items){
-    trafficCache[key]={items:items.map(i=>({...i,_src:key})),ts:Date.now()};
-  }else{
-    trafficCache[key]={items:[],ts:Date.now(),_failed:true};
-  }
-}
-
-async function ensureTrafficFeedLoaded(key){
-  if(key==='all'){
-    const missing=['td','rthk'].filter(k=>!cacheValid(k,trafficCache));
-    if(missing.length){
-      missing.forEach(k=>{
-        loadTrafficFeed(k).then(()=>{if(currentTrafficFeed==='all')renderTrafficFeed()});
-      });
-      const hasAny=['td','rthk'].some(k=>trafficCache[k]?.items?.length);
-      if(!hasAny)return;
-    }
-  }else{
-    if(!cacheValid(key,trafficCache))await loadTrafficFeed(key);
-  }
-  renderTrafficFeed();
-}
-
-function getMergedTraffic(){
-  const all=[];
-  ['td','rthk'].forEach(k=>{(trafficCache[k]?.items||[]).forEach(i=>all.push(i))});
-  return all.sort((a,b)=>{
-    const ta=a.pubDate?new Date(a.pubDate).getTime():0;
-    const tb=b.pubDate?new Date(b.pubDate).getTime():0;
-    return tb-ta;
-  });
-}
-
-function renderTrafficFeed(){
-  const el=document.getElementById('traffic-list');
-  if(!el)return;
-  const key=currentTrafficFeed;
-  if(key==='all'){
-    const items=getMergedTraffic();
-    if(!items.length&&['td','rthk'].some(k=>!trafficCache[k])){
-      el.innerHTML=`<div class="spinner"></div>`;return;
-    }
-    renderFeedItems(items,el,key,true);
-  }else{
-    if(!trafficCache[key]){el.innerHTML=`<div class="spinner"></div>`;return}
-    renderFeedItems(trafficCache[key].items,el,key,false);
-  }
-}
-
-async function reloadTrafficFeed(){
-  if(currentTrafficFeed==='all'){['td','rthk'].forEach(k=>delete trafficCache[k])}
-  else delete trafficCache[currentTrafficFeed];
-  document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
-  await ensureTrafficFeedLoaded(currentTrafficFeed);
-}
-
 function reloadCurrentFeed(){
   const pg=document.querySelector('.page.active')?.id;
   if(pg==='page-news')reloadNewsFeed();
-  else if(pg==='page-traffic')reloadTrafficFeed();
+  else if(pg==='page-traffic')reloadTrafficV2();
 }
 
 // ── News auto-update badge ────────────────────────────────────────────────────
@@ -1425,8 +1823,6 @@ function toggleEtaMode(){
 // ═══════════════════════════════════
 function setDist(m){nearbyDist=m;localStorage.setItem('nearby_dist',m);document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===m));loadNearby()}
 function syncDistPills(){document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist))}
-
-function pickStn(n){selectedStn=n;localStorage.setItem('hko_stn',n);closeDrawer();loadWeather();document.getElementById('sett-stn-sub').textContent=n}
 
 // ═══════════════════════════════════
 //  PROFILES
@@ -2521,6 +2917,7 @@ if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs();
 setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
 _startNewsAutoRefresh();
+_restartTrafficAutoRefresh();
 
 // PWA
 const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
