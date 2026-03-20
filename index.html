@@ -151,7 +151,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bus-card-v2.soon::before{background:var(--red)}.bus-card-v2.coming::before{background:var(--amb)}.bus-card-v2.ok::before{background:var(--grn)}
 .bus-card-v2.card-ghost{opacity:.25}.bus-card-v2.card-slot{border:1px dashed var(--amb-bdr);background:rgba(240,165,0,.04)}.bus-card-v2.card-slot::before{background:transparent}
 .bcv2-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--amb-bg);border-right:1px solid var(--amb-bdr);padding:10px 7px;min-width:68px;max-width:68px;flex-shrink:0}
-.bcv2-route-no{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--amb2);letter-spacing:-1px;line-height:1;text-align:center;word-break:break-all}
+.bcv2-route-no{font-family:var(--mono);font-weight:700;color:var(--amb2);letter-spacing:-1px;line-height:1;text-align:center;white-space:nowrap;overflow:hidden}
 .bcv2-co-name{font-size:9px;color:var(--mid);margin-top:3px;line-height:1.4;text-align:center;white-space:nowrap}
 .bcv2-mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:9px 6px 9px 10px}
 .bcv2-dest-lbl{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;color:var(--bright)}
@@ -364,6 +364,14 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <button class="dist-pill" data-m="1000" onclick="setDist(1000)">1km</button>
       <button class="dist-pill" data-m="3000" onclick="setDist(3000)">3km</button>
       <button class="dist-pill" data-m="5000" onclick="setDist(5000)">5km</button>
+      <button class="dist-pill" id="dist-custom-pill" onclick="openCustomDist()">自訂</button>
+      <div id="dist-custom-wrap" style="display:none;align-items:center;gap:4px;flex-shrink:0">
+        <input id="dist-custom-inp" type="number" min="50" max="50000" step="50"
+          style="width:72px;background:var(--bg3);border:1px solid var(--amb-bdr);border-radius:8px;padding:3px 7px;color:var(--txt);font-family:var(--mono);font-size:13px;outline:none"
+          placeholder="米" onkeydown="if(event.key==='Enter')confirmCustomDist()">
+        <button onclick="confirmCustomDist()" style="background:var(--amb);color:#000;border:none;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)">確定</button>
+        <button onclick="cancelCustomDist()" style="background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);border-radius:7px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:var(--sans)">✕</button>
+      </div>
     </div>
     <div class="bus-list" id="bus-list"></div>
   </div>
@@ -656,7 +664,7 @@ async function fetchKMBFare(route,dir,svcType){
   const key=`kmb_${route}_${bound}_${svcType}`;
   if(_fareCache[key]!==undefined)return _fareCache[key];
   try{
-    const d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+    const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),6000);let d;try{d=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal}).then(r=>r.json());}finally{clearTimeout(_ft);}
     const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
     const maxFare=fares.length?Math.max(...fares):null;
     _fareCache[key]=maxFare!==null?Math.round(maxFare*10)/10:null;
@@ -2020,7 +2028,28 @@ function toggleEtaMode(){/* removed - v2 always shows time+mins */}
 //  DISTANCE SELECTOR
 // ═══════════════════════════════════
 function setDist(m){nearbyDist=m;localStorage.setItem('nearby_dist',m);document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===m));loadNearby()}
-function syncDistPills(){document.querySelectorAll('.dist-pill').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist))}
+function syncDistPills(){
+  const stdVals=[100,300,500,1000,3000,5000];
+  const isStd=stdVals.includes(nearbyDist);
+  document.querySelectorAll('.dist-pill[data-m]').forEach(p=>p.classList.toggle('active',parseInt(p.dataset.m)===nearbyDist));
+  const cp=document.getElementById('dist-custom-pill');
+  if(cp)cp.classList.toggle('active',!isStd);
+}
+function openCustomDist(){
+  document.getElementById('dist-custom-wrap').style.display='flex';
+  document.getElementById('dist-custom-pill').style.display='none';
+  const inp=document.getElementById('dist-custom-inp');
+  if(inp){inp.value=nearbyDist;inp.focus();inp.select();}
+}
+function confirmCustomDist(){
+  const v=parseInt(document.getElementById('dist-custom-inp')?.value||'0');
+  if(v>=50&&v<=50000){setDist(v);}
+  cancelCustomDist();
+}
+function cancelCustomDist(){
+  document.getElementById('dist-custom-wrap').style.display='none';
+  document.getElementById('dist-custom-pill').style.display='';
+}
 
 // ═══════════════════════════════════
 //  PROFILES
@@ -2152,7 +2181,7 @@ function renderBusCardV2({route,dest,stopName,dist,fare,companyType,etasWithType
   return`<div class="bus-card-v2 ${urgency}" style="animation-delay:${idx*.04}s" ${clickAttr}>
     ${dragHtml}
     <div class="bcv2-badge" style="background:${badgeBg};border-color:${badgeBdr}">
-      <div class="bcv2-route-no" style="color:${routeCol}">${route}</div>
+      <div class="bcv2-route-no" style="color:${routeCol};font-size:${route.length<=3?'24px':route.length===4?'19px':'15px'}">${route}</div>
       <div class="bcv2-co-name">${coLabel}</div>
     </div>
     <div class="bcv2-mid">
@@ -2169,10 +2198,28 @@ function renderBusCardV2({route,dest,stopName,dist,fare,companyType,etasWithType
 // ═══════════════════════════════════
 async function fetchAllStops(){if(allStops)return allStops;const data=await fetch(`${KMB}/stop`).then(r=>r.json());allStops=data.data||[];return allStops}
 // ── CTB nearby raw data helper ─────────────────────────────────────────────
-async function _fetchCTBNearbyRaw(lat,lng,radius){
-  if(!window._ctbStops){
-    try{const d=await fetch(`${CTB}/stop`).then(r=>r.json());window._ctbStops=d.data||[];}catch{window._ctbStops=[];}
+let _ctbStopsPromise=null;
+async function _ensureCTBStops(){
+  if(window._ctbStops&&window._ctbStops.length>0)return window._ctbStops;
+  if(!_ctbStopsPromise){
+    _ctbStopsPromise=(async()=>{
+      try{
+        const d=await fetch(`${CTB}/stop`,{signal:AbortSignal.timeout?AbortSignal.timeout(12000):undefined}).then(r=>r.json());
+        window._ctbStops=d.data||[];
+        console.log('[CTB stops]',window._ctbStops.length);
+      }catch(e){
+        console.warn('[CTB stops] fetch failed:',e);
+        window._ctbStops=null;
+        _ctbStopsPromise=null;
+      }
+    })();
   }
+  await _ctbStopsPromise;
+  return window._ctbStops||[];
+}
+async function _fetchCTBNearbyRaw(lat,lng,radius){
+  const allStops=await _ensureCTBStops();
+  if(!allStops.length)return [];
   const nearbyCTB=(window._ctbStops||[])
     .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude||0),parseFloat(s.long||s.longitude||0))}))
     .filter(s=>s.dist<=radius&&!isNaN(s.dist)&&s.dist>0)
@@ -2321,9 +2368,18 @@ async function fetchOneETA(fav){
     fav._etas=(data.data||[]).filter(e=>e.eta).slice(0,3).map(e=>new Date(e.eta).getTime());
     fav._first=fav._etas[0]??null;fav._err=false;
   }catch{fav._etas=[];fav._first=null;fav._err=true;}
-  // Fetch fare lazily (KMB only)
+  // Fetch fare (KMB only) — update DOM directly after resolve
   if((fav.type==='kmb'||!fav.type)&&fav._fare==null){
-    fetchKMBFare(fav.route,'O',fav.serviceType).then(fare=>{if(fare!=null)fav._fare=fare;});
+    fetchKMBFare(fav.route,'O',fav.serviceType).then(fare=>{
+      if(fare==null)return;
+      fav._fare=fare;
+      const idx=favs.indexOf(fav);if(idx<0)return;
+      const cards=document.getElementById('bus-list')?.querySelectorAll('.bus-card-v2');
+      if(cards&&cards[idx]){
+        const sl=cards[idx].querySelector('.bcv2-stop-lbl');
+        if(sl)sl.textContent=fav.stopName+`  ($${fare})`;
+      }
+    });
   }
 }
 async function refreshAllETAs(){if(activePid===NEARBY_PID){loadNearby();return}favs=loadFavs(activePid);if(!favs.length){renderBusList();return}await Promise.all(favs.map(fetchOneETA));renderBusList()}
@@ -3196,11 +3252,8 @@ async function fetchMTRNearby(lat,lng){
 async function fetchCTBNearby(lat,lng,radius){
   try{
     // CTB stop list is large; use a cached approach
-    if(!window._ctbStops){
-      const d=await fetch(`${CTB}/stop`).then(r=>r.json());
-      window._ctbStops=d.data||[];
-    }
-    const nearby=window._ctbStops
+    const _ctbSt=await _ensureCTBStops();
+    const nearby=(_ctbSt||[])
       .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude),parseFloat(s.long||s.longitude))}))
       .filter(s=>s.dist<=radius&&!isNaN(s.dist))
       .sort((a,b)=>a.dist-b.dist).slice(0,8);
@@ -3268,6 +3321,8 @@ setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
 _startNewsAutoRefresh();
 _restartTrafficAutoRefresh();
+// Preload CTB stops in background so nearby search is ready
+setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},1500);
 
 // PWA
 const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
