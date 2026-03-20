@@ -708,13 +708,61 @@ function switchPage(name){
 function tickClock(){const n=new Date();document.getElementById('clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;document.getElementById('w-date').textContent=`${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()}（${DAY[n.getDay()]}）`;}
 tickClock();setInterval(tickClock,1000);
 
+// Last known position cache key
+const _GPS_CACHE_KEY='last_gps_v1';
+function _savePosCache(lat,lng){try{localStorage.setItem(_GPS_CACHE_KEY,JSON.stringify({lat,lng,ts:Date.now()}))}catch{}}
+function _loadPosCache(){try{const c=JSON.parse(localStorage.getItem(_GPS_CACHE_KEY)||'null');if(c&&c.lat&&c.lng&&(Date.now()-c.ts)<24*60*60*1000)return c;}catch{}return null;}
+
+// GPS in-flight guard (prevents double-fetch)
+let _gpsInFlight=false;
+
 async function autoLocate(){
   document.getElementById('w-loc-lbl').textContent=selectedStn;
   if(!navigator.geolocation)return;
+
+  // ── Step 1: restore cached position immediately so nearby tab doesn't block ──
+  const cached=_loadPosCache();
+  if(cached&&!nearbyLat){
+    nearbyLat=cached.lat;nearbyLng=cached.lng;
+    const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
+    if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);}
+    document.getElementById('w-loc-lbl').textContent=selectedStn;
+    // Render nearby from cache immediately (will refresh when fresh GPS arrives)
+    if(activePid===NEARBY_PID)loadNearby();
+  }
+
+  // ── Step 2: fetch fresh GPS (maximumAge=5min so browser may return instantly) ──
+  if(_gpsInFlight)return;
+  _gpsInFlight=true;
   navigator.geolocation.getCurrentPosition(
-    pos=>{nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude;const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather()}document.getElementById('w-loc-lbl').textContent=selectedStn;if(activePid===NEARBY_PID)loadNearby();},
-    ()=>{/* GPS失敗：沿用上次測站，不使用第三方定位 */},
-    {timeout:10000,maximumAge:60000,enableHighAccuracy:false}
+    pos=>{
+      _gpsInFlight=false;
+      nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude;
+      _savePosCache(nearbyLat,nearbyLng);
+      const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
+      if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather();}
+      document.getElementById('w-loc-lbl').textContent=selectedStn;
+      const stnSub=document.getElementById('sett-stn-sub');if(stnSub)stnSub.textContent=selectedStn;
+      if(activePid===NEARBY_PID)loadNearby();
+    },
+    err=>{
+      _gpsInFlight=false;
+      // GPS failed but we may already have cached coords — nearby still works
+      if(!nearbyLat&&activePid===NEARBY_PID){
+        const el=document.getElementById('bus-list');
+        if(el&&!el.querySelector('.bus-card-v2')){
+          el.innerHTML=`<div class="msg" style="padding:24px 20px">
+            <div style="font-size:28px;margin-bottom:10px">📍</div>
+            <div style="font-size:14px;color:var(--bright);margin-bottom:6px">位置取得失敗</div>
+            <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:14px">
+              ${err.code===1?'位置權限被拒絕，請到瀏覽器設定中允許位置存取。':'無法取得 GPS 信號，請移至室外後重試。'}
+            </div>
+            <button onclick="requestGPS()" style="background:var(--blu);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)">📡 重試</button>
+          </div>`;
+        }
+      }
+    },
+    {timeout:15000,maximumAge:5*60*1000,enableHighAccuracy:false}
   );
 }
 
@@ -2000,28 +2048,30 @@ function switchToNearby(){setActivePid(NEARBY_PID);renderProfiles();syncDistPill
 function requestGPS(){
   if(!navigator.geolocation)return;
   const el=document.getElementById('bus-list');
-  el.innerHTML=`<div class="spinner"></div>`;
+  el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;gap:12px">
+    <div class="spinner" style="margin:0"></div>
+    <div style="font-size:13px;color:var(--mid)">定位中…</div>
+  </div>`;
+  if(_gpsInFlight)return; // already in-flight from autoLocate
+  _gpsInFlight=true;
   navigator.geolocation.getCurrentPosition(
     pos=>{
-      nearbyLat=pos.coords.latitude;
-      nearbyLng=pos.coords.longitude;
-      // Also update weather station to nearest
+      _gpsInFlight=false;
+      nearbyLat=pos.coords.latitude;nearbyLng=pos.coords.longitude;
+      _savePosCache(nearbyLat,nearbyLng);
       const near=nearestOf(RHRREAD_STNS,nearbyLat,nearbyLng);
-      if(near.n!==selectedStn){
-        selectedStn=near.n;
-        localStorage.setItem('hko_stn',near.n);
-        loadWeather();
-      }
+      if(near.n!==selectedStn){selectedStn=near.n;localStorage.setItem('hko_stn',near.n);loadWeather();}
       document.getElementById('w-loc-lbl').textContent=selectedStn;
       loadNearby();
     },
     err=>{
+      _gpsInFlight=false;
       let msg='❌ 定位失敗';
       if(err.code===1) msg='⚠️ 位置權限被拒絕<br><small style="color:var(--dim)">請到瀏覽器設定中允許位置存取，然後重新整理頁面</small>';
       else if(err.code===2) msg='⚠️ 無法取得位置信號<br><small style="color:var(--dim)">請移至室外或開啟 WiFi 後重試</small>';
       el.innerHTML=`<div class="msg">${msg}</div>`;
     },
-    {timeout:15000, maximumAge:30000, enableHighAccuracy:true}
+    {timeout:15000, maximumAge:60000, enableHighAccuracy:true}
   );
 }
 function addProfile(){
@@ -2153,10 +2203,26 @@ async function loadNearby(){
   const el=document.getElementById('bus-list');el.innerHTML=`<div class="spinner"></div>`;
   if(!nearbyLat){
     if(!navigator.geolocation){el.innerHTML=`<div class="msg">此裝置不支援定位</div>`;return}
+
+    // ── Check if permission already granted (just waiting for GPS to return) ──
+    let permState='prompt';
+    try{const ps=await navigator.permissions.query({name:'geolocation'});permState=ps.state;}catch{}
+
+    if(permState==='granted'){
+      // Permission granted — GPS is in-flight, show spinner and kick GPS if needed
+      el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;gap:12px">
+        <div class="spinner" style="margin:0"></div>
+        <div style="font-size:13px;color:var(--mid)">定位中…</div>
+      </div>`;
+      if(!_gpsInFlight)autoLocate();
+      return;
+    }
+
+    // Permission not yet asked — show allow button
     el.innerHTML=`<div class="msg" style="padding:30px 20px">
       <div style="font-size:32px;margin-bottom:12px">📍</div>
       <div style="font-size:15px;color:var(--bright);margin-bottom:8px">需要位置權限</div>
-      <div style="font-size:13px;line-height:1.7;margin-bottom:16px">為搜尋附近九巴站，需要使用你的精確位置。<br>瀏覽器只需授權一次。</div>
+      <div style="font-size:13px;line-height:1.7;margin-bottom:16px">為搜尋附近班次，需要使用你的精確位置。<br>瀏覽器只需授權一次。</div>
       <button onclick="requestGPS()" style="background:var(--blu);color:#fff;border:none;border-radius:10px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)">📡 允許位置使用</button>
     </div>`;
     return;
@@ -3192,9 +3258,12 @@ checkAutoTab();   // sets activePid based on time rules (or NEARBY_PID)
 favs=loadFavs(activePid); // reload favs for whichever pid was chosen
 renderProfiles();
 document.getElementById('w-loc-lbl').textContent=selectedStn;
-autoLocate();
+autoLocate(); // handles nearby tab too (via cached pos + fresh GPS)
 loadWeather();
-if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs();
+if(activePid!==NEARBY_PID)refreshAllETAs();
+// Note: when activePid===NEARBY_PID, autoLocate() calls loadNearby() after GPS/cache
+// But if no cached pos yet, we still call loadNearby() to show the correct UI state
+if(activePid===NEARBY_PID&&!nearbyLat)loadNearby();
 setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
 _startNewsAutoRefresh();
