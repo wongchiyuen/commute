@@ -185,6 +185,33 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .tc-expand-btn{margin-left:auto;font-size:11px;color:var(--amb);background:none;border:none;cursor:pointer;font-family:var(--sans);padding:2px 0;flex-shrink:0}
 .tc-count-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:#fff;border-radius:8px;font-size:10px;font-weight:700;font-family:var(--mono);min-width:18px;height:18px;padding:0 5px;margin-left:4px;vertical-align:middle}
 
+/* ══ PASSENGER NOTICE CARDS ══ */
+.pn-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden;animation:slideIn .2s ease both;position:relative}
+.pn-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px}
+.pn-card.pn-kmb::before{background:#e8003d}
+.pn-card.pn-ctb::before{background:#2ed573}
+.pn-card.pn-mtr::before{background:#ff4757}
+.pn-card.pn-lwb::before{background:#e8003d}
+.pn-inner{padding:10px 13px 10px 16px}
+.pn-hdr{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+.pn-co-badge{font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;white-space:nowrap}
+.pn-co-badge.kmb{background:rgba(232,0,61,.12);color:#ff4f82;border:1px solid rgba(232,0,61,.3)}
+.pn-co-badge.ctb{background:rgba(46,213,115,.1);color:#2ed573;border:1px solid rgba(46,213,115,.25)}
+.pn-co-badge.mtr{background:rgba(255,71,87,.12);color:#ff8a96;border:1px solid rgba(255,71,87,.28)}
+.pn-co-badge.lwb{background:rgba(232,0,61,.12);color:#ff6b95;border:1px solid rgba(232,0,61,.25)}
+.pn-date{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:auto;white-space:nowrap;flex-shrink:0}
+.pn-title{font-size:14px;font-weight:600;color:var(--bright);line-height:1.45;margin-bottom:4px}
+.pn-content{font-size:13px;color:var(--txt);line-height:1.65;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.pn-content.expanded{-webkit-line-clamp:unset;display:block}
+.pn-footer{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pn-route-tag{font-family:var(--mono);font-size:10px;background:var(--amb-bg);border:1px solid var(--amb-bdr);color:var(--amb2);border-radius:5px;padding:2px 6px}
+.pn-link{margin-left:auto;font-size:11px;color:var(--blu);text-decoration:none;flex-shrink:0}
+.pn-expand-btn{margin-left:auto;font-size:11px;color:var(--amb);background:none;border:none;cursor:pointer;font-family:var(--sans);padding:2px 0;flex-shrink:0}
+.pn-section-hdr{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:10px 2px 7px}
+.pn-err{text-align:center;padding:16px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:8px}
+.pn-err-txt{font-size:12px;color:var(--mid);line-height:1.6}
+.pn-err-link{display:inline-block;margin-top:8px;font-size:12px;color:var(--blu);text-decoration:none}
+
 /* ══ SETTINGS ══ */
 .settings-scroll{flex:1;overflow-y:auto;padding:14px 14px 20px}
 .sett-section-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin:18px 0 8px;padding-left:2px}
@@ -364,6 +391,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <button class="sub-tab"        id="ttab-transit"  onclick="switchTrafficCat('transit')">🚌 公共交通</button>
       <button class="sub-tab"        id="ttab-new"      onclick="switchTrafficCat('new')">🆕 最新/更新</button>
       <button class="sub-tab"        id="ttab-closed"   onclick="switchTrafficCat('closed')">✅ 完結</button>
+      <button class="sub-tab"        id="ttab-notice"   onclick="switchTrafficCat('notice')">📢 乘客通告</button>
     </div>
     <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
       <span id="traffic-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
@@ -461,6 +489,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
         港鐵/輕鐵：<a href="https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data" target="_blank">港鐵實時列車資訊</a><br>
         新聞：<a href="https://news.rthk.hk/rthk/ch/rss.htm" target="_blank">香港電台（RTHK）</a>、<a href="https://www.hket.com/rss" target="_blank">香港經濟日報</a>、<a href="https://www.news.gov.hk/chi/index.html" target="_blank">政府新聞處</a><br>
         交通：<a href="https://data.gov.hk/tc-data/dataset/hk-td-tis_19-special-traffic-news-v2" target="_blank">運輸署特別交通消息第二代 (v2 XML)</a>、<a href="https://www.rthk.hk" target="_blank">香港電台（RTHK）</a><br>
+        乘客通告：<a href="https://www.kmb.hk/tc/news/announcement.html" target="_blank">九巴 (KMB)</a>、<a href="https://www.citybus.com.hk" target="_blank">城巴 (CTB)</a>、<a href="https://www.mtr.com.hk" target="_blank">港鐵 (MTR)</a><br>
         歷史：<a href="https://zh.wikipedia.org" target="_blank">維基百科</a><br>
         © 2026 生活日常。保留所有權利。
       </div>
@@ -1104,6 +1133,11 @@ async function loadTDTrafficV2() {
 }
 
 async function reloadTrafficV2() {
+  if (currentTrafficCat === 'notice') {
+    _noticesLoaded = false;
+    await renderNoticeTab(document.getElementById('traffic-list'));
+    return;
+  }
   trafficV2Data = [];
   trafficRthkData = [];
   document.getElementById('traffic-list').innerHTML = '<div class="spinner"></div>';
@@ -1118,7 +1152,11 @@ function switchTrafficCat(cat) {
   currentTrafficCat = cat;
   document.querySelectorAll('#traffic-cat-bar .sub-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('ttab-' + cat)?.classList.add('active');
-  renderTrafficV2();
+  if (cat === 'notice') {
+    renderNoticeTab(document.getElementById('traffic-list'));
+  } else {
+    renderTrafficV2();
+  }
 }
 
 // ── Time formatter ───────────────────────────────────────────────────────────
@@ -1305,9 +1343,249 @@ function _restartTrafficAutoRefresh() {
   }, 1000);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  PASSENGER NOTICES: KMB, CTB (城巴), MTR
+//  Sources:
+//    KMB: search.kmb.hk/KMBWebSite/Function/FunctionRequest.ashx?action=getAnnounce
+//         (unofficial KMB internal API, via CORS proxy; same source as BusETA app)
+//    CTB: citybus.com.hk – no structured API; provide direct link
+//    MTR: mtr.com.hk – service adjustment RSS / link
+// ─────────────────────────────────────────────────────────────────────────────
+
+let passengerNotices = [];   // [{co, title, content, date, url, routes}]
+let _noticesLoaded = false;
+
+// ── KMB notices: try multiple CORS proxy routes ───────────────────────────────
+const KMB_ANNOUNCE_BASE = 'https://search.kmb.hk/KMBWebSite/Function/FunctionRequest.ashx';
+const KMB_ANNOUNCE_PDF  = 'https://search.kmb.hk/KMBWebSite/AnnouncementPicture.ashx';
+
+async function fetchKMBNotices() {
+  const target = `${KMB_ANNOUNCE_BASE}?action=getAnnounce&lang=tc`;
+  const proxied = [
+    `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${target}`,
+  ];
+  for (const url of proxied) {
+    try {
+      const r = await Promise.race([
+        fetch(url),
+        new Promise((_,rej) => setTimeout(() => rej('timeout'), 7000)),
+      ]);
+      if (!r.ok) continue;
+      let text = await r.text();
+      // allorigins /get wrapper
+      if (text.trim().startsWith('{') && text.includes('"contents"')) {
+        try { text = JSON.parse(text).contents || text; } catch {}
+      }
+      const j = JSON.parse(text);
+      const list = j.data || j.result?.data || j.announcementList || [];
+      if (!list.length) continue;
+      console.log('[kmb-notice] ok:', list.length, 'notices');
+      return list.map(item => ({
+        co: 'kmb',
+        title: (item.title || item.announcementTitle || item.subject || '').trim(),
+        content: (item.content || item.announcementContent || item.description || '').trim(),
+        date: item.date || item.publishDate || item.created || '',
+        url: item.url ? `${KMB_ANNOUNCE_PDF}?url=${item.url}` : (item.pdfUrl || item.link || ''),
+        routes: item.routeList || item.routes || [],
+      })).filter(i => i.title || i.content);
+    } catch(e) { /* try next */ }
+  }
+  return null;
+}
+
+// ── CTB/MTR RSS notices (service adjustment notices via RSS) ──────────────────
+// CTB publishes service notices on their website; we use the RSS feed as proxy
+// MTR publishes via an RSS-like feed
+async function fetchCTBNotices() {
+  // CTB official service notice RSS (unofficial; best available public endpoint)
+  const urls = [
+    'https://www.citybus.com.hk/sinfoapi/getAnnouncement?lang=tc',
+    'https://mobile.nwstbus.com.hk/api6/noticelist.php?syscode=1&lang=C',
+  ];
+  for (const target of urls) {
+    const proxied = [
+      `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    ];
+    for (const url of proxied) {
+      try {
+        const r = await Promise.race([
+          fetch(url),
+          new Promise((_,rej) => setTimeout(() => rej('timeout'), 6000)),
+        ]);
+        if (!r.ok) continue;
+        let text = await r.text();
+        if (text.trim().startsWith('{') && text.includes('"contents"')) {
+          try { text = JSON.parse(text).contents || text; } catch {}
+        }
+        const j = JSON.parse(text);
+        const list = j.data || j.result || j.notices || j.items || [];
+        if (!list.length) continue;
+        console.log('[ctb-notice] ok:', list.length, 'notices via', url.slice(0,40));
+        return list.map(item => ({
+          co: 'ctb',
+          title: (item.title || item.subject || item.TITLE || '').trim(),
+          content: (item.content || item.detail || item.CONTENT || item.description || '').trim(),
+          date: item.date || item.PUBLISH_DATE || '',
+          url: item.url || item.URL || item.link || '',
+          routes: item.routeList || item.routes || [],
+        })).filter(i => i.title || i.content);
+      } catch(e) { /* try next */ }
+    }
+  }
+  return null;
+}
+
+// ── MTR service disruption notices via RSS ────────────────────────────────────
+async function fetchMTRNotices() {
+  const mtrRss = 'https://www.mtr.com.hk/ch/alert/realtime_informations.json';
+  const proxied = [
+    `https://corsproxy.io/?url=${encodeURIComponent(mtrRss)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(mtrRss)}`,
+  ];
+  for (const url of proxied) {
+    try {
+      const r = await Promise.race([
+        fetch(url),
+        new Promise((_,rej) => setTimeout(() => rej('timeout'), 6000)),
+      ]);
+      if (!r.ok) continue;
+      let text = await r.text();
+      if (text.trim().startsWith('{') && text.includes('"contents"')) {
+        try { text = JSON.parse(text).contents || text; } catch {}
+      }
+      const j = JSON.parse(text);
+      const list = j.status || j.data || j.alerts || [];
+      if (!list.length) continue;
+      console.log('[mtr-notice] ok:', list.length);
+      return list.map(item => ({
+        co: 'mtr',
+        title: (item.title_c || item.title || '港鐵服務消息').trim(),
+        content: (item.content_c || item.content || '').trim(),
+        date: item.date || '',
+        url: '',
+        routes: item.line ? [item.line] : [],
+      })).filter(i => i.title || i.content);
+    } catch(e) { /* try next */ }
+  }
+  return null;
+}
+
+// ── Main loader ───────────────────────────────────────────────────────────────
+async function loadPassengerNotices(force = false) {
+  if (_noticesLoaded && !force) return passengerNotices;
+  _noticesLoaded = true;
+  const [kmb, ctb, mtr] = await Promise.all([
+    fetchKMBNotices(),
+    fetchCTBNotices(),
+    fetchMTRNotices(),
+  ]);
+  passengerNotices = [
+    ...(kmb || []),
+    ...(ctb || []),
+    ...(mtr || []),
+  ];
+  console.log('[notices] total:', passengerNotices.length);
+  return passengerNotices;
+}
+
+// ── Card renderer ─────────────────────────────────────────────────────────────
+function renderNoticeCard(item, idx) {
+  const coLabel = {kmb:'🚌 九巴 KMB', ctb:'🟢 城巴 CTB', mtr:'🔴 港鐵 MTR', lwb:'🚌 龍運 LWB'}[item.co] || '📢 通告';
+  const cardClass = `pn-${item.co}`;
+  const coClass = item.co;
+  const contentId = `pn-content-${idx}`;
+  const btnId = `pn-btn-${idx}`;
+  const hasLong = (item.content || '').length > 100;
+  const routeTags = (item.routes || []).slice(0, 6).map(r =>
+    `<span class="pn-route-tag">${r}</span>`).join('');
+  const dateStr = item.date ? (() => {
+    const d = new Date(item.date);
+    if (isNaN(d)) return item.date.slice(0, 10);
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  })() : '';
+
+  return `<div class="pn-card ${cardClass}" style="animation-delay:${idx*.025}s">
+    <div class="pn-inner">
+      <div class="pn-hdr">
+        <span class="pn-co-badge ${coClass}">${coLabel}</span>
+        ${dateStr ? `<span class="pn-date">${dateStr}</span>` : ''}
+      </div>
+      <div class="pn-title">${item.title || '乘客通告'}</div>
+      ${item.content ? `<div class="pn-content" id="${contentId}">${item.content}</div>` : ''}
+      <div class="pn-footer">
+        ${routeTags}
+        ${hasLong ? `<button class="pn-expand-btn" id="${btnId}" onclick="togglePnContent('${contentId}','${btnId}')">展開 ▾</button>` : ''}
+        ${item.url ? `<a class="pn-link" href="${item.url}" target="_blank">📄 詳情</a>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function togglePnContent(cid, bid) {
+  const el = document.getElementById(cid);
+  const btn = document.getElementById(bid);
+  if (!el) return;
+  const exp = el.classList.toggle('expanded');
+  if (btn) btn.textContent = exp ? '收起 ▴' : '展開 ▾';
+}
+
+// ── Render notice tab ─────────────────────────────────────────────────────────
+async function renderNoticeTab(el) {
+  el.innerHTML = '<div class="spinner"></div>';
+  await loadPassengerNotices();
+
+  const kmbItems = passengerNotices.filter(i => i.co === 'kmb');
+  const ctbItems = passengerNotices.filter(i => i.co === 'ctb');
+  const mtrItems = passengerNotices.filter(i => i.co === 'mtr');
+
+  let html = '';
+
+  // KMB section
+  html += `<div class="pn-section-hdr">🚌 九巴 (KMB) 乘客通告</div>`;
+  if (kmbItems.length) {
+    html += kmbItems.map((item, i) => renderNoticeCard(item, i)).join('');
+  } else {
+    html += `<div class="pn-err">
+      <div class="pn-err-txt">未能從九巴伺服器取得通告<br>（API 需經代理，可能受網絡限制）</div>
+      <a class="pn-err-link" href="https://www.kmb.hk/tc/news/announcement.html" target="_blank">🔗 前往九巴通告頁面</a>
+    </div>`;
+  }
+
+  // CTB section
+  html += `<div class="pn-section-hdr" style="margin-top:14px">🟢 城巴 (CTB) 乘客通告</div>`;
+  if (ctbItems.length) {
+    html += ctbItems.map((item, i) => renderNoticeCard(item, kmbItems.length + i)).join('');
+  } else {
+    html += `<div class="pn-err">
+      <div class="pn-err-txt">城巴未提供公開通告 API<br>請到官方網頁查看最新消息</div>
+      <a class="pn-err-link" href="https://www.citybus.com.hk/tc/news-and-promotions/latest-news/" target="_blank">🔗 前往城巴消息頁面</a>
+    </div>`;
+  }
+
+  // MTR section
+  html += `<div class="pn-section-hdr" style="margin-top:14px">🔴 港鐵 (MTR) 服務消息</div>`;
+  if (mtrItems.length) {
+    html += mtrItems.map((item, i) => renderNoticeCard(item, kmbItems.length + ctbItems.length + i)).join('');
+  } else {
+    html += `<div class="pn-err">
+      <div class="pn-err-txt">港鐵服務消息<br>請到官方網頁查看最新動態</div>
+      <a class="pn-err-link" href="https://www.mtr.com.hk/ch/customer/services/index.html" target="_blank">🔗 前往港鐵服務消息</a>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 // ── Legacy shims (keep switchPage compatibility) ──────────────────────────────
 function switchTrafficFeed(key) { switchTrafficCat(key === 'td' ? 'all' : key); }
 async function ensureTrafficFeedLoaded(key) {
+  if (key === 'notice') {
+    await renderNoticeTab(document.getElementById('traffic-list'));
+    return;
+  }
   if (!trafficV2Data.length && !trafficRthkData.length) {
     document.getElementById('traffic-list').innerHTML = '<div class="spinner"></div>';
     await loadTDTrafficV2();
