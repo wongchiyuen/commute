@@ -743,7 +743,7 @@ async function loadWeather(){
       return`<div class="fc${hl?' hl':''}">
         <div class="fc-date${hl?' named':''}">${dateLbl}</div>
         <div class="fc-day${hl?' named':''}">${weekLbl}</div>
-        <div class="fc-ico">${W_ICONS[f.forecastWeather??f.ForecastIcon??f.forecastIcon]??'🌡'}</div>
+        <div class="fc-ico">${W_ICONS[f.ForecastIcon??f.forecastIcon??parseInt(f.forecastWeather)]??'🌡'}</div>
         <div class="fc-tt"><span class="fc-lo">${minT}°</span><span class="fc-sep">|</span><span class="fc-hi">${maxT}°</span></div>
         ${rhStr?`<div class="fc-rh">💧${rhStr}</div>`:''}
         ${psrHtml}
