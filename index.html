@@ -2650,7 +2650,8 @@ async function loadNearby(){
   document.getElementById('bus-hdr-lbl').textContent=`${nearbyDist}米內到站時間`;
   try{
     const stops=await fetchAllStops();
-    const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,12);
+    // 放寬至 25 個站，確保合營路線的 KMB 站都能進入 routeMap
+    const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,25);
     if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();
@@ -2676,13 +2677,22 @@ async function loadNearby(){
       try{
         const ctbRows=await _fetchCTBNearbyRaw(nearbyLat,nearbyLng,nearbyDist);
         ctbRows.forEach(r=>{
-          // Try to match with existing KMB entry (joint route)
-          const matchKey=routeMap.has(`${r.route}_O`)?`${r.route}_O`:routeMap.has(`${r.route}_I`)?`${r.route}_I`:null;
+          // 用路線號 match（唔限方向，因 CTB dir 不一定與 KMB 一致）
+          const matchKey=
+            routeMap.has(`${r.route}_O`)?`${r.route}_O`:
+            routeMap.has(`${r.route}_I`)?`${r.route}_I`:
+            routeMap.has(`${r.route}_outbound`)?`${r.route}_outbound`:
+            routeMap.has(`${r.route}_inbound`)?`${r.route}_inbound`:null;
           if(matchKey){
-            const ex=routeMap.get(matchKey);ex.companyType='joint';
-            r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
+            const ex=routeMap.get(matchKey);
+            ex.companyType='joint';
+            r.etasWithType.forEach(e=>{
+              if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))
+                ex.etasWithType.push(e);
+            });
             ex.etasWithType.sort((a,b)=>a.ts-b.ts);
           }else{
+            // 純城巴路線（KMB 附近無此路線）
             const newKey=`${r.route}_CTB_${r.stopId}`;
             if(!routeMap.has(newKey)){
               routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
@@ -2844,7 +2854,8 @@ async function _showRouteDetail(route,routes,svcType,dest,focusStopId,dirIdx){
     });
 
     window._detailRoutes=routes;
-    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="_showRouteDetail('${esc(route)}',window._detailRoutes,null,'${esc(rr.dest_tc)}',null,${i})">往 ${rr.dest_tc}</div>`).join('');
+    window._detailFocusStopId=focusStopId||null;
+    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="_showRouteDetail('${esc(route)}',window._detailRoutes,null,'${esc(rr.dest_tc)}',window._detailFocusStopId,${i})">往 ${rr.dest_tc}</div>`).join('');
     const stopHtml=stops.map((s,i)=>{
       const isFocus=s.stopId===focusStopId;
       const isFirst=i===0,isLast=i===stops.length-1;
