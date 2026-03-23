@@ -768,27 +768,32 @@ async function _getRouteUsage(){
 const _fareCache={};
 async function fetchKMBFare(route,dir,svcType){
   const bound=(dir==='O'||dir==='outbound')?'outbound':'inbound';
+  const altBound=bound==='outbound'?'inbound':'outbound';
   const key=`kmb_${route}_${bound}_${svcType}`;
   if(_fareCache[key]!==undefined)return _fareCache[key];
-  try{
+  // 內部抓一個方向的 helper
+  const _tryFetch=async(b)=>{
     const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),10000);
-    let resp;
-    try{resp=await fetch(`${KMB}/fare/${route}/${bound}/${svcType}`,{signal:ctrl.signal});}
-    finally{clearTimeout(_ft);}
-    // 404 = route has no fare data; cache as null permanently
-    if(resp.status===404){_fareCache[key]=null;return null;}
-    // Other HTTP errors = transient; don't cache, allow retry
-    if(!resp.ok)return null;
-    const d=await resp.json();
-    const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
-    const maxFare=fares.length?Math.max(...fares):null;
-    _fareCache[key]=maxFare!==null?Math.round(maxFare*10)/10:null;
-    return _fareCache[key];
-  }catch(e){
-    // Network/abort/timeout errors: don't cache, allow retry next time
-    if(e?.name==='AbortError'||e?.name==='TypeError')return null;
-    _fareCache[key]=null;return null;
-  }
+    try{
+      const resp=await fetch(`${KMB}/fare/${route}/${b}/${svcType}`,{signal:ctrl.signal});
+      if(resp.status===404)return null;
+      if(!resp.ok)return undefined; // transient error
+      const d=await resp.json();
+      const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
+      return fares.length?Math.round(Math.max(...fares)*10)/10:null;
+    }catch(e){
+      return(e?.name==='AbortError'||e?.name==='TypeError')?undefined:null;
+    }finally{clearTimeout(_ft);}
+  };
+  try{
+    let fare=await _tryFetch(bound);
+    // 第一個方向返回 null（404）→ 試另一個方向
+    if(fare===null)fare=await _tryFetch(altBound);
+    // undefined = 網絡錯誤，唔快取
+    if(fare===undefined)return null;
+    _fareCache[key]=fare;
+    return fare;
+  }catch{return null;}
 }
 const pad=n=>String(n).padStart(2,'0');
 
@@ -2675,34 +2680,41 @@ async function loadNearby(){
     const ts_s=getTransportSettings();
     if(ts_s.ctb){
       try{
-        const ctbRows=await _fetchCTBNearbyRaw(nearbyLat,nearbyLng,nearbyDist);
-        ctbRows.forEach(r=>{
-          // 用路線號 match（唔限方向，因 CTB dir 不一定與 KMB 一致）
-          const matchKey=
-            routeMap.has(`${r.route}_O`)?`${r.route}_O`:
-            routeMap.has(`${r.route}_I`)?`${r.route}_I`:
-            routeMap.has(`${r.route}_outbound`)?`${r.route}_outbound`:
-            routeMap.has(`${r.route}_inbound`)?`${r.route}_inbound`:null;
-          if(matchKey){
-            const ex=routeMap.get(matchKey);
-            ex.companyType='joint';
-            r.etasWithType.forEach(e=>{
-              if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))
-                ex.etasWithType.push(e);
-            });
-            ex.etasWithType.sort((a,b)=>a.ts-b.ts);
-          }else{
-            // 純城巴路線（KMB 附近無此路線）
-            const newKey=`${r.route}_CTB_${r.stopId}`;
-            if(!routeMap.has(newKey)){
-              routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
+        // 等待 CTB stops 載入（最多 8 秒），避免 loadNearby 跑得比 CTB stops 快
+        const ctbStops=await Promise.race([
+          _ensureCTBStops(),
+          new Promise(res=>setTimeout(()=>res([]),8000)),
+        ]);
+        if(ctbStops.length){
+          const ctbRows=await _fetchCTBNearbyRaw(nearbyLat,nearbyLng,nearbyDist);
+          ctbRows.forEach(r=>{
+            // 用路線號 match（唔限方向，因 CTB dir 不一定與 KMB 一致）
+            const matchKey=
+              routeMap.has(`${r.route}_O`)?`${r.route}_O`:
+              routeMap.has(`${r.route}_I`)?`${r.route}_I`:
+              routeMap.has(`${r.route}_outbound`)?`${r.route}_outbound`:
+              routeMap.has(`${r.route}_inbound`)?`${r.route}_inbound`:null;
+            if(matchKey){
+              const ex=routeMap.get(matchKey);
+              ex.companyType='joint';
+              r.etasWithType.forEach(e=>{
+                if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))
+                  ex.etasWithType.push(e);
+              });
+              ex.etasWithType.sort((a,b)=>a.ts-b.ts);
             }else{
-              const ex=routeMap.get(newKey);
-              r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
+              // 純城巴路線
+              const newKey=`${r.route}_CTB_${r.stopId}`;
+              if(!routeMap.has(newKey)){
+                routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
+              }else{
+                const ex=routeMap.get(newKey);
+                r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
+              }
             }
-          }
-        });
-      }catch(e){console.warn('[CTB nearby v2]',e);}
+          });
+        }
+      }catch(e){console.warn('[CTB nearby]',e);}
     }
     // MTR
     if(ts_s.mtr){
@@ -2819,6 +2831,7 @@ let _detailEtaTimer=null;
 
 async function openBusDetail(route,svcType,dest,focusStopId){
   _incrementRouteUsage(route,'kmb');
+  window._detailFocusName=null; // 清除上次 focus 站名
   setDTitle(`${route} 路線詳情`);
   document.getElementById('drawer-body').innerHTML=`<div class="spinner"></div>`;
   openOverlay();
@@ -2855,9 +2868,15 @@ async function _showRouteDetail(route,routes,svcType,dest,focusStopId,dirIdx){
 
     window._detailRoutes=routes;
     window._detailFocusStopId=focusStopId||null;
-    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="_showRouteDetail('${esc(route)}',window._detailRoutes,null,'${esc(rr.dest_tc)}',window._detailFocusStopId,${i})">往 ${rr.dest_tc}</div>`).join('');
+    // 記錄 focus 站名，供換方向時按名稱模糊匹配
+    if(focusStopId&&!window._detailFocusName){
+      const focusSt=stops.find(s=>s.stopId===focusStopId);
+      if(focusSt)window._detailFocusName=focusSt.name;
+    }
+    const dirTabs=routes.map((rr,i)=>`<div class="dir-tab${i===dirIdx?' active':''}" onclick="window._detailFocusStopId=null;_showRouteDetail('${esc(route)}',window._detailRoutes,null,'${esc(rr.dest_tc)}',null,${i})">往 ${rr.dest_tc}</div>`).join('');
     const stopHtml=stops.map((s,i)=>{
-      const isFocus=s.stopId===focusStopId;
+      // 先試 stopId match，再試站名模糊 match
+      const isFocus=s.stopId===focusStopId||(!!window._detailFocusName&&s.name===window._detailFocusName);
       const isFirst=i===0,isLast=i===stops.length-1;
       const eta=etaMap[i+1];
       const etaStr=eta!=null?(eta<=0?'即將':(eta<=2?`<span class="rsl-eta soon">${eta}分</span>`:(eta<=8?`<span class="rsl-eta coming">${eta}分</span>`:`<span class="rsl-eta">${eta}分</span>`))):'' ;
@@ -2881,8 +2900,8 @@ async function _showRouteDetail(route,routes,svcType,dest,focusStopId,dirIdx){
       ${routes.length>1?`<div class="dir-tab-row">${dirTabs}</div>`:''}
       <div class="route-stop-list">${stopHtml}</div>`;
 
-    // scroll to focus stop
-    if(focusStopId){
+    // scroll to focus stop（stopId match 或站名 match）
+    if(focusStopId||window._detailFocusName){
       setTimeout(()=>{
         const focusEl=el.querySelector('.rsl-focus');
         if(focusEl){
@@ -3742,7 +3761,7 @@ setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},3
 _startNewsAutoRefresh();
 _restartTrafficAutoRefresh();
 // Preload CTB stops in background so nearby search is ready
-setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},1500);
+setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},0);
 
 // PWA · Service Worker 註冊
 if('serviceWorker' in navigator){
