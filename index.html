@@ -60,16 +60,14 @@
 ║        - functions/proxy.js: CF Pages自家CORS Proxy          ║
 ║          新聞fetchFeed優先使用/proxy，白名單安全限制           ║
 ║                                                              ║
-║  v1.8  常用路線學習 + 交通事故地圖 + 推播通知              ║
+║  v1.8  常用路線學習 + 交通事故地圖 + 本地警告通知            ║
 ║        - _incrementRouteUsage/_getRouteUsage: IDB 記錄       ║
 ║          每次點擊路線(KMB/CTB/LRT)自動累計使用次數             ║
 ║        - 附近tab排序：<=3分鐘到站最優先，其次常用路線          ║
 ║        - 地圖加入運輸署交通事故pin（🚗🚧🚌按類別顯示）         ║
-║          只顯示有座標+未完結事故，點擊顯示事故詳情             ║
-║        - sw.js 加 push/notificationclick 事件               ║
-║        - functions/warn.js: Cron+KV+Web Push 全套            ║
-║          每5分鐘查 HKO warnsum，有新警告即推播               ║
-║        - 設定頁加「🔔天氣警告推播」入口                       ║
+║        - 天氣警告本地通知（方法A）：                          ║
+║          loadWeather比對上次警告，有新警告即顯示通知           ║
+║          設定頁「🔔天氣警告通知」一鍵啟用，無需伺服器          ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -985,6 +983,8 @@ async function loadWeather(){
     wxDetails.todayMinT=num(fcs[0]?.forecastMintemp);
     const aw=Object.entries(warn).filter(([,v])=>v?.actionCode&&v.actionCode!=='CANCEL').map(([k])=>k);
     document.getElementById('w-warns').innerHTML=aw.map(k=>`<span class="warn-pill${AMB_WARNS.has(k)?' amb':''}">⚠ ${WARN_MAP[k]||k}</span>`).join('');
+    // 本地通知：比對上次警告，有新警告即顯示
+    _checkWarnNotify(aw,warn);
     document.getElementById('w-desc').textContent=flw.forecastDesc||flw.outlook||'';
     document.getElementById('w-fore').innerHTML=fcs.slice(0,9).map((f,i)=>{
       const ds=String(f.forecastDate);
@@ -2118,40 +2118,97 @@ function openInstallDrawer(){
 }
 
 // ═══════════════════════════════════
-//  推播通知
+//  天氣警告本地通知（方法 A）
+//  原理：loadWeather 每5分鐘執行一次
+//        比對上次警告，有新警告就
+//        用 Notification API 本地顯示
+//  不需要伺服器、不需要 Web Push
 // ═══════════════════════════════════
-const WARN_URL='/warn';
+const _WARN_STORE_KEY='swd_last_warns';
+
+function _getStoredWarns(){
+  try{return JSON.parse(localStorage.getItem(_WARN_STORE_KEY)||'[]');}catch{return[];}
+}
+function _setStoredWarns(arr){
+  try{localStorage.setItem(_WARN_STORE_KEY,JSON.stringify(arr));}catch{}
+}
+
+async function _checkWarnNotify(activeKeys,warnData){
+  // 未開啟通知 → 靜默記錄即可
+  if(!('Notification' in window)||Notification.permission!=='granted'){
+    _setStoredWarns(activeKeys);
+    return;
+  }
+  const last=_getStoredWarns();
+  const newWarns=activeKeys.filter(k=>!last.includes(k));
+  const lifted=last.filter(k=>!activeKeys.includes(k));
+  _setStoredWarns(activeKeys);
+
+  // 顯示新警告通知
+  for(const k of newWarns){
+    const label=WARN_MAP[k]||k;
+    const urgent=['WRAINC','WTCSGNL'].includes(k);
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      reg.showNotification(`⚠️ ${label}已發出`,{
+        body:warnData[k]?.details||`${label} 現已生效，請注意安全`,
+        icon:'/manifest.json',
+        tag:`warn-${k}`,
+        renotify:true,
+        requireInteraction:urgent,
+        data:{url:'/'},
+      });
+    }catch{
+      // SW showNotification 失敗，用普通 Notification
+      try{new Notification(`⚠️ ${label}已發出`,{body:`${label} 現已生效`});}catch{}
+    }
+  }
+  // 顯示解除通知
+  for(const k of lifted){
+    const label=WARN_MAP[k]||k;
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      reg.showNotification(`✅ ${label}已取消`,{
+        body:`${label} 已解除`,
+        icon:'/manifest.json',
+        tag:`warn-lifted-${k}`,
+        data:{url:'/'},
+      });
+    }catch{
+      try{new Notification(`✅ ${label}已取消`,{body:`${label} 已解除`});}catch{}
+    }
+  }
+}
 
 async function _getNotifyStatus(){
-  if(!('Notification' in window)||!('serviceWorker' in navigator))return'unsupported';
+  if(!('Notification' in window))return'unsupported';
   if(Notification.permission==='denied')return'denied';
-  try{
-    const reg=await navigator.serviceWorker.ready;
-    const sub=await reg.pushManager.getSubscription();
-    return sub?'subscribed':'unsubscribed';
-  }catch{return'unsubscribed';}
+  if(Notification.permission==='granted')return'subscribed';
+  return'unsubscribed';
 }
 
 async function _updateNotifySubtitle(){
   const el=document.getElementById('notify-status-sub');
   if(!el)return;
   const st=await _getNotifyStatus();
-  el.textContent=st==='subscribed'?'✅ 已啟用 · 暴雨/颱風警告':st==='denied'?'❌ 通知被封鎖':st==='unsupported'?'此裝置不支援':'未啟用';
+  el.textContent=st==='subscribed'?'✅ 已啟用 · 暴雨/颱風警告':
+    st==='denied'?'❌ 通知被封鎖':
+    st==='unsupported'?'此裝置不支援':'未啟用';
 }
 
 async function openNotifyDrawer(){
-  setDTitle('🔔 天氣警告推播');
+  setDTitle('🔔 天氣警告通知');
   const el=document.getElementById('drawer-body');
   el.innerHTML=`<div class="spinner"></div>`;
   openOverlay();
   const st=await _getNotifyStatus();
 
   if(st==='unsupported'){
-    el.innerHTML=`<div class="msg">⚠️ 此裝置/瀏覽器不支援推播通知<br><small style="color:var(--dim)">請使用 Chrome（Android）或 Safari 16.4+（iOS）</small></div>`;
+    el.innerHTML=`<div class="msg">⚠️ 此裝置/瀏覽器不支援通知<br><small style="color:var(--dim)">請使用 Chrome（Android）或 Safari 16.4+（iOS）</small></div>`;
     return;
   }
   if(st==='denied'){
-    el.innerHTML=`<div class="msg">❌ 通知權限已被封鎖<br><small style="color:var(--dim)">請到瀏覽器設定中允許「commute-8xr.pages.dev」的通知</small></div>`;
+    el.innerHTML=`<div class="msg">❌ 通知權限已被封鎖<br><small style="color:var(--dim)">請到瀏覽器設定中允許此網站的通知，然後重新整理</small></div>`;
     return;
   }
 
@@ -2166,14 +2223,14 @@ async function openNotifyDrawer(){
         ⚡ 雷暴警告 · 🌊 山泥傾瀉警告
       </div>
     </div>
-    <button id="notify-toggle-btn" onclick="_toggleNotify()" style="width:100%;padding:13px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);border:none;background:${isOn?'rgba(255,71,87,.15)':'var(--amb-bg)'};color:${isOn?'#ff8a96':'var(--amb2)'};border:1px solid ${isOn?'rgba(255,71,87,.3)':'var(--amb-bdr)'}">
+    <div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--dim);line-height:1.7">
+      ℹ️ 通知由 App 本身每 5 分鐘查詢天文台數據後觸發<br>
+      App 在背景時仍可收到通知（已安裝至主畫面效果最佳）
+    </div>
+    <button id="notify-toggle-btn" onclick="_toggleNotify()" style="width:100%;padding:13px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);border:1px solid ${isOn?'rgba(255,71,87,.3)':'var(--amb-bdr)'};background:${isOn?'rgba(255,71,87,.15)':'var(--amb-bg)'};color:${isOn?'#ff8a96':'var(--amb2)'}">
       ${isOn?'🔕 關閉天氣警告通知':'🔔 啟用天氣警告通知'}
     </button>
-    <div id="notify-msg" style="margin-top:10px;font-size:12px;color:var(--mid);text-align:center;min-height:18px"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--dim);line-height:1.7;text-align:center">
-      通知由 HKO 天文台數據驅動 · 每 5 分鐘檢查一次<br>
-      只在有新警告時推送，不會騷擾
-    </div>`;
+    <div id="notify-msg" style="margin-top:10px;font-size:12px;color:var(--mid);text-align:center;min-height:18px"></div>`;
 }
 
 async function _toggleNotify(){
@@ -2181,60 +2238,37 @@ async function _toggleNotify(){
   const msg=document.getElementById('notify-msg');
   if(btn){btn.disabled=true;btn.textContent='處理中…';}
 
+  if(Notification.permission==='granted'){
+    // 已開啟 → 引導用戶去瀏覽器設定關閉
+    if(msg)msg.textContent='請到瀏覽器設定中關閉此網站的通知權限';
+    if(btn){btn.textContent='🔕 關閉天氣警告通知';btn.disabled=false;}
+    return;
+  }
+
+  // 請求權限
   try{
-    const reg=await navigator.serviceWorker.ready;
-    const existing=await reg.pushManager.getSubscription();
-
-    if(existing){
-      // 取消訂閱
-      await existing.unsubscribe();
-      await fetch(`${WARN_URL}?action=unsubscribe&endpoint=${encodeURIComponent(existing.endpoint)}`);
-      if(msg)msg.textContent='✅ 已關閉天氣警告通知';
-      if(btn){btn.textContent='🔔 啟用天氣警告通知';btn.style.background='var(--amb-bg)';btn.style.color='var(--amb2)';btn.disabled=false;}
+    const perm=await Notification.requestPermission();
+    if(perm==='granted'){
+      _setStoredWarns([]); // 清空記錄，確保下次抓到現有警告會通知
+      if(msg)msg.textContent='✅ 已啟用！有暴雨/颱風警告時會顯示通知';
+      if(btn){btn.textContent='🔕 關閉天氣警告通知';btn.style.background='rgba(255,71,87,.15)';btn.style.color='#ff8a96';btn.style.borderColor='rgba(255,71,87,.3)';btn.disabled=false;}
       _updateNotifySubtitle();
-      return;
-    }
-
-    // 訂閱：先取 VAPID public key
-    let vapidPublic='';
-    try{
-      const r=await fetch(`${WARN_URL}?action=vapid-public`);
-      vapidPublic=await r.text();
-    }catch{}
-
-    if(!vapidPublic){
-      if(msg)msg.textContent='⚠️ 伺服器未設定，請稍後再試';
+      // 立即觸發一次天氣查詢，更新警告狀態
+      loadWeather();
+    }else{
+      if(msg)msg.textContent='❌ 未獲得通知權限';
       if(btn){btn.textContent='🔔 啟用天氣警告通知';btn.disabled=false;}
-      return;
     }
-
-    const permission=await Notification.requestPermission();
-    if(permission!=='granted'){
-      if(msg)msg.textContent='❌ 請允許通知權限';
-      if(btn){btn.textContent='🔔 啟用天氣警告通知';btn.disabled=false;}
-      return;
-    }
-
-    const sub=await reg.pushManager.subscribe({
-      userVisibleOnly:true,
-      applicationServerKey:_urlBase64ToUint8Array(vapidPublic),
-    });
-
-    await fetch(`${WARN_URL}?action=subscribe&sub=${encodeURIComponent(JSON.stringify(sub))}`);
-    if(msg)msg.textContent='✅ 已啟用！有暴雨/颱風警告時會推送通知';
-    if(btn){btn.textContent='🔕 關閉天氣警告通知';btn.style.background='rgba(255,71,87,.15)';btn.style.color='#ff8a96';btn.disabled=false;}
-    _updateNotifySubtitle();
   }catch(e){
-    if(msg)msg.textContent='❌ 發生錯誤：'+e.message;
+    if(msg)msg.textContent='❌ 錯誤：'+e.message;
     if(btn){btn.textContent='🔔 啟用天氣警告通知';btn.disabled=false;}
   }
 }
 
-function _urlBase64ToUint8Array(base64String){
-  const padding='='.repeat((4-base64String.length%4)%4);
-  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
-  const raw=atob(base64);
-  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+function _urlBase64ToUint8Array(b){
+  const p='='.repeat((4-b.length%4)%4);
+  const s=(b+p).replace(/-/g,'+').replace(/_/g,'/');
+  return Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 }
 
 function openAboutDrawer(){
