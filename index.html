@@ -776,7 +776,7 @@ async function fetchKMBFare(route,dir,svcType){
     const ctrl=new AbortController();const _ft=setTimeout(()=>ctrl.abort(),10000);
     try{
       const resp=await fetch(`${KMB}/fare/${route}/${b}/${svcType}`,{signal:ctrl.signal});
-      if(resp.status===404)return null;
+      if(resp.status===404||resp.status===422)return null;
       if(!resp.ok)return undefined; // transient error
       const d=await resp.json();
       const fares=(d.data||[]).map(f=>parseFloat(f.fare||f.fare_full||0)).filter(f=>f>0);
@@ -2748,7 +2748,9 @@ async function loadNearby(){
               routeMap.has(`${r.route}_O`)?`${r.route}_O`:
               routeMap.has(`${r.route}_I`)?`${r.route}_I`:null;
             if(matchKey){
-              const ex=routeMap.get(matchKey);ex.companyType='joint';
+              const ex=routeMap.get(matchKey);
+              // 只有原本係 KMB 才升級為 joint；純 CTB 路線唔改
+              if(ex.companyType==='kmb')ex.companyType='joint';
               r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))ex.etasWithType.push(e);});
               ex.etasWithType.sort((a,b)=>a.ts-b.ts);
             }else{
