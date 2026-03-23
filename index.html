@@ -47,11 +47,14 @@
 ║                                                              ║
 ║  v1.6  路線 B 遷移 (Cloudflare Pages + Service Worker)       ║
 ║        - manifest.json 獨立檔案，取代 blob URL               ║
-║        - sw.js Service Worker: 離線快取、SWR 策略             ║
-║          App Shell Cache First / KMB靜態 24hr               ║
-║          天氣 SWR 5min / 新聞 SWR 10min / ETA Network Only   ║
-║        - _headers: Cloudflare cache 規則 + 安全標頭           ║
-║        - 部署至 Cloudflare Pages，GitHub 自動觸發部署         ║
+║        - sw.js: App Shell快取/天氣SWR5min/新聞SWR10min        ║
+║        - _headers: CF cache 規則 + 安全標頭                   ║
+║        - GitHub → Cloudflare Pages 自動部署                  ║
+║                                                              ║
+║  v1.7  IndexedDB 記憶層                                      ║
+║        - _idb helper (open/get/set/fresh + TTL)              ║
+║        - kmb_stops/kmb_routes/ctb_stops/ctb_routes 24hr快取  ║
+║          首次載入後附近tab及搜尋速度大幅提升                   ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -62,7 +65,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="生活日常">
-<link rel="manifest" href="/manifest.json">
 <title>生活日常</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=Azeret+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -733,6 +735,50 @@ async function fetchKMBFare(route,dir,svcType){
   }
 }
 const pad=n=>String(n).padStart(2,'0');
+
+// ═══════════════════════════════════
+//  INDEXEDDB 快取層
+//  DB: swd-cache v1 · store: kv
+//  每筆記錄: { data, ts, ttl }
+// ═══════════════════════════════════
+const _idb={
+  _db:null,
+  async open(){
+    if(this._db)return this._db;
+    return new Promise((res,rej)=>{
+      const req=indexedDB.open('swd-cache',1);
+      req.onupgradeneeded=e=>e.target.result.createObjectStore('kv');
+      req.onsuccess=e=>{this._db=e.target.result;res(this._db);};
+      req.onerror=()=>rej(req.error);
+    });
+  },
+  async get(key){
+    try{
+      const db=await this.open();
+      return new Promise((res,rej)=>{
+        const req=db.transaction('kv').objectStore('kv').get(key);
+        req.onsuccess=()=>res(req.result);
+        req.onerror=()=>rej(req.error);
+      });
+    }catch{return null;}
+  },
+  async set(key,data,ttl){
+    try{
+      const db=await this.open();
+      return new Promise((res,rej)=>{
+        const req=db.transaction('kv','readwrite').objectStore('kv').put({data,ts:Date.now(),ttl},key);
+        req.onsuccess=()=>res();
+        req.onerror=()=>rej(req.error);
+      });
+    }catch{}
+  },
+  async fresh(key){
+    const entry=await this.get(key);
+    if(!entry||!entry.data)return null;
+    if(Date.now()-entry.ts>entry.ttl)return null;
+    return entry.data;
+  },
+};
 
 function haverDist(la1,ln1,la2,ln2){
   const R=6371000,r=Math.PI/180,dLa=(la2-la1)*r,dLn=(ln2-ln1)*r;
@@ -2294,16 +2340,28 @@ function renderBusCardV2({route,dest,stopName,dist,fare,companyType,etasWithType
 // ═══════════════════════════════════
 //  NEARBY
 // ═══════════════════════════════════
-async function fetchAllStops(){if(allStops)return allStops;const data=await fetch(`${KMB}/stop`).then(r=>r.json());allStops=data.data||[];return allStops}
+async function fetchAllStops(){
+  if(allStops&&allStops.length)return allStops;
+  const cached=await _idb.fresh('kmb_stops');
+  if(cached&&cached.length){allStops=cached;console.log('[IDB] kmb_stops hit:',cached.length);return allStops;}
+  const data=await fetch(`${KMB}/stop`).then(r=>r.json());
+  allStops=data.data||[];
+  if(allStops.length)_idb.set('kmb_stops',allStops,24*60*60*1000);
+  return allStops;
+}
 // ── CTB nearby raw data helper ─────────────────────────────────────────────
 let _ctbStopsPromise=null;
 async function _ensureCTBStops(){
   if(window._ctbStops&&window._ctbStops.length>0)return window._ctbStops;
   if(!_ctbStopsPromise){
     _ctbStopsPromise=(async()=>{
+      // IDB 快取優先（24hr TTL）
+      const cached=await _idb.fresh('ctb_stops');
+      if(cached&&cached.length){window._ctbStops=cached;console.log('[IDB] ctb_stops hit:',cached.length);return;}
       try{
         const d=await fetch(`${CTB}/stop`,{signal:AbortSignal.timeout?AbortSignal.timeout(12000):undefined}).then(r=>r.json());
         window._ctbStops=d.data||[];
+        if(window._ctbStops.length)_idb.set('ctb_stops',window._ctbStops,24*60*60*1000);
         console.log('[CTB stops]',window._ctbStops.length);
       }catch(e){
         console.warn('[CTB stops] fetch failed:',e);
@@ -2620,9 +2678,15 @@ let _allRoutes=null;
 
 async function getAllRoutes(){
   if(_allRoutes&&_allRoutes.length)return _allRoutes;
+  const cached=await _idb.fresh('kmb_routes');
+  if(cached&&cached.length){_allRoutes=cached;console.log('[IDB] kmb_routes hit:',cached.length);return _allRoutes;}
   try{
     const d=await fetch(`${KMB}/route/`).then(r=>r.json());
-    if(d.data&&d.data.length){_allRoutes=d.data;return _allRoutes;}
+    if(d.data&&d.data.length){
+      _allRoutes=d.data;
+      _idb.set('kmb_routes',_allRoutes,24*60*60*1000);
+      return _allRoutes;
+    }
   }catch(e){console.warn('[getAllRoutes]',e)}
   return _allRoutes||[];
 }
@@ -2703,10 +2767,19 @@ async function doRouteSearch(){
   if(ts.ctb){
     try{
       if(!window._ctbRoutes||!window._ctbRoutes.length){
-        try{
-          const d=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
-          if(d.data&&d.data.length)window._ctbRoutes=d.data;
-        }catch(e){console.warn('[CTB routes]',e)}
+        const cachedCTBR=await _idb.fresh('ctb_routes');
+        if(cachedCTBR&&cachedCTBR.length){
+          window._ctbRoutes=cachedCTBR;
+          console.log('[IDB] ctb_routes hit:',cachedCTBR.length);
+        }else{
+          try{
+            const d=await fetch(`https://rt.data.gov.hk/v2/transport/citybus/route/ctb`).then(r=>r.json());
+            if(d.data&&d.data.length){
+              window._ctbRoutes=d.data;
+              _idb.set('ctb_routes',window._ctbRoutes,24*60*60*1000);
+            }
+          }catch(e){console.warn('[CTB routes]',e)}
+        }
       }
       // 1) 路線號 / 起終點名
       let ctbMatches=window._ctbRoutes.filter(r=>
@@ -3423,22 +3496,9 @@ _restartTrafficAutoRefresh();
 // Preload CTB stops in background so nearby search is ready
 setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},1500);
 
-// PWA · Service Worker 註冊
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').then(reg=>{
-      console.log('[SW] 已註冊:',reg.scope);
-      reg.addEventListener('updatefound',()=>{
-        const nw=reg.installing;
-        nw.addEventListener('statechange',()=>{
-          if(nw.state==='installed'&&navigator.serviceWorker.controller){
-            showToast('✅ 已更新至最新版本');
-          }
-        });
-      });
-    }).catch(e=>console.warn('[SW] 註冊失敗:',e));
-  });
-}
+// PWA
+const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
+const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(new Blob([JSON.stringify({name:'生活日常',short_name:'生活日常',start_url:'.',display:'standalone',background_color:'#06080d',theme_color:'#06080d',icons:[{src:'data:image/svg+xml,'+ICON_SVG,sizes:'512x512',type:'image/svg+xml'}]})],{type:'application/json'}));document.head.appendChild(ml);
 </script>
 </body>
 </html>
