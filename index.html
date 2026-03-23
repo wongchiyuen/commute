@@ -2583,7 +2583,7 @@ async function _ensureCTBStops(){
       try{
         const d=await fetch(`${CTB}/stop`,{signal:AbortSignal.timeout?AbortSignal.timeout(12000):undefined}).then(r=>r.json());
         window._ctbStops=d.data||[];
-        if(window._ctbStops.length)_idb.set('ctb_stops',window._ctbStops,24*60*60*1000);
+        if(window._ctbStops.length)_idb.set('ctb_stops',window._ctbStops,7*24*60*60*1000);
         console.log('[CTB stops]',window._ctbStops.length);
       }catch(e){
         console.warn('[CTB stops] fetch failed:',e);
@@ -2655,124 +2655,112 @@ async function loadNearby(){
   document.getElementById('bus-hdr-lbl').textContent=`${nearbyDist}米內到站時間`;
   try{
     const stops=await fetchAllStops();
-    // 放寬至 25 個站，確保合營路線的 KMB 站都能進入 routeMap
     const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,25);
     if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
+
     const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();
-    // routeMap key = route+dir, value = display row data
-    const routeMap=new Map();
-    etaResults.forEach((res,i)=>{
-      const stop=nearby[i];
-      (res.data||[]).forEach(e=>{
-        if(!e.eta)return;const ts=new Date(e.eta).getTime();
-        if(ts<now-30000)return;
-        const key=`${e.route}_${e.dir}`;
-        if(!routeMap.has(key)){
-          routeMap.set(key,{route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,companyType:'kmb',etasWithType:[{ts,type:'kmb'}],fare:null});
-        }else{
-          const ex=routeMap.get(key);
-          if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===ts))ex.etasWithType.push({ts,type:'kmb'});
-        }
-      });
-    });
-    // CTB
     const ts_s=getTransportSettings();
+
+    // ── 建立 routeMap helper（KMB + CTB 共用）──────────────
+    const buildRouteMap=(etaResultsArr,nearbyArr,existingMap)=>{
+      const routeMap=existingMap||new Map();
+      etaResultsArr.forEach((res,i)=>{
+        const stop=nearbyArr[i];
+        (res.data||[]).forEach(e=>{
+          if(!e.eta)return;
+          const ts=new Date(e.eta).getTime();
+          if(ts<Date.now()-30000)return;
+          const co=(e.co||'KMB').toUpperCase();
+          if(co==='CTB'&&!ts_s.ctb)return;
+          const type=co==='CTB'?'ctb':'kmb';
+          const key=`${e.route}_${e.dir}`;
+          if(!routeMap.has(key)){
+            routeMap.set(key,{route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,companyType:type,etasWithType:[{ts,type}],fare:null});
+          }else{
+            const ex=routeMap.get(key);
+            if(type==='ctb'&&ex.companyType==='kmb')ex.companyType='joint';
+            if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===ts))ex.etasWithType.push({ts,type});
+          }
+        });
+      });
+      return routeMap;
+    };
+
+    // ── 渲染 helper ────────────────────────────────────────
+    const renderNearbyRows=async(routeMap)=>{
+      // MTR
+      if(ts_s.mtr){
+        try{
+          const mtrRows=await fetchMTRNearby(nearbyLat,nearbyLng);
+          mtrRows.forEach((r,i)=>routeMap.set(`MTR_${r.route}_${r.dest}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'U',companyType:'mtr',etasWithType:r._etas.map(ts=>({ts,type:'mtr'})),fare:null}));
+        }catch(e){console.warn('[MTR nearby]',e);}
+      }
+      // LRT
+      if(ts_s.lrt){
+        try{
+          const lrtRows=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);
+          lrtRows.forEach((r,i)=>routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'lrt',etasWithType:r._etas.map(ts=>({ts,type:'lrt'})),fare:null}));
+        }catch(e){console.warn('[LRT nearby]',e);}
+      }
+      let rows=[...routeMap.values()].filter(r=>r.etasWithType.length>0);
+      rows.forEach(r=>{if(r.companyType==='joint')r.etasWithType.sort((a,b)=>a.ts-b.ts);});
+      const usage=await _getRouteUsage();
+      rows.sort((a,b)=>{
+        const nowMs=Date.now();
+        const aEta=a.etasWithType[0].ts,bEta=b.etasWithType[0].ts;
+        const aMin=Math.round((aEta-nowMs)/60000),bMin=Math.round((bEta-nowMs)/60000);
+        if(aMin<=3&&bMin>3)return -1;if(bMin<=3&&aMin>3)return 1;
+        const aU=usage[`${a.route}_${a.companyType}`]||0,bU=usage[`${b.route}_${b.companyType}`]||0;
+        if(aU!==bU)return bU-aU;return aEta-bEta;
+      });
+      if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return;}
+      const renderRows=rows.slice(0,25);
+      const fareRowsIdx=renderRows.map((r,i)=>({r,i})).filter(({r})=>r.companyType==='kmb'||r.companyType==='joint');
+      await Promise.race([
+        Promise.all(fareRowsIdx.map(({r})=>fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{r.fare=fare;}).catch(()=>{}))),
+        new Promise(res=>setTimeout(res,4000)),
+      ]);
+      el.innerHTML=renderRows.map((r,i)=>renderBusCardV2({...r,idx:i,clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null})).join('');
+      fareRowsIdx.forEach(({r})=>{
+        if(r.fare==null)return;
+        const card=document.querySelector(`.bus-card-v2[data-fare-key="${r.route}_${r.companyType}"]`);
+        if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${r.fare})`;}}
+      });
+    };
+
+    // ── 第一階段：即時顯示 KMB ────────────────────────────
+    const routeMap=buildRouteMap(etaResults,nearby,null);
+    await renderNearbyRows(new Map(routeMap)); // 傳複本，避免後面 CTB 更新時污染
+
+    // ── 第二階段：城巴 stops 載入後補入，重新渲染 ──────────
     if(ts_s.ctb){
-      try{
-        // 等待 CTB stops 載入（最多 8 秒），避免 loadNearby 跑得比 CTB stops 快
-        const ctbStops=await Promise.race([
-          _ensureCTBStops(),
-          new Promise(res=>setTimeout(()=>res([]),8000)),
-        ]);
-        if(ctbStops.length){
+      _ensureCTBStops().then(async ctbStops=>{
+        if(!ctbStops||!ctbStops.length)return;
+        // 仍在附近 tab 才更新
+        if(activePid!==NEARBY_PID)return;
+        try{
           const ctbRows=await _fetchCTBNearbyRaw(nearbyLat,nearbyLng,nearbyDist);
+          if(!ctbRows.length)return;
+          // 在原 routeMap 上合併城巴資料
           ctbRows.forEach(r=>{
-            // 用路線號 match（唔限方向，因 CTB dir 不一定與 KMB 一致）
             const matchKey=
               routeMap.has(`${r.route}_O`)?`${r.route}_O`:
-              routeMap.has(`${r.route}_I`)?`${r.route}_I`:
-              routeMap.has(`${r.route}_outbound`)?`${r.route}_outbound`:
-              routeMap.has(`${r.route}_inbound`)?`${r.route}_inbound`:null;
+              routeMap.has(`${r.route}_I`)?`${r.route}_I`:null;
             if(matchKey){
-              const ex=routeMap.get(matchKey);
-              ex.companyType='joint';
-              r.etasWithType.forEach(e=>{
-                if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))
-                  ex.etasWithType.push(e);
-              });
+              const ex=routeMap.get(matchKey);ex.companyType='joint';
+              r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))ex.etasWithType.push(e);});
               ex.etasWithType.sort((a,b)=>a.ts-b.ts);
             }else{
-              // 純城巴路線
               const newKey=`${r.route}_CTB_${r.stopId}`;
-              if(!routeMap.has(newKey)){
+              if(!routeMap.has(newKey))
                 routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
-              }else{
-                const ex=routeMap.get(newKey);
-                r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3)ex.etasWithType.push(e);});
-              }
             }
           });
-        }
-      }catch(e){console.warn('[CTB nearby]',e);}
+          await renderNearbyRows(routeMap);
+        }catch(e){console.warn('[CTB phase2]',e);}
+      });
     }
-    // MTR
-    if(ts_s.mtr){
-      try{
-        const mtrRows=await fetchMTRNearby(nearbyLat,nearbyLng);
-        mtrRows.forEach((r,i)=>{
-          routeMap.set(`MTR_${r.route}_${r.dest}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'U',companyType:'mtr',etasWithType:r._etas.map(ts=>({ts,type:'mtr'})),fare:null});
-        });
-      }catch(e){console.warn('[MTR nearby]',e);}
-    }
-    // LRT
-    if(ts_s.lrt){
-      try{
-        const lrtRows=await fetchLRTNearby(nearbyLat,nearbyLng,nearbyDist);
-        lrtRows.forEach((r,i)=>{
-          routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'lrt',etasWithType:r._etas.map(ts=>({ts,type:'lrt'})),fare:null});
-        });
-      }catch(e){console.warn('[LRT nearby]',e);}
-    }
-    let rows=[...routeMap.values()].filter(r=>r.etasWithType.length>0);
-    // 排序：使用次數 × 時間權重（常用路線優先，但即將到站仍最前）
-    const usage=await _getRouteUsage();
-    rows.sort((a,b)=>{
-      const nowMs=Date.now();
-      const aEta=a.etasWithType[0].ts;
-      const bEta=b.etasWithType[0].ts;
-      const aMin=Math.round((aEta-nowMs)/60000);
-      const bMin=Math.round((bEta-nowMs)/60000);
-      // 即將到站（<=3分鐘）永遠最前
-      if(aMin<=3&&bMin>3)return -1;
-      if(bMin<=3&&aMin>3)return 1;
-      // 其餘：使用次數高者優先（同次數再按 ETA 排）
-      const aU=usage[`${a.route}_${a.companyType}`]||0;
-      const bU=usage[`${b.route}_${b.companyType}`]||0;
-      if(aU!==bU)return bU-aU;
-      return aEta-bEta;
-    });
-    if(!rows.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⏱</div><div class="empty-text">暫無班次</div></div>`;return}
-    const renderRows=rows.slice(0,25);
-    // Pre-fetch fares for all KMB/joint rows, wait up to 4s
-    const fareRowsIdx=renderRows.map((r,i)=>({r,i})).filter(({r})=>r.companyType==='kmb'||r.companyType==='joint');
-    const fareTimeout=new Promise(res=>setTimeout(res,4000));
-    await Promise.race([
-      Promise.all(fareRowsIdx.map(({r})=>
-        fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{r.fare=fare;}).catch(()=>{})
-      )),
-      fareTimeout
-    ]);
-    el.innerHTML=renderRows.map((r,i)=>renderBusCardV2({
-      ...r,idx:i,
-      clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null,
-    })).join('');
-    // Any fares that arrived late — update DOM via data-fare-key
-    fareRowsIdx.forEach(({r})=>{
-      if(r.fare==null)return;
-      const card=document.querySelector(`.bus-card-v2[data-fare-key="${r.route}_${r.companyType}"]`);
-      if(card){const sl=card.querySelector('.bcv2-stop-lbl');if(sl){const ds=r.dist?` - ${r.dist}m`:'';sl.textContent=r.stopName+ds+`  ($${r.fare})`;}}
-    });
   }catch(e){console.warn('[nearby v2]',e);el.innerHTML=`<div class="msg">載入失敗，請重試</div>`}
 }
 // ═══════════════════════════════════
