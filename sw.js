@@ -171,3 +171,37 @@ async function putWithTimestamp(cache, req, res) {
   const body = await res.arrayBuffer();
   cache.put(req, new Response(body, { status: res.status, headers }));
 }
+
+// ── Push 通知：接收並顯示 ─────────────────────────────────
+self.addEventListener('push', e => {
+  let data = { title: '生活日常', body: '有新警告' };
+  try { data = e.data?.json() ?? data; } catch {}
+
+  const opts = {
+    body: data.body || '',
+    icon: data.icon || '/manifest.json',
+    badge: data.badge || '',
+    tag: data.tag || 'swd-warn',
+    renotify: true,
+    requireInteraction: data.urgent || false,
+    data: { url: data.url || '/' },
+  };
+
+  e.waitUntil(
+    self.registration.showNotification(data.title, opts)
+  );
+});
+
+// ── 點擊通知：開啟 App ────────────────────────────────────
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(list => {
+        const existing = list.find(c => c.url.includes(self.location.origin));
+        if (existing) return existing.focus();
+        return clients.openWindow(url);
+      })
+  );
+});
