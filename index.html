@@ -44,6 +44,14 @@
 ║        - 附近路線改為先等車費(最多4秒)再渲染，確保顯示          ║
 ║        - 自訂距離改為 range slider 滑桿，步進值友好            ║
 ║          覆蓋式面板顯示，取消/確定按鈕                         ║
+║                                                              ║
+║  v1.6  路線 B 遷移 (Cloudflare Pages + Service Worker)       ║
+║        - manifest.json 獨立檔案，取代 blob URL               ║
+║        - sw.js Service Worker: 離線快取、SWR 策略             ║
+║          App Shell Cache First / KMB靜態 24hr               ║
+║          天氣 SWR 5min / 新聞 SWR 10min / ETA Network Only   ║
+║        - _headers: Cloudflare cache 規則 + 安全標頭           ║
+║        - 部署至 Cloudflare Pages，GitHub 自動觸發部署         ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -54,6 +62,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="生活日常">
+<link rel="manifest" href="/manifest.json">
 <title>生活日常</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=Azeret+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -3414,9 +3423,22 @@ _restartTrafficAutoRefresh();
 // Preload CTB stops in background so nearby search is ready
 setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},1500);
 
-// PWA
-const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
-const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(new Blob([JSON.stringify({name:'生活日常',short_name:'生活日常',start_url:'.',display:'standalone',background_color:'#06080d',theme_color:'#06080d',icons:[{src:'data:image/svg+xml,'+ICON_SVG,sizes:'512x512',type:'image/svg+xml'}]})],{type:'application/json'}));document.head.appendChild(ml);
+// PWA · Service Worker 註冊
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').then(reg=>{
+      console.log('[SW] 已註冊:',reg.scope);
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            showToast('✅ 已更新至最新版本');
+          }
+        });
+      });
+    }).catch(e=>console.warn('[SW] 註冊失敗:',e));
+  });
+}
 </script>
 </body>
 </html>
