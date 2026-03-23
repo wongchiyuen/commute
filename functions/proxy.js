@@ -9,8 +9,6 @@ const ALLOWED = [
   'news.rthk.hk',
   'hket.com',
   'www.hket.com',
-  'sc.mp',
-  'www.scmp.com',
   'td.gov.hk',
   'www.td.gov.hk',
   'resource.data.one.gov.hk',
@@ -19,10 +17,18 @@ const ALLOWED = [
   'www.info.gov.hk',
 ];
 
-export async function onRequest(ctx) {
-  const { request } = ctx;
+export async function onRequest({ request }) {
+  // CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
+  }
 
-  // 只接受 GET
   if (request.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });
   }
@@ -34,12 +40,18 @@ export async function onRequest(ctx) {
     return new Response('Missing url parameter', { status: 400 });
   }
 
-  // 驗證目標 URL
+  // 驗證目標 URL（支援雙重 encode）
   let targetUrl;
   try {
-    targetUrl = new URL(target);
+    targetUrl = new URL(decodeURIComponent(target));
   } catch {
-    return new Response('Invalid url', { status: 400 });
+    try { targetUrl = new URL(target); }
+    catch { return new Response('Invalid url', { status: 400 }); }
+  }
+
+  // 只允許 http/https
+  if (!['http:', 'https:'].includes(targetUrl.protocol)) {
+    return new Response('Only http/https allowed', { status: 400 });
   }
 
   // 白名單檢查
@@ -53,22 +65,21 @@ export async function onRequest(ctx) {
     return new Response(`Domain not allowed: ${targetUrl.hostname}`, { status: 403 });
   }
 
-  // 抓取目標
+  // 抓取目標（Pages Functions 不支援 cf 屬性，移除）
   try {
     const res = await fetch(targetUrl.toString(), {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SWD-Bot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; SWD/1.0)',
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'zh-HK, zh, en',
       },
-      cf: { cacheTtl: 120 }, // Cloudflare edge cache 2 分鐘
     });
 
-    // 回傳內容，加上 CORS 標頭
     const body = await res.arrayBuffer();
     return new Response(body, {
       status: res.status,
       headers: {
-        'Content-Type': res.headers.get('Content-Type') || 'text/xml',
+        'Content-Type': res.headers.get('Content-Type') || 'text/xml; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=120',
         'X-Proxy-By': 'swd-cf-pages',
