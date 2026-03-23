@@ -69,9 +69,11 @@ export async function onRequest({ request }) {
   try {
     const res = await fetch(targetUrl.toString(), {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SWD/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',
         'Accept-Language': 'zh-HK, zh, en',
+        'Referer': `${targetUrl.protocol}//${targetUrl.hostname}/`,
+        'Origin': `${targetUrl.protocol}//${targetUrl.hostname}`,
       },
     });
 
