@@ -51,10 +51,14 @@
 ║        - _headers: CF cache 規則 + 安全標頭                   ║
 ║        - GitHub → Cloudflare Pages 自動部署                  ║
 ║                                                              ║
-║  v1.7  IndexedDB 記憶層                                      ║
+║  v1.7  IndexedDB 記憶層 + 地圖 + CF Proxy                    ║
 ║        - _idb helper (open/get/set/fresh + TTL)              ║
 ║        - kmb_stops/kmb_routes/ctb_stops/ctb_routes 24hr快取  ║
 ║          首次載入後附近tab及搜尋速度大幅提升                   ║
+║        - 附近地圖：Leaflet+OSM，站點pin+即時ETA popup         ║
+║          附近tab「地圖/列表」切換按鈕正式顯示                  ║
+║        - functions/proxy.js: CF Pages自家CORS Proxy          ║
+║          新聞fetchFeed優先使用/proxy，白名單安全限制           ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -68,6 +72,18 @@
 <title>生活日常</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=Azeret+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+#nearby-map .leaflet-container{background:#0d0f18}
+#nearby-map{border-top:1px solid var(--bdr)}
+.map-toggle-btn{display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:5px 10px;color:var(--mid);font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:var(--sans);transition:all .15s}
+.map-toggle-btn.active{background:rgba(91,143,255,.12);border-color:rgba(91,143,255,.45);color:#7ba8ff}
+.map-stop-popup{font-family:var(--sans);min-width:160px}
+.map-stop-popup .route-tag{display:inline-block;background:#1a1f30;border:1px solid #262f48;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;color:#ffc03a;margin:2px 2px 2px 0;cursor:pointer}
+.map-stop-popup .stop-name{font-size:13px;font-weight:600;color:#edf1fb;margin-bottom:5px}
+.map-stop-popup .eta-line{font-size:11px;color:#bbc5dc;margin-top:3px}
+</style>
 <style>
 :root{
   --bg:#06080d;--bg2:#0d0f18;--bg3:#131620;--bg4:#1a1f30;
@@ -412,6 +428,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
   <div class="bus-sec">
     <div class="bus-hdr">
       <div class="bus-hdr-lbl" id="bus-hdr-lbl">到站時間</div>
+      <button class="map-toggle-btn" id="map-toggle-btn" onclick="toggleMapView()" style="display:none">🗺 地圖</button>
       <button class="add-btn" id="add-route-btn" onclick="openSearch()">＋ 加路線</button>
     </div>
     <div class="dist-row" id="dist-row" style="display:none">
@@ -425,6 +442,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       <button class="dist-pill" id="dist-custom-pill" onclick="openCustomDist()">自訂</button>
     </div>
     <div class="bus-list" id="bus-list"></div>
+    <div id="nearby-map" style="display:none;flex:1;min-height:0;position:relative"></div>
   </div>
 </div>
 
@@ -1696,8 +1714,11 @@ async function fetchFeed(url){
   const SIG=AbortSignal.timeout?AbortSignal.timeout(12000):undefined;
   const opt=SIG?{signal:SIG}:{};
 
-  // Build list of concurrent attempts
+  // Build list of concurrent attempts（自家 CF proxy 最優先）
   const attempts=[
+    // 自家 Cloudflare Pages Function proxy（最穩定）
+    _tryProxy('cf-proxy',
+      fetch(`/proxy?url=${enc}`,opt),false),
     // rss2json – great for standard RSS
     _tryProxy('rss2json',
       fetch(`https://api.rss2json.com/v1/api.json?rss_url=${enc}&count=60`,opt),true),
@@ -2214,6 +2235,8 @@ function renderProfiles(){
   document.getElementById('add-route-btn').style.display=nb?'none':'';
   document.getElementById('dist-row').style.display=nb?'':'none';
   document.getElementById('bus-hdr-lbl').textContent=nb?`${nearbyDist}米內到站時間`:'到站時間';
+  const mapBtn=document.getElementById('map-toggle-btn');
+  if(mapBtn)mapBtn.style.display=nb?'':'none';
 }
 function switchProfile(pid){setActivePid(pid);favs=loadFavs(pid);renderProfiles();refreshAllETAs()}
 function switchToNearby(){setActivePid(NEARBY_PID);renderProfiles();syncDistPills();loadNearby()}
@@ -3496,9 +3519,150 @@ _restartTrafficAutoRefresh();
 // Preload CTB stops in background so nearby search is ready
 setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},1500);
 
-// PWA
-const ICON_SVG=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2306080d'/><text y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'>🌿</text><text y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'>日常</text></svg>`;
-const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(new Blob([JSON.stringify({name:'生活日常',short_name:'生活日常',start_url:'.',display:'standalone',background_color:'#06080d',theme_color:'#06080d',icons:[{src:'data:image/svg+xml,'+ICON_SVG,sizes:'512x512',type:'image/svg+xml'}]})],{type:'application/json'}));document.head.appendChild(ml);
+// PWA · Service Worker 註冊
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').then(reg=>{
+      console.log('[SW] 已註冊:',reg.scope);
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller)showToast('✅ 已更新至最新版本');
+        });
+      });
+    }).catch(e=>console.warn('[SW] 註冊失敗:',e));
+  });
+}
+
+// ═══════════════════════════════════
+//  附近地圖 (Leaflet + OpenStreetMap)
+// ═══════════════════════════════════
+let _map=null, _mapInited=false, _mapView=false;
+let _mapMarkers=[], _mapUserMarker=null;
+
+function toggleMapView(){
+  _mapView=!_mapView;
+  const btn=document.getElementById('map-toggle-btn');
+  const listEl=document.getElementById('bus-list');
+  const mapEl=document.getElementById('nearby-map');
+  const distRow=document.getElementById('dist-row');
+  if(_mapView){
+    btn.classList.add('active');btn.textContent='📋 列表';
+    listEl.style.display='none';
+    mapEl.style.display='flex';
+    distRow.style.display='none';
+    _initMap();
+  }else{
+    btn.classList.remove('active');btn.textContent='🗺 地圖';
+    listEl.style.display='';
+    mapEl.style.display='none';
+    distRow.style.display='';
+  }
+}
+
+function _initMap(){
+  if(!window.L){showToast('地圖載入中，請稍候');return;}
+  const mapEl=document.getElementById('nearby-map');
+  if(!_mapInited){
+    _map=L.map(mapEl,{
+      zoomControl:true,
+      attributionControl:false,
+    }).setView([nearbyLat||22.32,nearbyLng||114.17],16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19,
+      className:'map-tiles',
+    }).addTo(_map);
+    L.control.attribution({prefix:'© OpenStreetMap'}).addTo(_map);
+    _mapInited=true;
+  }
+  setTimeout(()=>{
+    _map.invalidateSize();
+    if(nearbyLat)_updateMapMarkers();
+  },120);
+}
+
+// 自訂 pin 圖示
+function _makeIcon(color,label){
+  return L.divIcon({
+    className:'',
+    html:`<div style="background:${color};border:2px solid #fff;border-radius:50% 50% 50% 0;width:28px;height:28px;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5)"><span style="transform:rotate(45deg);font-size:11px;font-weight:700;color:#000">${label||''}</span></div>`,
+    iconSize:[28,28],iconAnchor:[14,28],popupAnchor:[0,-30],
+  });
+}
+
+async function _updateMapMarkers(){
+  if(!_map||!nearbyLat)return;
+  // 移除舊 markers
+  _mapMarkers.forEach(m=>m.remove());
+  _mapMarkers=[];
+  if(_mapUserMarker)_mapUserMarker.remove();
+
+  // 用戶位置
+  _mapUserMarker=L.marker([nearbyLat,nearbyLng],{
+    icon:L.divIcon({
+      className:'',
+      html:`<div style="background:#5b8fff;border:3px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 0 4px rgba(91,143,255,.3)"></div>`,
+      iconSize:[16,16],iconAnchor:[8,8],
+    }),
+    zIndexOffset:1000,
+  }).addTo(_map);
+  _mapUserMarker.bindTooltip('你的位置',{permanent:false,direction:'top'});
+  _map.setView([nearbyLat,nearbyLng],16);
+
+  // 抓附近 KMB 站點
+  try{
+    const stops=await fetchAllStops();
+    const nearby=stops
+      .map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))}))
+      .filter(s=>s.dist<=nearbyDist&&!isNaN(s.dist))
+      .sort((a,b)=>a.dist-b.dist).slice(0,20);
+
+    nearby.forEach(stop=>{
+      const marker=L.marker([parseFloat(stop.lat),parseFloat(stop.long)],{
+        icon:_makeIcon('#f0a500','🚌'),
+      }).addTo(_map);
+
+      // popup：點擊時抓 ETA
+      marker.on('click',async()=>{
+        marker.bindPopup(`<div class="map-stop-popup">
+          <div class="stop-name">🚌 ${stop.name_tc}</div>
+          <div class="eta-line" style="color:#8898b8">載入班次中…</div>
+        </div>`,{maxWidth:220}).openPopup();
+
+        try{
+          const d=await fetch(`${KMB}/stop-eta/${stop.stop}`).then(r=>r.json());
+          const now=Date.now();
+          // 每條路線取最近一班
+          const routeMap=new Map();
+          (d.data||[]).forEach(e=>{
+            if(!e.eta)return;
+            const ts=new Date(e.eta).getTime();
+            if(ts<now-30000)return;
+            const m=Math.round((ts-now)/60000);
+            const key=`${e.route}_${e.dir}`;
+            if(!routeMap.has(key))routeMap.set(key,{route:e.route,dest:e.dest_tc||'',m,svcType:e.service_type||'1'});
+          });
+          const rows=[...routeMap.values()].sort((a,b)=>a.m-b.m).slice(0,5);
+          const etaHtml=rows.length
+            ?rows.map(r=>`<div class="eta-line"><span class="route-tag" onclick="openBusDetail('${esc(r.route)}','${r.svcType}','${esc(r.dest)}','${stop.stop}')">${r.route}</span> 往${r.dest} <b style="color:${r.m<=2?'#ff4757':r.m<=8?'#ffc03a':'#2ed573'}">${r.m<=0?'即將':r.m+'分'}</b></div>`).join('')
+            :`<div class="eta-line" style="color:#8898b8">暫無班次</div>`;
+          marker.setPopupContent(`<div class="map-stop-popup">
+            <div class="stop-name">🚌 ${stop.name_tc}</div>
+            <div style="font-size:10px;color:#8898b8;margin-bottom:4px">${Math.round(stop.dist)}m · ${stop.stop}</div>
+            ${etaHtml}
+          </div>`);
+        }catch{
+          marker.setPopupContent(`<div class="map-stop-popup">
+            <div class="stop-name">🚌 ${stop.name_tc}</div>
+            <div class="eta-line" style="color:#ff4757">載入失敗</div>
+          </div>`);
+        }
+      });
+      _mapMarkers.push(marker);
+    });
+  }catch(e){console.warn('[map]',e);}
+}
+
 </script>
 </body>
 </html>
