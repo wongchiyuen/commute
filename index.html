@@ -2671,16 +2671,13 @@ async function loadNearby(){
           if(!e.eta)return;
           const ts=new Date(e.eta).getTime();
           if(ts<Date.now()-30000)return;
-          const co=(e.co||'KMB').toUpperCase();
-          if(co==='CTB'&&!ts_s.ctb)return;
-          const type=co==='CTB'?'ctb':'kmb';
+          // KMB stop-eta API 只返回 KMB 班次，co 欄位不可靠
           const key=`${e.route}_${e.dir}`;
           if(!routeMap.has(key)){
-            routeMap.set(key,{route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,companyType:type,etasWithType:[{ts,type}],fare:null});
+            routeMap.set(key,{route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc,stopId:stop.stop,dist:Math.round(stop.dist),serviceType:e.service_type||'1',dir:e.dir,companyType:'kmb',etasWithType:[{ts,type:'kmb'}],fare:null});
           }else{
             const ex=routeMap.get(key);
-            if(type==='ctb'&&ex.companyType==='kmb')ex.companyType='joint';
-            if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===ts))ex.etasWithType.push({ts,type});
+            if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===ts))ex.etasWithType.push({ts,type:'kmb'});
           }
         });
       });
