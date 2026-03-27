@@ -78,18 +78,18 @@
 -->
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
-<meta name="theme-color" content="#06080d">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="生活日常">
-<title>生活日常</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=Azeret+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="生活日常">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2306080d'/%3E%3Ctext y='54' x='50' font-size='52' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%8C%BF%3C/text%3E%3Ctext y='82' x='50' font-size='15' text-anchor='middle' fill='%23f0a500' font-family='sans-serif' font-weight='bold'%3E%E6%97%A5%E5%B8%B8%3C/text%3E%3C/svg%3E">
+  <link rel="manifest" href="/manifest.json">
+  <title>生活日常</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+
 #nearby-map .leaflet-container{background:#0d0f18}
 #nearby-map{border-top:1px solid var(--bdr)}
 .map-toggle-btn{display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;padding:5px 10px;color:var(--mid);font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:var(--sans);transition:all .15s}
@@ -414,6 +414,106 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 </style>
 </head>
 <body>
+
+/* 新增：新聞更新掣樣式 */
+    .refresh-btn {
+      padding: 4px 10px;
+      border: 1px solid rgba(240, 165, 0, 0.4);
+      border-radius: 6px;
+      color: #f0a500;
+      font-size: 12px;
+      cursor: pointer;
+      background: rgba(240, 165, 0, 0.05);
+    }
+    .badge-joint { background: linear-gradient(90deg, #ed1d24 50%, #ffd600 50%) !important; color: #fff !important; }
+  </style>
+</head>
+<body>
+
+  <div id="tab-news" class="tab-content" style="display:none">
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>最新新聞</span>
+      <div class="refresh-btn" onclick="uiForceRefreshNews()">🗘 重新載入</div>
+    </div>
+    <div id="news-list" class="news-list"></div>
+  </div>
+
+  <div id="tab-settings" class="tab-content" style="display:none">
+    <div class="card">
+      <h3 style="margin-bottom:12px; font-size:16px">關於生活日常</h3>
+      <p style="font-size:13px; color:#8898b8; margin-bottom:8px">版本：<span id="app-version-val">v1.3.0</span></p>
+      <p style="font-size:12px; color:#5b6a85">本程式為 PWA 應用，旨在提供更流暢的日常資訊體驗。</p>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // 核心變數
+  const VERSION = 'v1.3.0';
+  
+  // 修正 1 & 2: 改進聯營巴士邏輯
+  async function loadNearbyBus(lat, lng) {
+    try {
+      // 獲取兩間公司的附近站點 (確保你有實作這些 function)
+      const [kmbResult, ctbResult] = await Promise.all([
+        _getKmbNearby(lat, lng),
+        _getCtbNearby(lat, lng)
+      ]);
+
+      // 合併邏輯
+      const merged = [...kmbResult];
+      ctbResult.forEach(c => {
+        // 比對路線及站名，如果一樣就當係聯營
+        const match = merged.find(k => k.route === c.route && k.stopName === c.stopName);
+        if (match) {
+          match.co = "KMB+CTB"; 
+          match.isJoint = true;
+        } else {
+          merged.push(c);
+        }
+      });
+      
+      renderBusCards(merged);
+    } catch(e) {
+      console.error("Nearby load failed", e);
+    }
+  }
+
+  // 修正 3: 強制刷新新聞並跳過 SW Cache
+  async function uiForceRefreshNews() {
+    if(typeof showToast === 'function') showToast("正在獲取最新資訊...");
+    // 傳入 force=true 觸發加 timestamp 穿透快取
+    await loadNewsData(true);
+  }
+
+  // 修正後的新聞抓取
+  async function loadNewsData(force = false) {
+    const newsUrl = 'https://news.rthk.hk/rthk/ch/rss/export_msnews_ch.xml';
+    // 如果 force 為 true，在 URL 後面加 timestamp 穿透 Service Worker 快取
+    const cacheBuster = force ? `&refresh=true&t=${Date.now()}` : '';
+    const finalUrl = `/proxy?url=${encodeURIComponent(newsUrl)}${cacheBuster}`;
+    
+    try {
+      const res = await fetch(finalUrl);
+      const xml = await res.text();
+      parseNewsXML(xml); // 這裡呼叫你原本的解析 function
+      if(force && typeof showToast === 'function') showToast("更新完畢");
+    } catch(e) {
+      console.error("News load failed", e);
+    }
+  }
+
+  // 初始化
+  window.addEventListener('DOMContentLoaded', () => {
+    // 修正 5: 自動同步設定頁的版本號
+    const verDisplay = document.getElementById('app-version-val');
+    if(verDisplay) verDisplay.innerText = VERSION;
+    
+    // 註冊 Service Worker (確保 sw.js 已經更新)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  });
 
 <!-- ══ HOME ══ -->
 <div class="page active" id="page-home">
