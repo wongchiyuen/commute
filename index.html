@@ -68,6 +68,14 @@
 ║        - 天氣警告本地通知（方法A）：                          ║
 ║          loadWeather比對上次警告，有新警告即顯示通知           ║
 ║          設定頁「🔔天氣警告通知」一鍵啟用，無需伺服器          ║
+║  v1.9  Bug修復 + 體驗改善                                    ║
+║        - 附近城巴路線：修復 _fetchCTBNearbyRaw 內             ║
+║          allStops 變數遮蓋外層 KMB allStops 的 bug            ║
+║        - 聯營路線：修復合併邏輯，ETA 時間差<5秒視為同班        ║
+║          確保「九巴+城巴」正確標示                             ║
+║        - 新聞：加入「🗑 清除重載」按鈕，清 SW 快取後強制重抓   ║
+║        - 安裝說明：加入只顯示書籤的排查指引                    ║
+║        - 版本號：關於頁面及設定列同步更新至 v1.9               ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -468,7 +476,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
     <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
       <span id="news-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
-      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 立即更新</button>
+      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 更新</button>
+      <button class="feed-refresh-btn" onclick="hardReloadNewsFeed()" style="color:var(--amb2);border-left:1px solid var(--bdr);padding-left:8px;margin-left:2px">🗑 清除重載</button>
     </div>
     <div class="feed-list" id="news-list"><div class="spinner"></div></div>
   </div>
@@ -537,7 +546,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" onclick="openAboutDrawer()">
         <div class="sett-ico">🌿</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v1.2 · 2026 · 數據來源</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v1.9 · 2026 · 數據來源</div></div>
         <div class="sett-chev">›</div>
       </div>
     </div>
@@ -1919,6 +1928,29 @@ async function reloadNewsFeed(){
   _updateNewsBadge();
 }
 
+async function hardReloadNewsFeed(){
+  NEWS_FEED_KEYS.forEach(k=>delete newsCache[k]);
+  document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
+  _updateNewsBadge('清除快取中…');
+  try{
+    if('caches' in window){
+      const cacheNames=await caches.keys();
+      for(const name of cacheNames){
+        const cache=await caches.open(name);
+        const keys=await cache.keys();
+        for(const req of keys){
+          if(/rss2json|allorigins|corsproxy|codetabs|rthk.*rss/i.test(req.url))
+            await cache.delete(req);
+        }
+      }
+    }
+  }catch(e){console.warn('[hardReload]',e);}
+  _newsAutoCountdown=NEWS_AUTO_INTERVAL_SEC;
+  await ensureNewsFeedLoaded(currentNewsFeed);
+  _updateNewsBadge();
+  showToast('✅ 快取已清除，新聞已重新載入');
+}
+
 function reloadCurrentFeed(){
   const pg=document.querySelector('.page.active')?.id;
   if(pg==='page-news')reloadNewsFeed();
@@ -2114,8 +2146,19 @@ function openInstallDrawer(){
         <div style="font-size:12px;font-weight:700;color:var(--amb2);margin-bottom:8px">🤖 Android（Chrome）</div>
         1. 用 <strong style="color:var(--bright)">Chrome</strong> 開啟此網頁<br>
         2. 點右上角 <strong style="color:var(--bright)">「⋮」</strong> 選單<br>
-        3. 選「<strong style="color:var(--bright)">新增至主畫面</strong>」<br>
+        3. 選「<strong style="color:var(--bright)">新增至主畫面</strong>」或「安裝應用程式」<br>
         4. 按「新增」確認
+      </div>
+      <div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.22);border-radius:11px;padding:13px 15px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#ff8a96;margin-bottom:6px">⚠️ 安裝後只顯示書籤？</div>
+        <div style="font-size:12px;color:var(--mid);line-height:1.8">
+          若安裝後只是普通書籤（有瀏覽器頂欄），可能因為：<br>
+          • <strong style="color:var(--bright)">必須用 Safari</strong>（iOS）或 <strong style="color:var(--bright)">Chrome</strong>（Android）安裝<br>
+          • 網址必須是 <strong style="color:var(--bright)">https://</strong> 開頭<br>
+          • iOS 需要 Safari 16.4 或更新版本<br>
+          • 已安裝的舊捷徑需刪除後重新安裝<br>
+          • Android 需選「<strong style="color:var(--bright)">安裝應用程式</strong>」而非「加至主畫面」
+        </div>
       </div>
       <div style="font-size:12px;color:var(--mid);text-align:center;line-height:1.7">安裝後全螢幕顯示，如原生 App 般使用<br>無需應用商店</div>
     </div>`;
@@ -2282,7 +2325,7 @@ function openAboutDrawer(){
     <div style="text-align:center;padding:8px 0 20px">
       <div style="font-size:48px;margin-bottom:8px">🌿</div>
       <div style="font-size:20px;font-weight:700;color:var(--amb2);margin-bottom:3px">生活日常</div>
-      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v1.2 · 2026</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v1.9 · 2026</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:11px;overflow:hidden;margin-bottom:8px">
       ${[
@@ -2596,9 +2639,9 @@ async function _ensureCTBStops(){
   return window._ctbStops||[];
 }
 async function _fetchCTBNearbyRaw(lat,lng,radius){
-  const allStops=await _ensureCTBStops();
-  if(!allStops.length)return [];
-  const nearbyCTB=(window._ctbStops||[])
+  const ctbStops=await _ensureCTBStops();
+  if(!ctbStops||!ctbStops.length)return [];
+  const nearbyCTB=ctbStops
     .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude||0),parseFloat(s.long||s.longitude||0))}))
     .filter(s=>s.dist<=radius&&!isNaN(s.dist)&&s.dist>0)
     .sort((a,b)=>a.dist-b.dist).slice(0,8);
@@ -2741,16 +2784,21 @@ async function loadNearby(){
           if(!ctbRows.length)return;
           // 在原 routeMap 上合併城巴資料
           ctbRows.forEach(r=>{
+            // 嘗試找同路線的 KMB 記錄（任一方向）
             const matchKey=
               routeMap.has(`${r.route}_O`)?`${r.route}_O`:
               routeMap.has(`${r.route}_I`)?`${r.route}_I`:null;
             if(matchKey){
               const ex=routeMap.get(matchKey);
-              // 只有原本係 KMB 才升級為 joint；純 CTB 路線唔改
-              if(ex.companyType==='kmb')ex.companyType='joint';
-              r.etasWithType.forEach(e=>{if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>x.ts===e.ts))ex.etasWithType.push(e);});
+              // 升級為 joint（不管原來是 kmb 還是其他）
+              ex.companyType='joint';
+              r.etasWithType.forEach(e=>{
+                if(ex.etasWithType.length<3&&!ex.etasWithType.find(x=>Math.abs(x.ts-e.ts)<5000))
+                  ex.etasWithType.push(e);
+              });
               ex.etasWithType.sort((a,b)=>a.ts-b.ts);
             }else{
+              // 城巴獨有路線：直接加入
               const newKey=`${r.route}_CTB_${r.stopId}`;
               if(!routeMap.has(newKey))
                 routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
