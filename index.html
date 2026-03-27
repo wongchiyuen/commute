@@ -74,6 +74,15 @@
 ║        - 舊版用戶升級相容：ctb 欄位缺失時自動補 true           ║
 ║        - loadTransportSettings() 改用 getTransportSettings()  ║
 ║          確保設定頁勾選框與附近 tab 預設值一致                  ║
+║  v2.0  新聞 & 交通「清除重載」按鈕                            ║
+║        - 新聞/交通 toolbar 各加「🗑 清除重載」按鈕             ║
+║          清除全部快取後強制重新抓取，解決卡住無法更新問題        ║
+║        - hardReloadNewsFeed() / hardReloadTrafficFeed()        ║
+║          清 newsCache / trafficV2Data + trafficRthkData        ║
+║          並顯示 toast 提示用戶操作已執行                       ║
+║        - switchPage 加強：切換至新聞/交通頁時                  ║
+║          若快取全空/全失敗自動觸發重載，避免空白頁面           ║
+║        - _restartNewsAutoRefresh() 別名確保倒計時重置          ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -474,7 +483,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     </div>
     <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
       <span id="news-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
-      <button class="feed-refresh-btn" onclick="reloadNewsFeed()">↺ 立即更新</button>
+      <button class="feed-refresh-btn" onclick="reloadNewsFeed()" title="立即重新載入">↺ 更新</button>
+      <button class="feed-refresh-btn" onclick="hardReloadNewsFeed()" title="清除快取並重新載入" style="color:var(--red);border:1px solid rgba(255,71,87,.3);border-radius:6px;padding:2px 7px;background:rgba(255,71,87,.08)">🗑 清除重載</button>
     </div>
     <div class="feed-list" id="news-list"><div class="spinner"></div></div>
   </div>
@@ -494,7 +504,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
     <div style="flex-shrink:0;padding:4px 12px 4px;background:var(--bg2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr)">
       <span id="traffic-auto-badge" style="font-size:10px;color:var(--dim);font-family:var(--mono);flex:1">⟳ 自動更新中</span>
       <span id="traffic-src-lbl" style="font-size:10px;color:var(--dim);font-family:var(--mono)"></span>
-      <button class="feed-refresh-btn" onclick="reloadTrafficV2()">↺ 更新</button>
+      <button class="feed-refresh-btn" onclick="reloadTrafficV2()" title="立即重新載入">↺ 更新</button>
+      <button class="feed-refresh-btn" onclick="hardReloadTrafficFeed()" title="清除快取並重新載入" style="color:var(--red);border:1px solid rgba(255,71,87,.3);border-radius:6px;padding:2px 7px;background:rgba(255,71,87,.08)">🗑 清除重載</button>
     </div>
     <div class="feed-list" id="traffic-list"><div class="spinner"></div></div>
   </div>
@@ -543,7 +554,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" onclick="openAboutDrawer()">
         <div class="sett-ico">🌿</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v1.2 · 2026 · 數據來源</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v2.0 · 2026 · 數據來源</div></div>
         <div class="sett-chev">›</div>
       </div>
     </div>
@@ -882,8 +893,17 @@ function switchPage(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
-  if(name==='news')ensureNewsFeedLoaded(currentNewsFeed);
-  if(name==='traffic')ensureTrafficFeedLoaded(currentTrafficCat);
+  if(name==='news'){
+    // 若所有快取均失敗或空，切換時自動重載
+    const allFailed=NEWS_FEED_KEYS.every(k=>!newsCache[k]||newsCache[k]._failed||!newsCache[k].items?.length);
+    if(allFailed){reloadNewsFeed();}
+    else{ensureNewsFeedLoaded(currentNewsFeed);}
+  }
+  if(name==='traffic'){
+    // 若交通資料全空，切換時自動重載
+    if(!trafficV2Data.length&&!trafficRthkData.length){ensureTrafficFeedLoaded(currentTrafficCat);}
+    else{renderTrafficV2();}
+  }
   if(name==='settings'){document.getElementById('sett-stn-sub').textContent=selectedStn;_updateSettingsSubtitles();loadTodayHistory();loadTransportSettings()}
 }
 
@@ -1923,6 +1943,31 @@ async function reloadNewsFeed(){
   _updateNewsBadge('載入中…');
   await ensureNewsFeedLoaded(currentNewsFeed);
   _updateNewsBadge();
+  _restartNewsAutoRefresh();
+}
+
+// 清除快取並強制重新抓取所有新聞（無論當前 tab）
+async function hardReloadNewsFeed(){
+  NEWS_FEED_KEYS.forEach(k=>delete newsCache[k]);
+  document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
+  _updateNewsBadge('清除快取中…');
+  showToast('🗑 清除快取，重新載入新聞…');
+  await ensureNewsFeedLoaded(currentNewsFeed);
+  _updateNewsBadge();
+  _restartNewsAutoRefresh();
+}
+
+// 清除快取並強制重新抓取交通消息
+async function hardReloadTrafficFeed(){
+  trafficV2Data=[];
+  trafficRthkData=[];
+  document.getElementById('traffic-list').innerHTML=`<div class="spinner"></div>`;
+  document.getElementById('traffic-src-lbl').textContent='';
+  _updateTrafficBadge('清除快取中…');
+  showToast('🗑 清除快取，重新載入交通消息…');
+  await loadTDTrafficV2();
+  _updateTrafficBadge();
+  _restartTrafficAutoRefresh();
 }
 
 function reloadCurrentFeed(){
@@ -1963,6 +2008,7 @@ function _startNewsAutoRefresh(){
     _updateNewsBadge();
   },1000);
 }
+function _restartNewsAutoRefresh(){ _startNewsAutoRefresh(); }
 
 // ═══════════════════════════════════
 //  TODAY IN HISTORY
@@ -2288,7 +2334,7 @@ function openAboutDrawer(){
     <div style="text-align:center;padding:8px 0 20px">
       <div style="font-size:48px;margin-bottom:8px">🌿</div>
       <div style="font-size:20px;font-weight:700;color:var(--amb2);margin-bottom:3px">生活日常</div>
-      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v1.2 · 2026</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v2.0 · 2026</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:11px;overflow:hidden;margin-bottom:8px">
       ${[
