@@ -83,6 +83,16 @@
 ║        - switchPage 加強：切換至新聞/交通頁時                  ║
 ║          若快取全空/全失敗自動觸發重載，避免空白頁面           ║
 ║        - _restartNewsAutoRefresh() 別名確保倒計時重置          ║
+║  v2.1  PWA 安裝修復（本次更新）                              ║
+║        - index.html 補加 <link rel="manifest"> 標籤          ║
+║          （原本完全缺失，導致瀏覽器無法識別 PWA，只建立書籤）  ║
+║        - index.html 補加 <link rel="apple-touch-icon">       ║
+║          （iOS 主畫面圖示正確顯示）                           ║
+║        - index.html 補加 <link rel="icon"> favicon 標籤      ║
+║        - manifest.json 圖示改用真實 PNG 檔案路徑              ║
+║          （原本用 data: URI，Chrome 不認可無法觸發安裝提示）   ║
+║          新增 icon-192.png / icon-512.png / icon-180.png     ║
+║        - manifest.json shortcuts 補加 icons 欄位              ║
 ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="zh-Hant">
@@ -94,6 +104,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="生活日常">
 <title>生活日常</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=Azeret+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -554,7 +567,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" onclick="openAboutDrawer()">
         <div class="sett-ico">🌿</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v2.0 · 2026 · 數據來源</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v2.1 · 2026 · 數據來源</div></div>
         <div class="sett-chev">›</div>
       </div>
     </div>
