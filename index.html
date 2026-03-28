@@ -83,7 +83,13 @@
 ║        - switchPage 加強：切換至新聞/交通頁時                  ║
 ║          若快取全空/全失敗自動觸發重載，避免空白頁面           ║
 ║        - _restartNewsAutoRefresh() 別名確保倒計時重置          ║
-║  v2.1  PWA 安裝修復（本次更新）                              ║
+║  v2.2  附近城巴顯示修復（本次更新）                          ║
+║        - Bug1: loadNearby 移除早退 return                    ║
+║          附近無九巴站時若城巴啟用，繼續讓 Phase 2 載入城巴   ║
+║          ts_s/now 移至 nearby 篩選之前以供早退判斷使用       ║
+║        - Bug2: renderNearbyRows 加 fareTimeout 參數          ║
+║          Phase 2 用 800ms（車費已快取），減少城巴短暫消失窗口  ║
+║  v2.1  PWA 安裝修復                                          ║
 ║        - index.html 補加 <link rel="manifest"> 標籤          ║
 ║          （原本完全缺失，導致瀏覽器無法識別 PWA，只建立書籤）  ║
 ║        - index.html 補加 <link rel="apple-touch-icon">       ║
@@ -2721,11 +2727,15 @@ async function loadNearby(){
   try{
     const stops=await fetchAllStops();
     const nearby=stops.map(s=>({...s,dist:haverDist(nearbyLat,nearbyLng,parseFloat(s.lat),parseFloat(s.long))})).filter(s=>s.dist<=nearbyDist).sort((a,b)=>a.dist-b.dist).slice(0,25);
-    if(!nearby.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無九巴站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
-
-    const etaResults=await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
     const now=Date.now();
     const ts_s=getTransportSettings();
+    // 附近冇九巴站：若城巴亦未啟用，先顯示空狀態並退出；
+    // 若城巴已啟用，保留 spinner，讓 Phase 2 嘗試載入城巴
+    const noKmb=!nearby.length;
+    if(noKmb&&!ts_s.ctb){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無巴士站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;return}
+
+    const etaResults=noKmb?[]:await Promise.all(nearby.map(s=>fetch(`${KMB}/stop-eta/${s.stop}`).then(r=>r.json()).catch(()=>({data:[]}))));
+
 
     // ── 建立 routeMap helper（KMB + CTB 共用）──────────────
     const buildRouteMap=(etaResultsArr,nearbyArr,existingMap)=>{
@@ -2750,7 +2760,7 @@ async function loadNearby(){
     };
 
     // ── 渲染 helper ────────────────────────────────────────
-    const renderNearbyRows=async(routeMap)=>{
+    const renderNearbyRows=async(routeMap,fareTimeout=4000)=>{
       // MTR
       if(ts_s.mtr){
         try{
@@ -2781,7 +2791,7 @@ async function loadNearby(){
       const fareRowsIdx=renderRows.map((r,i)=>({r,i})).filter(({r})=>r.companyType==='kmb'||r.companyType==='joint');
       await Promise.race([
         Promise.all(fareRowsIdx.map(({r})=>fetchKMBFare(r.route,r.dir,r.serviceType).then(fare=>{r.fare=fare;}).catch(()=>{}))),
-        new Promise(res=>setTimeout(res,4000)),
+        new Promise(res=>setTimeout(res,fareTimeout)),
       ]);
       el.innerHTML=renderRows.map((r,i)=>renderBusCardV2({...r,idx:i,clickFn:r.companyType!=='mtr'?`openBusDetail('${esc(r.route)}','${r.serviceType}','${esc(r.dest)}','${r.stopId}')`:null})).join('');
       fareRowsIdx.forEach(({r})=>{
@@ -2791,14 +2801,19 @@ async function loadNearby(){
       });
     };
 
-    // ── 第一階段：即時顯示 KMB ────────────────────────────
+    // ── 第一階段：即時顯示 KMB（若附近有九巴站）──────────────
     const routeMap=buildRouteMap(etaResults,nearby,null);
-    await renderNearbyRows(new Map(routeMap)); // 傳複本，避免後面 CTB 更新時污染
+    // noKmb 時跳過第一階段渲染，保留 spinner 直至城巴資料到達
+    if(!noKmb) await renderNearbyRows(new Map(routeMap)); // 傳複本，避免後面 CTB 更新時污染
 
     // ── 第二階段：城巴 stops 載入後補入，重新渲染 ──────────
     if(ts_s.ctb){
       _ensureCTBStops().then(async ctbStops=>{
-        if(!ctbStops||!ctbStops.length)return;
+        if(!ctbStops||!ctbStops.length){
+          // CTB 站點載入失敗且冇九巴：顯示空狀態
+          if(noKmb)el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚌</div><div class="empty-text">附近無巴士站</div><div class="empty-sub">${nearbyDist}米範圍內沒有站點</div></div>`;
+          return;
+        }
         // 仍在附近 tab 才更新
         if(activePid!==NEARBY_PID)return;
         try{
@@ -2821,7 +2836,7 @@ async function loadNearby(){
                 routeMap.set(newKey,{route:r.route,dest:r.dest,stopName:r.stopName,stopId:r.stopId,dist:r.dist,serviceType:'1',dir:'O',companyType:'ctb',etasWithType:r.etasWithType,fare:null});
             }
           });
-          await renderNearbyRows(routeMap);
+          await renderNearbyRows(routeMap,800);
         }catch(e){console.warn('[CTB phase2]',e);}
       });
     }
