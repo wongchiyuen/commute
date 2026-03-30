@@ -83,6 +83,17 @@
 ║        - switchPage 加強：切換至新聞/交通頁時                  ║
 ║          若快取全空/全失敗自動觸發重載，避免空白頁面           ║
 ║        - _restartNewsAutoRefresh() 別名確保倒計時重置          ║
+║  v2.3  城巴附近、新聞清除、逐小時預報（本次）                ║
+║        - CTB 附近修復：廢棄不存在的 /eta/CTB/{stop}/all      ║
+║          建立 Stop→Route 反向索引（IDB 12hr 快取）           ║
+║          _buildCTBStopRouteIdx() 背景建立，首次需10-20秒     ║
+║          取 IDB 後立即可用，每站最多嘗試 12 條路線            ║
+║        - 新聞清除重載修復：加 _clearSWProxyCache()           ║
+║          同時清除 Service Worker 快取中的 /proxy 條目         ║
+║          sw.js 新增：/proxy pathname 完全繞過 SW 快取         ║
+║        - 逐小時天氣預報：openHourlyForecast()                ║
+║          點擊主頁溫度/天氣圖示開啟 HKO fhh API 小時預報       ║
+║          顯示未來 24 小時溫度、濕度、風向、天氣圖示            ║
 ║  v2.2  附近城巴顯示修復（本次更新）                          ║
 ║        - Bug1: loadNearby 移除早退 return                    ║
 ║          附近無九巴站時若城巴啟用，繼續讓 Phase 2 載入城巴   ║
@@ -447,7 +458,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 <div class="page active" id="page-home">
   <div class="w-panel">
     <div class="w-r1">
-      <div class="w-templeft">
+      <div class="w-templeft" onclick="openHourlyForecast()" style="cursor:pointer" title="點擊查看逐小時預報">
         <div class="w-icon" id="w-icon">🌡</div>
         <div>
           <div class="w-temp-big"><span id="w-temp">--</span><sup>°C</sup></div>
@@ -573,7 +584,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
       </div>
       <div class="sett-row" onclick="openAboutDrawer()">
         <div class="sett-ico">🌿</div>
-        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v2.1 · 2026 · 數據來源</div></div>
+        <div class="sett-lbl"><div class="sett-lbl-main">關於生活日常</div><div class="sett-lbl-sub">v2.3 · 2026 · 數據來源</div></div>
         <div class="sett-chev">›</div>
       </div>
     </div>
@@ -1214,6 +1225,63 @@ function openWeatherDetails(){
   setTimeout(()=>{
     if(document.getElementById('overlay').classList.contains('open'))renderWeatherDetailsContent();
   },3000);
+}
+
+// ── 逐小時天氣預測（HKO fhh）────────────────────────────────────────────────
+async function openHourlyForecast(){
+  setDTitle('逐小時天氣預測');
+  const el=document.getElementById('drawer-body');
+  el.innerHTML='<div class="spinner"></div>';
+  openOverlay();
+  try{
+    const d=await fetch(`${HKO}?dataType=fhh&lang=tc`).then(r=>r.json());
+    const hours=d.hourlyWeather||[];
+    const now=new Date();
+    // 只顯示未來 24 小時
+    const upcoming=hours.filter(h=>{
+      const s=String(h.forecastHour).padStart(12,'0');
+      const dt=new Date(parseInt(s.slice(0,4)),parseInt(s.slice(4,6))-1,parseInt(s.slice(6,8)),parseInt(s.slice(8,10)),0);
+      return dt>=now;
+    }).slice(0,24);
+    if(!upcoming.length){el.innerHTML='<div class="msg">暫無逐小時預測資料</div>';return;}
+    const updStr=d.updateTime?relTime(d.updateTime):'';
+    let html=`<div style="font-size:11px;color:var(--dim);font-family:var(--mono);margin-bottom:12px">未來天氣預測 · 天文台${updStr?' · 更新：'+updStr:''}</div>`;
+    let lastDay=-1;
+    upcoming.forEach((h,i)=>{
+      const s=String(h.forecastHour).padStart(12,'0');
+      const dt=new Date(parseInt(s.slice(0,4)),parseInt(s.slice(4,6))-1,parseInt(s.slice(6,8)),parseInt(s.slice(8,10)),0);
+      const isNow=dt.getHours()===now.getHours()&&dt.getDate()===now.getDate();
+      const isToday=dt.getDate()===now.getDate();
+      const isTmrw=dt.getDate()===now.getDate()+1||(now.getDate()>=28&&dt.getDate()===1&&dt.getMonth()!==now.getMonth());
+      const dayLabel=isToday?'今日':isTmrw?'明日':`${dt.getMonth()+1}/${dt.getDate()}`;
+      const weekLabel=`星期${DAY[dt.getDay()]}`;
+      if(dt.getDate()!==lastDay){
+        lastDay=dt.getDate();
+        html+=`<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--amb2);font-family:var(--mono);padding:${i>0?'10px':0} 0 5px;text-transform:uppercase">${dayLabel} ${weekLabel}</div>`;
+      }
+      const temp=h.ForecastTemperature??'--';
+      const humi=h.ForecastRelativeHumidity??'--';
+      const icon=W_ICONS[h.ForecastWeather]??'🌡';
+      const wdir=h.ForecastWindDirection||'';
+      const wspd=h.ForecastWindSpeed!=null?h.ForecastWindSpeed+'km/h':'';
+      const windStr=[wdir,wspd].filter(Boolean).join(' ');
+      const timeStr=`${pad(dt.getHours())}:00`;
+      html+=`<div style="display:flex;align-items:center;gap:12px;padding:9px ${isNow?'10px':'2px 0'};${isNow?'background:rgba(240,165,0,.09);border-radius:9px;margin:0 -10px;':''}border-bottom:1px solid var(--bdr)">
+        <div style="font-family:var(--mono);font-size:13px;font-weight:${isNow?700:400};color:${isNow?'var(--amb2)':'var(--mid)'};min-width:44px;flex-shrink:0">${timeStr}</div>
+        <div style="font-size:20px;flex-shrink:0">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--bright);line-height:1">${temp}<span style="font-size:13px;color:var(--mid);font-weight:400">°</span></div>
+          ${windStr?`<div style="font-size:10px;color:var(--dim);margin-top:1px">🌬 ${windStr}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:12px;color:#7ba8ff;font-family:var(--mono)">💧${humi}%</div>
+        </div>
+      </div>`;
+    });
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML=`<div class="msg">載入失敗<br><small style="color:var(--dim)">${e.message}</small><br><button onclick="openHourlyForecast()" style="margin-top:12px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt);border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-family:var(--sans)">↺ 重試</button></div>`;
+  }
 }
 function useGPS2(){
   if(!navigator.geolocation){alert('不支援定位');return}
@@ -1965,12 +2033,33 @@ async function reloadNewsFeed(){
   _restartNewsAutoRefresh();
 }
 
+// ── SW Cache 清除工具（清除 /proxy 及外部代理快取）───────────────────────────
+async function _clearSWProxyCache(){
+  try{
+    const names=await caches.keys();
+    let total=0;
+    for(const name of names){
+      const cache=await caches.open(name);
+      const keys=await cache.keys();
+      const toDelete=keys.filter(r=>{
+        const u=new URL(r.url);
+        return u.pathname==='/proxy'||
+          /rss2json\.com|allorigins\.win|corsproxy\.io|codetabs\.com|htmldriven|thingproxy|freeboard/.test(r.url);
+      });
+      await Promise.all(toDelete.map(r=>cache.delete(r)));
+      total+=toDelete.length;
+    }
+    console.log('[SW cache] cleared',total,'proxy entries');
+  }catch(e){console.warn('[SW cache clear]',e);}
+}
+
 // 清除快取並強制重新抓取所有新聞（無論當前 tab）
 async function hardReloadNewsFeed(){
   NEWS_FEED_KEYS.forEach(k=>delete newsCache[k]);
   document.getElementById('news-list').innerHTML=`<div class="spinner"></div>`;
   _updateNewsBadge('清除快取中…');
   showToast('🗑 清除快取，重新載入新聞…');
+  await _clearSWProxyCache(); // 同時清除 Service Worker 快取中的代理條目
   await ensureNewsFeedLoaded(currentNewsFeed);
   _updateNewsBadge();
   _restartNewsAutoRefresh();
@@ -1984,6 +2073,7 @@ async function hardReloadTrafficFeed(){
   document.getElementById('traffic-src-lbl').textContent='';
   _updateTrafficBadge('清除快取中…');
   showToast('🗑 清除快取，重新載入交通消息…');
+  await _clearSWProxyCache();
   await loadTDTrafficV2();
   _updateTrafficBadge();
   _restartTrafficAutoRefresh();
@@ -2353,7 +2443,7 @@ function openAboutDrawer(){
     <div style="text-align:center;padding:8px 0 20px">
       <div style="font-size:48px;margin-bottom:8px">🌿</div>
       <div style="font-size:20px;font-weight:700;color:var(--amb2);margin-bottom:3px">生活日常</div>
-      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v2.0 · 2026</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:20px">v2.3 · 2026</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:11px;overflow:hidden;margin-bottom:8px">
       ${[
@@ -2666,31 +2756,103 @@ async function _ensureCTBStops(){
   await _ctbStopsPromise;
   return window._ctbStops||[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CTB Stop → Route Reverse Index
+//  CTB API 無 /eta/CTB/{stop}/all 批量端點，必須建立反向索引：
+//  stopId → [routeNo, ...]  (IDB 快取 12 小時)
+// ─────────────────────────────────────────────────────────────────────────────
+let _ctbSRIdxPromise=null;
+async function _buildCTBStopRouteIdx(){
+  if(window._ctbStopRouteIdx)return window._ctbStopRouteIdx;
+  if(!_ctbSRIdxPromise){
+    _ctbSRIdxPromise=(async()=>{
+      try{
+        const cached=await _idb.fresh('ctb_stop_route_idx');
+        if(cached&&Object.keys(cached).length>10){
+          window._ctbStopRouteIdx=cached;
+          console.log('[IDB] ctb_stop_route_idx hit:',Object.keys(cached).length,'stops');
+          return cached;
+        }
+      }catch{}
+      // 取路線列表
+      let routes=window._ctbRoutes;
+      if(!routes||!routes.length){
+        try{
+          const d=await fetch(`${CTB}/route/ctb`).then(r=>r.json());
+          routes=d.data||[];
+          if(routes.length){window._ctbRoutes=routes;_idb.set('ctb_routes',routes,24*60*60*1000);}
+        }catch(e){console.warn('[CTB idx] routes failed:',e);window._ctbStopRouteIdx={};return{};}
+      }
+      const uniq=[...new Set(routes.map(r=>r.route))];
+      console.log('[CTB idx] building for',uniq.length,'routes…');
+      const idx={};
+      const BATCH=20;
+      for(let i=0;i<uniq.length;i+=BATCH){
+        await Promise.all(uniq.slice(i,i+BATCH).flatMap(routeNo=>
+          ['outbound','inbound'].map(async dir=>{
+            try{
+              const ctrl=new AbortController();
+              const t=setTimeout(()=>ctrl.abort(),6000);
+              const d=await fetch(`${CTB}/route-stop/ctb/${routeNo}/${dir}`,{signal:ctrl.signal}).then(r=>r.json());
+              clearTimeout(t);
+              (d.data||[]).forEach(s=>{
+                if(!idx[s.stop])idx[s.stop]=[];
+                if(!idx[s.stop].includes(routeNo))idx[s.stop].push(routeNo);
+              });
+            }catch{}
+          })
+        ));
+      }
+      console.log('[CTB idx] done:',Object.keys(idx).length,'stops indexed');
+      try{await _idb.set('ctb_stop_route_idx',idx,12*60*60*1000);}catch{}
+      window._ctbStopRouteIdx=idx;
+      return idx;
+    })();
+  }
+  return _ctbSRIdxPromise;
+}
+
+// ── CTB 附近真正的資料抓取（使用反向索引）────────────────────────────────
 async function _fetchCTBNearbyRaw(lat,lng,radius){
-  const allStops=await _ensureCTBStops();
-  if(!allStops.length)return [];
-  const nearbyCTB=(window._ctbStops||[])
+  const ctbStops=await _ensureCTBStops();
+  if(!ctbStops||!ctbStops.length)return[];
+  const nearbyCTB=ctbStops
     .map(s=>({...s,dist:haverDist(lat,lng,parseFloat(s.lat||s.latitude||0),parseFloat(s.long||s.longitude||0))}))
     .filter(s=>s.dist<=radius&&!isNaN(s.dist)&&s.dist>0)
     .sort((a,b)=>a.dist-b.dist).slice(0,8);
-  const now=Date.now();const results=[];
+  if(!nearbyCTB.length)return[];
+
+  // 等候索引（最多15秒，首次建立時較慢）
+  const idx=await Promise.race([
+    _buildCTBStopRouteIdx(),
+    new Promise(res=>setTimeout(()=>res(window._ctbStopRouteIdx||{}),15000)),
+  ]);
+
+  const now=Date.now();const results=[];const seen=new Set();
   await Promise.all(nearbyCTB.map(async stop=>{
-    try{
-      const d=await fetch(`${CTB}/eta/CTB/${stop.stop}/all`).then(r=>r.json());
-      const seen=new Set();
-      (d.data||[]).forEach(e=>{
-        if(!e.eta)return;const ts=new Date(e.eta).getTime();
-        if(ts<now-30000)return;
-        const key=`${e.route}_${e.dir||'O'}`;
-        if(!seen.has(key)){
-          seen.add(key);
-          results.push({route:e.route,dest:e.dest_tc||'',stopName:stop.name_tc||stop.stop,stopId:stop.stop,dist:Math.round(stop.dist),dir:e.dir||'O',etasWithType:[{ts,type:'ctb'}]});
-        }else{
-          const ex=results.find(r=>r.route===e.route&&r.stopId===stop.stop);
-          if(ex&&ex.etasWithType.length<3)ex.etasWithType.push({ts,type:'ctb'});
+    const stopRoutes=(idx[stop.stop]||[]).slice(0,12); // 每站最多嘗試12條路線
+    if(!stopRoutes.length)return;
+    await Promise.all(stopRoutes.map(async routeNo=>{
+      const key=`${routeNo}_${stop.stop}`;
+      if(seen.has(key))return;
+      seen.add(key);
+      try{
+        const ctrl=new AbortController();
+        const t=setTimeout(()=>ctrl.abort(),5000);
+        const d=await fetch(`${CTB}/eta/CTB/${stop.stop}/${routeNo}`,{signal:ctrl.signal}).then(r=>r.json());
+        clearTimeout(t);
+        const etas=(d.data||[])
+          .filter(e=>e.eta&&new Date(e.eta).getTime()>now-30000)
+          .map(e=>({ts:new Date(e.eta).getTime(),type:'ctb'}))
+          .slice(0,3);
+        if(etas.length){
+          const destCN=d.data?.find(e=>e.dest_tc)?.dest_tc||'';
+          results.push({route:routeNo,dest:destCN,stopName:stop.name_tc||stop.stop,
+            stopId:stop.stop,dist:Math.round(stop.dist),dir:'O',etasWithType:etas});
         }
-      });
-    }catch{}
+      }catch{}
+    }));
   }));
   return results;
 }
@@ -3832,8 +3994,14 @@ setInterval(loadWeather,5*60*1000);
 setInterval(()=>{if(activePid===NEARBY_PID)loadNearby();else refreshAllETAs()},30*1000);
 _startNewsAutoRefresh();
 _restartTrafficAutoRefresh();
-// Preload CTB stops in background so nearby search is ready
-setTimeout(()=>{if(getTransportSettings().ctb)_ensureCTBStops();},0);
+// Preload CTB stops and build stop-route index in background
+setTimeout(()=>{
+  if(getTransportSettings().ctb){
+    _ensureCTBStops().then(()=>{
+      _buildCTBStopRouteIdx(); // 建立反向索引（首次需時10-20秒，之後 IDB 快取）
+    });
+  }
+},1500);
 
 // PWA · Service Worker 註冊
 if('serviceWorker' in navigator){

@@ -61,6 +61,9 @@ self.addEventListener('fetch', e => {
   // ETA 即時資料：完全交給網絡，不攔截
   if (is.eta(url)) return;
 
+  // /proxy CORS Proxy：永遠不快取，確保 RSS 永遠是最新的
+  if (url.pathname === '/proxy') return;
+
   // App Shell：Cache First
   if (is.shell(url)) {
     e.respondWith(cacheFirst(e.request));
