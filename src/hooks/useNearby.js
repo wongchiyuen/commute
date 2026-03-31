@@ -34,29 +34,120 @@ async function fetchAllKMBStops() {
 export { fetchAllKMBStops };
 
 // ── CTB stops cache ───────────────────────────────────────
+// 修復：用 callback 隊列避免重複 fetch 同靜默失敗
 let _ctbStopsCache = null;
-let _ctbStopsPromise = null;
+let _ctbStopsLoading = false;
+let _ctbStopsCallbacks = [];
+
 export async function ensureCTBStops() {
   if (_ctbStopsCache?.length) return _ctbStopsCache;
-  if (!_ctbStopsPromise) {
-    _ctbStopsPromise = (async () => {
-      const cached = await _idb.fresh('ctb_stops');
-      if (cached?.length) { _ctbStopsCache = cached; return; }
-      try {
-        const d = await fetch(`${CTB}/stop`, {
-          signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined,
-        }).then(r => r.json());
-        _ctbStopsCache = d.data || [];
-        if (_ctbStopsCache.length) _idb.set('ctb_stops', _ctbStopsCache, 7 * 24 * 60 * 60 * 1000);
-      } catch (e) {
-        console.warn('[CTB stops]', e);
-        _ctbStopsCache = null;
-        _ctbStopsPromise = null;
-      }
-    })();
+
+  // 先試 IDB
+  try {
+    const cached = await _idb.fresh('ctb_stops');
+    if (cached?.length) {
+      _ctbStopsCache = cached;
+      console.log('[CTB stops] IDB hit:', cached.length);
+      return cached;
+    }
+  } catch {}
+
+  // 如果已在 fetch 中，排隊等待
+  if (_ctbStopsLoading) {
+    return new Promise(resolve => { _ctbStopsCallbacks.push(resolve); });
   }
-  await _ctbStopsPromise;
+
+  _ctbStopsLoading = true;
+  console.log('[CTB stops] fetching from API...');
+
+  try {
+    const sig = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+    const d = await fetch(`${CTB}/stop`, sig ? { signal: sig } : {}).then(r => r.json());
+    _ctbStopsCache = d.data || [];
+    if (_ctbStopsCache.length) {
+      console.log('[CTB stops] fetched:', _ctbStopsCache.length);
+      _idb.set('ctb_stops', _ctbStopsCache, 7 * 24 * 60 * 60 * 1000);
+    } else {
+      console.warn('[CTB stops] API returned empty');
+    }
+  } catch (e) {
+    console.warn('[CTB stops] fetch failed:', e.message);
+    _ctbStopsCache = null;
+  } finally {
+    _ctbStopsLoading = false;
+    const cbs = _ctbStopsCallbacks.splice(0);
+    cbs.forEach(cb => cb(_ctbStopsCache || []));
+  }
+
   return _ctbStopsCache || [];
+}
+
+// ── CTB nearby ────────────────────────────────────────────
+async function fetchCTBNearbyRaw(lat, lng, radius) {
+  const ctbStops = await ensureCTBStops();
+  if (!ctbStops?.length) {
+    console.warn('[CTB nearby] no stops data available');
+    return [];
+  }
+
+  const nearby = ctbStops
+    .map(s => {
+      const sLat = parseFloat(s.lat ?? s.latitude ?? 0);
+      const sLng = parseFloat(s.long ?? s.longitude ?? 0);
+      return { ...s, dist: haverDist(lat, lng, sLat, sLng) };
+    })
+    .filter(s => s.dist <= radius && s.dist > 0 && !isNaN(s.dist))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 6);
+
+  if (!nearby.length) {
+    console.log('[CTB nearby] no stops within', radius, 'm');
+    return [];
+  }
+
+  console.log('[CTB nearby] checking', nearby.length, 'stops');
+  const now = Date.now();
+  const results = [];
+
+  await Promise.all(nearby.map(async stop => {
+    try {
+      const sig = AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined;
+      const d = await fetch(
+        `${CTB}/eta/CTB/${stop.stop}/all`,
+        sig ? { signal: sig } : {}
+      ).then(r => r.json());
+
+      const etaData = d.data || [];
+      if (!etaData.length) return;
+
+      const routeMap = new Map();
+      etaData.forEach(e => {
+        if (!e.eta) return;
+        const ts = new Date(e.eta).getTime();
+        if (ts < now - 30000) return;
+        const key = `${e.route}_${e.dir || 'O'}`;
+        if (!routeMap.has(key)) {
+          routeMap.set(key, {
+            route: e.route, dest: e.dest_tc || '',
+            stopName: stop.name_tc || stop.stop,
+            stopId: stop.stop, dist: Math.round(stop.dist),
+            dir: e.dir || 'O', etasWithType: [{ ts, type: 'ctb' }],
+          });
+        } else {
+          const ex = routeMap.get(key);
+          if (ex.etasWithType.length < 3) ex.etasWithType.push({ ts, type: 'ctb' });
+        }
+      });
+
+      routeMap.forEach(r => results.push(r));
+      console.log('[CTB nearby] stop', stop.stop, '→', routeMap.size, 'routes');
+    } catch (e) {
+      console.warn('[CTB nearby] stop', stop.stop, 'failed:', e.message);
+    }
+  }));
+
+  console.log('[CTB nearby] total:', results.length, 'routes');
+  return results;
 }
 
 // ── LRT nearby ────────────────────────────────────────────
@@ -81,7 +172,8 @@ async function fetchLRTNearby(lat, lng, radius) {
             results.push({
               type: 'lrt', route: route.route_no, stopName: stn.n,
               dest: route.dest_ch || route.dest_en || '', stopId: stn.id,
-              serviceType: '1', etasWithType: [{ ts, type: 'lrt' }], dist: Math.round(stn.dist), fare: null,
+              serviceType: '1', etasWithType: [{ ts, type: 'lrt' }],
+              dist: Math.round(stn.dist), fare: null,
             });
           });
         });
@@ -124,116 +216,100 @@ async function fetchMTRNearby(lat, lng) {
   return results;
 }
 
-// ── CTB nearby raw ────────────────────────────────────────
-async function fetchCTBNearbyRaw(lat, lng, radius) {
-  const ctbStops = await ensureCTBStops();
-  if (!ctbStops?.length) return [];
-  const nearby = ctbStops
-    .map(s => ({ ...s, dist: haverDist(lat, lng, parseFloat(s.lat || s.latitude || 0), parseFloat(s.long || s.longitude || 0)) }))
-    .filter(s => s.dist <= radius && !isNaN(s.dist) && s.dist > 0)
-    .sort((a, b) => a.dist - b.dist).slice(0, 8);
-  const now = Date.now();
-  const results = [];
-  await Promise.all(nearby.map(async stop => {
+// ── 排序 + 車費 ───────────────────────────────────────────
+async function buildRows(routeMap, lat, lng, dist, transportSettings) {
+  const { mtr, lrt } = transportSettings;
+
+  if (mtr) {
     try {
-      const d = await fetch(`${CTB}/eta/CTB/${stop.stop}/all`).then(r => r.json());
-      const seen = new Set();
-      (d.data || []).forEach(e => {
-        if (!e.eta) return;
-        const ts = new Date(e.eta).getTime();
-        if (ts < now - 30000) return;
-        const key = `${e.route}_${e.dir || 'O'}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          results.push({
-            route: e.route, dest: e.dest_tc || '', stopName: stop.name_tc || stop.stop,
-            stopId: stop.stop, dist: Math.round(stop.dist), dir: e.dir || 'O',
-            etasWithType: [{ ts, type: 'ctb' }],
-          });
-        } else {
-          const ex = results.find(r => r.route === e.route && r.stopId === stop.stop);
-          if (ex && ex.etasWithType.length < 3) ex.etasWithType.push({ ts, type: 'ctb' });
-        }
-      });
+      const mtrRows = await fetchMTRNearby(lat, lng);
+      mtrRows.forEach((r, i) =>
+        routeMap.set(`MTR_${r.route}_${r.dest}_${i}`, {
+          ...r, serviceType: '1', dir: 'U', companyType: 'mtr', fare: null,
+        })
+      );
     } catch {}
-  }));
-  return results;
+  }
+  if (lrt) {
+    try {
+      const lrtRows = await fetchLRTNearby(lat, lng, dist);
+      lrtRows.forEach((r, i) =>
+        routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`, {
+          ...r, serviceType: '1', dir: 'O', companyType: 'lrt', fare: null,
+        })
+      );
+    } catch {}
+  }
+
+  let allRows = [...routeMap.values()].filter(r => r.etasWithType?.length > 0);
+  allRows.forEach(r => {
+    if (r.companyType === 'joint') r.etasWithType.sort((a, b) => a.ts - b.ts);
+  });
+
+  const usage = await getRouteUsage();
+  const now = Date.now();
+  allRows.sort((a, b) => {
+    const aMin = Math.round((a.etasWithType[0].ts - now) / 60000);
+    const bMin = Math.round((b.etasWithType[0].ts - now) / 60000);
+    if (aMin <= 3 && bMin > 3) return -1;
+    if (bMin <= 3 && aMin > 3) return 1;
+    const aU = usage[`${a.route}_${a.companyType}`] || 0;
+    const bU = usage[`${b.route}_${b.companyType}`] || 0;
+    if (aU !== bU) return bU - aU;
+    return a.etasWithType[0].ts - b.etasWithType[0].ts;
+  });
+
+  const renderRows = allRows.slice(0, 25);
+
+  // 車費（KMB/joint，最多等 4 秒）
+  const fareRows = renderRows.filter(r => r.companyType === 'kmb' || r.companyType === 'joint');
+  await Promise.race([
+    Promise.all(fareRows.map(r =>
+      fetchKMBFare(r.route, r.dir, r.serviceType)
+        .then(fare => { r.fare = fare; })
+        .catch(() => {})
+    )),
+    new Promise(res => setTimeout(res, 4000)),
+  ]);
+
+  return renderRows;
 }
 
 // ── Main hook ─────────────────────────────────────────────
 export function useNearby(transportSettings) {
-  // status: 'idle' | 'no-permission' | 'loading' | 'ready' | 'error'
   const [status, setStatus] = useState('idle');
   const [rows, setRows] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
-
-  const buildAndRender = useCallback(async (lat, lng, dist, routeMap) => {
-    const { mtr, lrt } = transportSettings;
-
-    if (mtr) {
-      try {
-        const mtrRows = await fetchMTRNearby(lat, lng);
-        mtrRows.forEach((r, i) =>
-          routeMap.set(`MTR_${r.route}_${r.dest}_${i}`, { ...r, serviceType: '1', dir: 'U', companyType: 'mtr', fare: null })
-        );
-      } catch {}
-    }
-    if (lrt) {
-      try {
-        const lrtRows = await fetchLRTNearby(lat, lng, dist);
-        lrtRows.forEach((r, i) =>
-          routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`, { ...r, serviceType: '1', dir: 'O', companyType: 'lrt', fare: null })
-        );
-      } catch {}
-    }
-
-    let allRows = [...routeMap.values()].filter(r => r.etasWithType?.length > 0);
-    allRows.forEach(r => { if (r.companyType === 'joint') r.etasWithType.sort((a, b) => a.ts - b.ts); });
-
-    const usage = await getRouteUsage();
-    const now = Date.now();
-    allRows.sort((a, b) => {
-      const aMin = Math.round((a.etasWithType[0].ts - now) / 60000);
-      const bMin = Math.round((b.etasWithType[0].ts - now) / 60000);
-      if (aMin <= 3 && bMin > 3) return -1;
-      if (bMin <= 3 && aMin > 3) return 1;
-      const aU = usage[`${a.route}_${a.companyType}`] || 0;
-      const bU = usage[`${b.route}_${b.companyType}`] || 0;
-      if (aU !== bU) return bU - aU;
-      return a.etasWithType[0].ts - b.etasWithType[0].ts;
-    });
-
-    const renderRows = allRows.slice(0, 25);
-
-    // Fetch fares (KMB/joint only) — max 4s wait
-    const fareRows = renderRows.filter(r => r.companyType === 'kmb' || r.companyType === 'joint');
-    await Promise.race([
-      Promise.all(fareRows.map(r =>
-        fetchKMBFare(r.route, r.dir, r.serviceType).then(fare => { r.fare = fare; }).catch(() => {})
-      )),
-      new Promise(res => setTimeout(res, 4000)),
-    ]);
-
-    setRows([...renderRows]);
-    setStatus('ready');
-  }, [transportSettings]);
+  // 防止舊 load 結果覆蓋新 load
+  const loadId = useRef(0);
 
   const load = useCallback(async (lat, lng, dist) => {
+    const myId = ++loadId.current;
     setStatus('loading');
+
     try {
+      // ── Phase 1: KMB ──────────────────────────────────
       const stops = await fetchAllKMBStops();
       const nearby = stops
         .map(s => ({ ...s, dist: haverDist(lat, lng, parseFloat(s.lat), parseFloat(s.long)) }))
         .filter(s => s.dist <= dist)
-        .sort((a, b) => a.dist - b.dist).slice(0, 25);
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 25);
 
-      if (!nearby.length) { setRows([]); setStatus('ready'); return; }
+      if (!nearby.length) {
+        if (myId !== loadId.current) return;
+        setRows([]); setStatus('ready'); return;
+      }
 
       const etaResults = await Promise.all(
-        nearby.map(s => fetch(`${KMB}/stop-eta/${s.stop}`).then(r => r.json()).catch(() => ({ data: [] })))
+        nearby.map(s =>
+          fetch(`${KMB}/stop-eta/${s.stop}`).then(r => r.json()).catch(() => ({ data: [] }))
+        )
       );
+
       const now = Date.now();
       const routeMap = new Map();
+
       etaResults.forEach((res, i) => {
         const stop = nearby[i];
         (res.data || []).forEach(e => {
@@ -256,20 +332,24 @@ export function useNearby(transportSettings) {
         });
       });
 
-      // Phase 1: render KMB immediately
-      await buildAndRender(lat, lng, dist, new Map(routeMap));
+      // 先顯示 KMB（複製 map 避免 Phase 2 污染已渲染結果）
+      const kmbRows = await buildRows(new Map(routeMap), lat, lng, dist, transportSettings);
+      if (myId !== loadId.current) return;
+      setRows(kmbRows);
+      setStatus('ready');
 
-      // Phase 2: merge CTB if enabled
+      // ── Phase 2: CTB（背景合併，完成後更新）──────────
       if (transportSettings.ctb) {
-        ensureCTBStops().then(async ctbStops => {
-          if (!ctbStops?.length) return;
-          try {
-            const ctbRows = await fetchCTBNearbyRaw(lat, lng, dist);
-            if (!ctbRows.length) return;
+        try {
+          const ctbRows = await fetchCTBNearbyRaw(lat, lng, dist);
+          if (myId !== loadId.current) return;
+
+          if (ctbRows.length > 0) {
             ctbRows.forEach(r => {
               const matchKey =
                 routeMap.has(`${r.route}_O`) ? `${r.route}_O` :
                 routeMap.has(`${r.route}_I`) ? `${r.route}_I` : null;
+
               if (matchKey) {
                 const ex = routeMap.get(matchKey);
                 if (ex.companyType === 'kmb') ex.companyType = 'joint';
@@ -280,20 +360,30 @@ export function useNearby(transportSettings) {
                 ex.etasWithType.sort((a, b) => a.ts - b.ts);
               } else {
                 const newKey = `${r.route}_CTB_${r.stopId}`;
-                if (!routeMap.has(newKey))
-                  routeMap.set(newKey, { ...r, serviceType: '1', dir: 'O', companyType: 'ctb', fare: null });
+                if (!routeMap.has(newKey)) {
+                  routeMap.set(newKey, {
+                    ...r, serviceType: '1', dir: 'O', companyType: 'ctb', fare: null,
+                  });
+                }
               }
             });
-            await buildAndRender(lat, lng, dist, routeMap);
-          } catch (e) { console.warn('[CTB phase2]', e); }
-        });
+
+            const finalRows = await buildRows(routeMap, lat, lng, dist, transportSettings);
+            if (myId !== loadId.current) return;
+            setRows(finalRows);
+          }
+        } catch (e) {
+          console.warn('[CTB phase2]', e);
+          // Phase 2 失敗唔影響已顯示的 KMB 結果
+        }
       }
     } catch (e) {
       console.warn('[nearby]', e);
+      if (myId !== loadId.current) return;
       setStatus('error');
       setErrorMsg('載入失敗，請重試');
     }
-  }, [transportSettings, buildAndRender]);
+  }, [transportSettings]);
 
   return { status, rows, errorMsg, setStatus, load };
 }
