@@ -208,7 +208,16 @@ export default function HomePage({ openDrawer, showToast }) {
             {p.name}
           </button>
         ))}
+        {/* 新增版面 */}
         <button className="add-profile-btn" onClick={() => openDrawer('新增版面', 'add-profile')}>＋</button>
+        {/* 管理版面（排序 / 刪除） */}
+        <button
+          className="add-profile-btn"
+          title="管理版面"
+          onClick={() => openDrawer('📋 管理版面', 'manage-profiles')}
+          style={{ fontSize: 18, color: 'var(--dim)' }}>
+          ⚙
+        </button>
       </div>
 
       {/* 巴士區域 */}
