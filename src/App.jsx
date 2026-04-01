@@ -272,19 +272,36 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
 // ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
+  const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
+
   const update = (pid, patch) => {
-    const def = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
-    const next = { ...cfg, [pid]: { ...def, ...(cfg[pid] || {}), ...patch } };
+    const next = { ...cfg, [pid]: { ...DEF, ...(cfg[pid] || {}), ...patch } };
     setCfg(next);
     saveAutoTabs(next);
-    showToast('已儲存');
   };
+
+  // 快捷選擇
+  const PRESETS = [
+    { label: '工作日', days: [false,true,true,true,true,true,false] },
+    { label: '週末',   days: [true,false,false,false,false,false,true] },
+    { label: '每天',   days: [true,true,true,true,true,true,true] },
+  ];
+
+  // 常用時段
+  const TIME_PRESETS = [
+    { label: '早上通勤', from: '07:30', to: '09:30' },
+    { label: '下午通勤', from: '17:00', to: '19:30' },
+    { label: '上午',     from: '08:00', to: '12:00' },
+    { label: '下午',     from: '12:00', to: '18:00' },
+  ];
+
   return (
     <div>
       {profiles.map(p => {
-        const c = cfg[p.id] || { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
+        const c = { ...DEF, ...(cfg[p.id] || {}) };
         return (
-          <div key={p.id} className="auto-tab-card">
+          <div key={p.id} className="auto-tab-card" style={{ marginBottom: 12 }}>
+            {/* 標題列 + 開關 */}
             <div className="auto-tab-hdr">
               <div className="auto-tab-name">{p.name}</div>
               <label className="toggle">
@@ -293,26 +310,90 @@ function AutoTabDrawer({ profiles, showToast }) {
                 <span className="toggle-slider" />
               </label>
             </div>
-            <div className="auto-tab-body"
-              style={{ opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
-              <div style={{ fontSize: 10, color: 'var(--mid)', marginBottom: 7 }}>啟用日子</div>
-              <div className="days-row">
+
+            <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
+
+              {/* 星期選擇 — 大按鈕，易點擊 */}
+              <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 {DAY.map((d, i) => (
-                  <button key={i} className={`day-btn${c.days[i] ? ' on' : ''}`}
-                    onClick={() => {
-                      const days = [...c.days]; days[i] = !days[i];
-                      update(p.id, { days });
+                  <button key={i}
+                    onClick={() => { const days = [...c.days]; days[i] = !days[i]; update(p.id, { days }); }}
+                    style={{
+                      flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600,
+                      background: c.days[i] ? 'var(--amb)' : 'var(--bg3)',
+                      color: c.days[i] ? '#000' : 'var(--mid)',
+                      transition: 'all .15s',
                     }}>{d}</button>
                 ))}
               </div>
-              <div className="time-row">
-                <span className="time-lbl">時間：</span>
-                <input className="time-inp" type="time" value={c.from || '07:00'}
-                  onChange={e => update(p.id, { from: e.target.value })} />
-                <span className="time-lbl">至</span>
-                <input className="time-inp" type="time" value={c.to || '09:00'}
-                  onChange={e => update(p.id, { to: e.target.value })} />
+
+              {/* 快捷日子 */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                {PRESETS.map(ps => (
+                  <button key={ps.label}
+                    onClick={() => update(p.id, { days: ps.days })}
+                    style={{
+                      flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: 'var(--bg4)', border: '1px solid var(--bdr2)',
+                      color: 'var(--mid)',
+                    }}>{ps.label}</button>
+                ))}
               </div>
+
+              {/* 時間選擇 */}
+              <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
+                  <input type="time" value={c.from || '07:00'}
+                    onChange={e => update(p.id, { from: e.target.value })}
+                    style={{
+                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
+                    }} />
+                </div>
+                <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
+                  <input type="time" value={c.to || '09:00'}
+                    onChange={e => update(p.id, { to: e.target.value })}
+                    style={{
+                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
+                    }} />
+                </div>
+              </div>
+
+              {/* 常用時段快捷 */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {TIME_PRESETS.map(tp => (
+                  <button key={tp.label}
+                    onClick={() => update(p.id, { from: tp.from, to: tp.to })}
+                    style={{
+                      padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)',
+                      border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
+                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)',
+                    }}>
+                    {tp.label}<br />
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)' }}>{tp.from}–{tp.to}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* 當前設定預覽 */}
+              {c.days.some(Boolean) && (
+                <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
+                  📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
+                  <span style={{ fontFamily: 'var(--mono)' }}>{c.from} – {c.to}</span>
+                </div>
+              )}
             </div>
           </div>
         );
