@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { NEARBY_PID } from '../constants/transport.js';
 import { DAY } from '../constants/weather.js';
 
@@ -43,10 +43,13 @@ export function AppProvider({ children }) {
 
   // Profiles
   const [profiles, setProfiles] = useState(() => loadProfiles());
+
+  // ── activePid 預設為「附近」而非第一個版面 ──────────────
+  // 若 localStorage 有上次選擇的版面且仍存在則恢復，否則用附近
   const [activePid, setActivePidState] = useState(() => {
     const saved = localStorage.getItem('active_pid') || '';
     const ps = loadProfiles();
-    return ps.find(p => p.id === saved) ? saved : (ps[0]?.id || NEARBY_PID);
+    return ps.find(p => p.id === saved) ? saved : NEARBY_PID;
   });
 
   const setActivePid = useCallback((pid) => {
@@ -59,12 +62,50 @@ export function AppProvider({ children }) {
     saveProfiles(newProfiles);
   }, []);
 
+  // ── 刪除版面（同步清除 auto-tab 設定，切換至附近）────────
+  const deleteProfile = useCallback((pid) => {
+    setProfiles(prev => {
+      const next = prev.filter(p => p.id !== pid);
+      saveProfiles(next);
+      return next;
+    });
+    // 清除孤兒 auto-tab 設定
+    const at = loadAutoTabs();
+    if (at[pid]) {
+      delete at[pid];
+      saveAutoTabs(at);
+    }
+    // 若正在使用被刪版面，切到附近
+    setActivePidState(cur => {
+      if (cur === pid) {
+        localStorage.setItem('active_pid', NEARBY_PID);
+        return NEARBY_PID;
+      }
+      return cur;
+    });
+  }, []);
+
+  // ── 上下移動版面順序 ──────────────────────────────────
+  const moveProfile = useCallback((pid, dir) => {
+    // dir: -1 上移, +1 下移
+    setProfiles(prev => {
+      const idx = prev.findIndex(p => p.id === pid);
+      if (idx < 0) return prev;
+      const swapIdx = idx + dir;
+      if (swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      saveProfiles(next);
+      return next;
+    });
+  }, []);
+
   // Favs
   const [favs, setFavsState] = useState(() => loadFavs(
     (() => {
       const saved = localStorage.getItem('active_pid') || '';
       const ps = loadProfiles();
-      return ps.find(p => p.id === saved) ? saved : (ps[0]?.id || NEARBY_PID);
+      return ps.find(p => p.id === saved) ? saved : NEARBY_PID;
     })()
   ));
 
@@ -123,7 +164,9 @@ export function AppProvider({ children }) {
     try { localStorage.setItem('last_gps_v1', JSON.stringify(c)); } catch {}
   }, []);
 
-  // Auto-tab check
+  // ── 自動跳轉版面（每個 browser session 只執行一次）────────
+  // 用 sessionStorage flag 保護：用戶手動切 tab 後重新整理不受影響，
+  // 但關閉瀏覽器重新開啟則再次按時間匹配
   const checkAutoTab = useCallback(() => {
     const cfg = loadAutoTabs();
     const now = new Date();
@@ -139,12 +182,25 @@ export function AppProvider({ children }) {
     return NEARBY_PID;
   }, []);
 
+  useEffect(() => {
+    // 已在此 session 執行過則跳過（防止手動切 tab 後被覆蓋）
+    if (sessionStorage.getItem('auto_tab_done')) return;
+    sessionStorage.setItem('auto_tab_done', '1');
+    const pid = checkAutoTab();
+    if (pid !== NEARBY_PID) {
+      setActivePidState(pid);
+      localStorage.setItem('active_pid', pid);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <AppContext.Provider value={{
       activePage, setActivePage,
       toast, showToast,
       drawer, openDrawer, closeDrawer,
       profiles, updateProfiles,
+      deleteProfile, moveProfile,
       activePid, setActivePid,
       favs, setFavs, reloadFavs,
       transportSettings, saveTransport,
