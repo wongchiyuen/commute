@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { AppProvider, useApp, NEARBY_PID } from './context/AppContext.jsx';
+import { AppProvider, useApp, NEARBY_PID,
+  loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
 import { useNews } from './hooks/useNews.js';
 import { useTraffic } from './hooks/useTraffic.js';
 import { Drawer, Toast } from './components/Overlay.jsx';
@@ -8,7 +9,11 @@ import NewsPage from './pages/NewsPage.jsx';
 import TrafficPage from './pages/TrafficPage.jsx';
 import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import './styles/global.css';
+
+// 自動從 package.json 讀取版本號（Vite build 時注入）
+const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
   { id: 'home',     ico: '🌿', lbl: '主頁' },
@@ -24,8 +29,10 @@ function AppInner() {
   const newsHook = useNews();
   const trafficHook = useTraffic();
 
-  const openDrawer = useCallback((title, key) => setDrawer({ open: true, title, key }), []);
-  const closeDrawer = useCallback(() => setDrawer(d => ({ ...d, open: false })), []);
+  const openDrawer = useCallback((title, key) =>
+    setDrawer({ open: true, title, key }), []);
+  const closeDrawer = useCallback(() =>
+    setDrawer(d => ({ ...d, open: false })), []);
 
   const switchPage = (id) => {
     setActivePage(id);
@@ -36,18 +43,15 @@ function AppInner() {
   return (
     <>
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* HomePage 自己負責渲染 profiles bar（天氣面板之下） */}
         <div style={{ display: activePage === 'home' ? 'contents' : 'none' }}>
           <HomePage openDrawer={openDrawer} showToast={showToast} />
         </div>
-
         <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
         <SearchPage isActive={activePage === 'search'} />
         <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
       </div>
 
-      {/* 底部導航 */}
       <nav className="bottom-nav">
         {NAV.map(n => (
           <button key={n.id} className={`nav-btn${activePage === n.id ? ' active' : ''}`}
@@ -58,14 +62,8 @@ function AppInner() {
         ))}
       </nav>
 
-      {/* Drawer */}
       <Drawer open={drawer.open} title={drawer.title} onClose={closeDrawer}>
-        <DrawerContent
-          drawerKey={drawer.key}
-          closeDrawer={closeDrawer}
-          showToast={showToast}
-          newsHook={newsHook}
-        />
+        <DrawerContent drawerKey={drawer.key} closeDrawer={closeDrawer} showToast={showToast} />
       </Drawer>
 
       <Toast msg={toast.msg} visible={toast.visible} />
@@ -74,10 +72,9 @@ function AppInner() {
 }
 
 // ── Drawer 內容路由 ───────────────────────────────────────
-function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
+function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
-    setActivePid, reloadFavs, selectedStn, setSelectedStn,
-    gpsCoords, saveGps } = useApp();
+    setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
 
@@ -91,7 +88,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
           <div className="sett-lbl-sub">{sub}</div>
         </div>
         <label className="toggle">
-          <input type="checkbox" checked={checked} onChange={onChange} disabled={disabled} />
+          <input type="checkbox" checked={!!checked} onChange={onChange} disabled={!!disabled} />
           <span className="toggle-slider" />
         </label>
       </div>
@@ -111,20 +108,23 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
 
   // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
-    const { RHRREAD_STNS } = require('./constants/weather.js');
     return (
       <div>
-        <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 10 }}>選擇天氣測站</div>
-        <div className="loc-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 10 }}>
+          選擇天氣測站（目前：{selectedStn}）
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {RHRREAD_STNS.map(s => (
             <div key={s.n}
+              onClick={() => { setSelectedStn(s.n); closeDrawer(); showToast(`已切換至 ${s.n}`); }}
               style={{
                 background: s.n === selectedStn ? 'var(--amb-bg)' : 'var(--bg3)',
                 border: `1px solid ${s.n === selectedStn ? 'var(--amb-bdr)' : 'var(--bdr)'}`,
                 borderRadius: 10, padding: '10px 12px', cursor: 'pointer', transition: 'all .15s',
-              }}
-              onClick={() => { setSelectedStn(s.n); closeDrawer(); showToast(`已切換至 ${s.n}`); }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: s.n === selectedStn ? 'var(--amb2)' : 'var(--txt)' }}>{s.n}</div>
+              }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: s.n === selectedStn ? 'var(--amb2)' : 'var(--txt)' }}>
+                {s.n}
+              </div>
             </div>
           ))}
         </div>
@@ -134,60 +134,11 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
 
   // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
-    const { loadAutoTabs, saveAutoTabs } = require('./context/AppContext.jsx');
-    const DAY = ['日','一','二','三','四','五','六'];
-    const [cfg, setCfg] = useState(() => loadAutoTabs());
-
-    const update = (pid, patch) => {
-      const next = { ...cfg, [pid]: { ...(cfg[pid] || { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' }), ...patch } };
-      setCfg(next);
-      saveAutoTabs(next);
-    };
-
-    return (
-      <div>
-        {profiles.map(p => {
-          const c = cfg[p.id] || { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
-          return (
-            <div key={p.id} className="auto-tab-card">
-              <div className="auto-tab-hdr">
-                <div className="auto-tab-name">{p.name}</div>
-                <label className="toggle">
-                  <input type="checkbox" checked={!!c.enabled}
-                    onChange={e => update(p.id, { enabled: e.target.checked })} />
-                  <span className="toggle-slider" />
-                </label>
-              </div>
-              <div className="auto-tab-body" style={{ opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
-                <div style={{ fontSize: 10, color: 'var(--mid)', marginBottom: 7 }}>啟用日子</div>
-                <div className="days-row">
-                  {DAY.map((d, i) => (
-                    <button key={i} className={`day-btn${c.days[i] ? ' on' : ''}`}
-                      onClick={() => {
-                        const days = [...c.days]; days[i] = !days[i];
-                        update(p.id, { days });
-                      }}>{d}</button>
-                  ))}
-                </div>
-                <div className="time-row">
-                  <span className="time-lbl">時間：</span>
-                  <input className="time-inp" type="time" value={c.from || '07:00'}
-                    onChange={e => update(p.id, { from: e.target.value })} />
-                  <span className="time-lbl">至</span>
-                  <input className="time-inp" type="time" value={c.to || '09:00'}
-                    onChange={e => update(p.id, { to: e.target.value })} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+    return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
   }
 
   // ── 資料管理 ──────────────────────────────────────────
   if (drawerKey === 'data') {
-    const { loadFavs, saveFavs, saveProfiles } = require('./context/AppContext.jsx');
     const exportData = () => {
       const data = { profiles, favsByProfile: {} };
       profiles.forEach(p => { data.favsByProfile[p.id] = loadFavs(p.id); });
@@ -215,6 +166,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
         } catch { showToast('❌ 檔案格式不正確'); }
       };
       reader.readAsText(file);
+      e.target.value = '';
     };
     return (
       <div className="sett-card">
@@ -234,71 +186,21 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
           </div>
           <div className="sett-chev">›</div>
         </div>
-        <input id="_import-file" type="file" accept=".json" style={{ display: 'none' }} onChange={importData} />
+        <input id="_import-file" type="file" accept=".json"
+          style={{ display: 'none' }} onChange={importData} />
       </div>
     );
   }
 
   // ── 天氣警告通知 ──────────────────────────────────────
   if (drawerKey === 'notify') {
-    const [perm, setPerm] = useState(Notification?.permission || 'unsupported');
-    const isOn = perm === 'granted';
-    const toggle = async () => {
-      if (!('Notification' in window)) return;
-      if (isOn) { showToast('請到瀏覽器設定關閉通知權限'); return; }
-      const result = await Notification.requestPermission();
-      setPerm(result);
-      if (result === 'granted') showToast('✅ 已啟用天氣警告通知');
-    };
-    if (!('Notification' in window)) return <div className="msg">此裝置不支援通知</div>;
-    if (perm === 'denied') return <div className="msg">❌ 通知已被封鎖<br /><small style={{ color: 'var(--dim)' }}>請到瀏覽器設定允許通知</small></div>;
-    return (
-      <div>
-        <div style={{ background: 'rgba(240,165,0,.08)', border: '1px solid var(--amb-bdr)', borderRadius: 11, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--bright)', marginBottom: 6 }}>🔔 會通知的警告</div>
-          <div style={{ fontSize: 12, color: 'var(--mid)', lineHeight: 1.9 }}>
-            ⛈ 黑色 / 紅色 / 黃色暴雨警告<br />
-            🌀 熱帶氣旋警告信號（颱風）<br />
-            🥵 酷熱 / 🥶 寒冷天氣警告<br />
-            ⚡ 雷暴警告 · 🌊 山泥傾瀉警告
-          </div>
-        </div>
-        <button onClick={toggle} style={{
-          width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600,
-          cursor: 'pointer', fontFamily: 'var(--sans)',
-          border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`,
-          background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)',
-          color: isOn ? '#ff8a96' : 'var(--amb2)',
-        }}>
-          {isOn ? '🔕 關閉天氣警告通知' : '🔔 啟用天氣警告通知'}
-        </button>
-      </div>
-    );
+    return <NotifyDrawer showToast={showToast} />;
   }
 
   // ── 新增版面 ──────────────────────────────────────────
   if (drawerKey === 'add-profile') {
-    const [name, setName] = useState('');
-    const confirm = () => {
-      if (!name.trim()) return;
-      const id = 'p_' + Date.now();
-      const newProfiles = [...profiles, { id, name: name.trim() }];
-      updateProfiles(newProfiles);
-      closeDrawer();
-      showToast(`已新增「${name.trim()}」`);
-    };
-    return (
-      <div>
-        <div className="sec-lbl">版面名稱</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input className="d-input" value={name} placeholder="如：上班、週末…" maxLength={10}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && confirm()}
-            autoFocus />
-          <button className="d-btn" onClick={confirm}>確定</button>
-        </div>
-      </div>
-    );
+    return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
+      closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
   // ── 安裝到手機 ────────────────────────────────────────
@@ -323,7 +225,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
     );
   }
 
-  // ── 關於 ──────────────────────────────────────────────
+  // ── 關於生活日常 ──────────────────────────────────────
   if (drawerKey === 'about') {
     const sources = [
       ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
@@ -338,12 +240,16 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
         <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>🌿</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--amb2)', marginBottom: 3 }}>生活日常</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--dim)' }}>v2.1 · React + Vite · 2026</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--dim)' }}>
+            v{APP_VERSION} · React + Vite · 2026
+          </div>
         </div>
         <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 11, overflow: 'hidden' }}>
           {sources.map(([ico, name, src, url], i) => (
             <a key={i} href={url} target="_blank" rel="noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: i < sources.length - 1 ? '1px solid var(--bdr)' : 'none', textDecoration: 'none', color: 'inherit' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                borderBottom: i < sources.length - 1 ? '1px solid var(--bdr)' : 'none',
+                textDecoration: 'none', color: 'inherit' }}>
               <div style={{ fontSize: 18, width: 26, textAlign: 'center' }}>{ico}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--bright)' }}>{name}</div>
@@ -353,12 +259,136 @@ function DrawerContent({ drawerKey, closeDrawer, showToast, newsHook }) {
             </a>
           ))}
         </div>
-        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--dim)', padding: '8px 0' }}>© 2026 生活日常</div>
+        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--dim)', padding: '8px 0' }}>
+          © 2026 生活日常
+        </div>
       </div>
     );
   }
 
   return <div className="msg">載入中…</div>;
+}
+
+// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
+function AutoTabDrawer({ profiles, showToast }) {
+  const [cfg, setCfg] = useState(() => loadAutoTabs());
+  const update = (pid, patch) => {
+    const def = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
+    const next = { ...cfg, [pid]: { ...def, ...(cfg[pid] || {}), ...patch } };
+    setCfg(next);
+    saveAutoTabs(next);
+    showToast('已儲存');
+  };
+  return (
+    <div>
+      {profiles.map(p => {
+        const c = cfg[p.id] || { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
+        return (
+          <div key={p.id} className="auto-tab-card">
+            <div className="auto-tab-hdr">
+              <div className="auto-tab-name">{p.name}</div>
+              <label className="toggle">
+                <input type="checkbox" checked={!!c.enabled}
+                  onChange={e => update(p.id, { enabled: e.target.checked })} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <div className="auto-tab-body"
+              style={{ opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
+              <div style={{ fontSize: 10, color: 'var(--mid)', marginBottom: 7 }}>啟用日子</div>
+              <div className="days-row">
+                {DAY.map((d, i) => (
+                  <button key={i} className={`day-btn${c.days[i] ? ' on' : ''}`}
+                    onClick={() => {
+                      const days = [...c.days]; days[i] = !days[i];
+                      update(p.id, { days });
+                    }}>{d}</button>
+                ))}
+              </div>
+              <div className="time-row">
+                <span className="time-lbl">時間：</span>
+                <input className="time-inp" type="time" value={c.from || '07:00'}
+                  onChange={e => update(p.id, { from: e.target.value })} />
+                <span className="time-lbl">至</span>
+                <input className="time-inp" type="time" value={c.to || '09:00'}
+                  onChange={e => update(p.id, { to: e.target.value })} />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NotifyDrawer({ showToast }) {
+  const [perm, setPerm] = useState(() => {
+    if (!('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+  });
+  if (perm === 'unsupported') return <div className="msg">此裝置不支援通知</div>;
+  if (perm === 'denied') return (
+    <div className="msg">
+      ❌ 通知已被封鎖<br />
+      <small style={{ color: 'var(--dim)' }}>請到瀏覽器設定允許通知，然後重新整理頁面</small>
+    </div>
+  );
+  const isOn = perm === 'granted';
+  const toggle = async () => {
+    if (isOn) { showToast('請到瀏覽器設定中關閉通知權限'); return; }
+    const result = await Notification.requestPermission();
+    setPerm(result);
+    if (result === 'granted') showToast('✅ 已啟用天氣警告通知');
+    else showToast('❌ 未獲得通知權限');
+  };
+  return (
+    <div>
+      <div style={{ background: 'rgba(240,165,0,.08)', border: '1px solid var(--amb-bdr)', borderRadius: 11, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--bright)', marginBottom: 6 }}>🔔 會通知的警告</div>
+        <div style={{ fontSize: 12, color: 'var(--mid)', lineHeight: 1.9 }}>
+          ⛈ 黑色 / 紅色 / 黃色暴雨警告<br />
+          🌀 熱帶氣旋警告信號（颱風）<br />
+          🥵 酷熱 / 🥶 寒冷天氣警告<br />
+          ⚡ 雷暴警告 · 🌊 山泥傾瀉警告
+        </div>
+      </div>
+      <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, padding: '11px 13px', marginBottom: 14, fontSize: 12, color: 'var(--dim)', lineHeight: 1.7 }}>
+        ℹ️ 每 5 分鐘查詢天文台，有新警告時本地觸發通知
+      </div>
+      <button onClick={toggle} style={{
+        width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600,
+        cursor: 'pointer', fontFamily: 'var(--sans)',
+        border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`,
+        background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)',
+        color: isOn ? '#ff8a96' : 'var(--amb2)',
+      }}>
+        {isOn ? '🔕 關閉天氣警告通知' : '🔔 啟用天氣警告通知'}
+      </button>
+    </div>
+  );
+}
+
+function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) {
+  const [name, setName] = useState('');
+  const doAdd = () => {
+    if (!name.trim()) return;
+    const id = 'p_' + Date.now();
+    updateProfiles([...profiles, { id, name: name.trim() }]);
+    closeDrawer();
+    showToast(`已新增「${name.trim()}」`);
+  };
+  return (
+    <div>
+      <div className="sec-lbl">版面名稱</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input className="d-input" value={name} placeholder="如：上班、週末…" maxLength={10}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doAdd()}
+          autoFocus />
+        <button className="d-btn" onClick={doAdd}>確定</button>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
