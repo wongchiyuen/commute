@@ -34,15 +34,20 @@ async function fetchAllKMBStops() {
 export { fetchAllKMBStops };
 
 // ── CTB stops cache ───────────────────────────────────────
-// 修復：用 callback 隊列避免重複 fetch 同靜默失敗
+// CTB API v2 沒有 bulk GET /stop endpoint，必須透過路線資料建立 stop 索引：
+// Step 1: GET /route/CTB         → 取所有路線（1 call）
+// Step 2: GET /route-stop/CTB/{route}/outbound  → 取各路線站點 ID（批次 20）
+// Step 3: GET /stop/{id}         → 取各站座標（批次 30）
+// 結果緩存 IDB 24 小時；首次載入約 10-15 秒，之後即時命中
 let _ctbStopsCache = null;
 let _ctbStopsLoading = false;
 let _ctbStopsCallbacks = [];
 
 export async function ensureCTBStops() {
+  // 模組級緩存
   if (_ctbStopsCache?.length) return _ctbStopsCache;
 
-  // 先試 IDB
+  // IDB 緩存
   try {
     const cached = await _idb.fresh('ctb_stops');
     if (cached?.length) {
@@ -52,31 +57,68 @@ export async function ensureCTBStops() {
     }
   } catch {}
 
-  // 如果已在 fetch 中，排隊等待
+  // 已在建立中 → 排隊等待
   if (_ctbStopsLoading) {
-    return new Promise(resolve => { _ctbStopsCallbacks.push(resolve); });
+    return new Promise(resolve => _ctbStopsCallbacks.push(resolve));
   }
-
   _ctbStopsLoading = true;
-  console.log('[CTB stops] fetching from API...');
+  console.log('[CTB stops] building from route data...');
 
   try {
-    const sig = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
-    const d = await fetch(`${CTB}/stop`, sig ? { signal: sig } : {}).then(r => r.json());
-    _ctbStopsCache = d.data || [];
-    if (_ctbStopsCache.length) {
-      console.log('[CTB stops] fetched:', _ctbStopsCache.length);
-      _idb.set('ctb_stops', _ctbStopsCache, 7 * 24 * 60 * 60 * 1000);
-    } else {
-      console.warn('[CTB stops] API returned empty');
+    const BATCH_ROUTES = 20;
+    const BATCH_STOPS  = 30;
+
+    // ── Step 1: 全部 CTB 路線 ─────────────────────────────
+    const routesRes = await fetch(`${CTB}/route/CTB`).then(r => r.json());
+    const routes = [...new Set((routesRes.data || []).map(r => r.route).filter(Boolean))];
+    if (!routes.length) throw new Error('no CTB routes returned');
+    console.log('[CTB stops] routes found:', routes.length);
+
+    // ── Step 2: 每條路線的 outbound 站點 → 收集唯一 stop ID ──
+    const stopIds = new Set();
+    for (let i = 0; i < routes.length; i += BATCH_ROUTES) {
+      const batch = routes.slice(i, i + BATCH_ROUTES);
+      const results = await Promise.all(
+        batch.map(route =>
+          fetch(`${CTB}/route-stop/CTB/${route}/outbound`)
+            .then(r => r.json())
+            .catch(() => ({ data: [] }))
+        )
+      );
+      results.forEach(res =>
+        (res.data || []).forEach(s => { if (s.stop) stopIds.add(s.stop); })
+      );
     }
+    if (!stopIds.size) throw new Error('no stop IDs collected from routes');
+    console.log('[CTB stops] unique stop IDs:', stopIds.size);
+
+    // ── Step 3: 取每個站的座標資料（批次並行）───────────────
+    const stopIdArr = [...stopIds];
+    const stops = [];
+    for (let i = 0; i < stopIdArr.length; i += BATCH_STOPS) {
+      const batch = stopIdArr.slice(i, i + BATCH_STOPS);
+      const results = await Promise.all(
+        batch.map(id =>
+          fetch(`${CTB}/stop/${id}`)
+            .then(r => r.json())
+            .then(d => d.data || null)
+            .catch(() => null)
+        )
+      );
+      results.forEach(s => { if (s) stops.push(s); });
+    }
+    if (!stops.length) throw new Error('no stop coordinate data fetched');
+
+    _ctbStopsCache = stops;
+    _idb.set('ctb_stops', stops, 24 * 60 * 60 * 1000);
+    console.log('[CTB stops] ready:', stops.length, 'stops cached');
+
   } catch (e) {
-    console.warn('[CTB stops] fetch failed:', e.message);
+    console.warn('[CTB stops] build failed:', e.message);
     _ctbStopsCache = null;
   } finally {
     _ctbStopsLoading = false;
-    const cbs = _ctbStopsCallbacks.splice(0);
-    cbs.forEach(cb => cb(_ctbStopsCache || []));
+    _ctbStopsCallbacks.splice(0).forEach(cb => cb(_ctbStopsCache || []));
   }
 
   return _ctbStopsCache || [];
@@ -280,7 +322,6 @@ export function useNearby(transportSettings) {
   const [status, setStatus] = useState('idle');
   const [rows, setRows] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
-  // 防止舊 load 結果覆蓋新 load
   const loadId = useRef(0);
 
   const load = useCallback(async (lat, lng, dist) => {
@@ -332,13 +373,13 @@ export function useNearby(transportSettings) {
         });
       });
 
-      // 先顯示 KMB（複製 map 避免 Phase 2 污染已渲染結果）
+      // 先顯示 KMB
       const kmbRows = await buildRows(new Map(routeMap), lat, lng, dist, transportSettings);
       if (myId !== loadId.current) return;
       setRows(kmbRows);
       setStatus('ready');
 
-      // ── Phase 2: CTB（背景合併，完成後更新）──────────
+      // ── Phase 2: CTB（背景合併）──────────────────────
       if (transportSettings.ctb) {
         try {
           const ctbRows = await fetchCTBNearbyRaw(lat, lng, dist);
@@ -374,7 +415,6 @@ export function useNearby(transportSettings) {
           }
         } catch (e) {
           console.warn('[CTB phase2]', e);
-          // Phase 2 失敗唔影響已顯示的 KMB 結果
         }
       }
     } catch (e) {
