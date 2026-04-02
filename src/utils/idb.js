@@ -34,6 +34,17 @@ const _idb = {
       });
     } catch {}
   },
+  /** 刪除指定 key */
+  async del(key) {
+    try {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const req = db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
+        req.onsuccess = () => res();
+        req.onerror = () => rej(req.error);
+      });
+    } catch {}
+  },
   /** Returns data if fresh (within TTL), else null */
   async fresh(key) {
     const entry = await this.get(key);
