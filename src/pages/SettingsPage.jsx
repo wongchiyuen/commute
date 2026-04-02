@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react';
 import { useApp, loadAutoTabs } from '../context/AppContext.jsx';
 import _idb from '../utils/idb.js';
 
-// 版本號由 vite.config.js 的 define 注入
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1';
 
 function HistoryCard() {
   const [events, setEvents] = useState([]);
   const [idx, setIdx] = useState(0);
-
   useEffect(() => {
     const now = new Date(), mo = now.getMonth() + 1, d = now.getDate();
     fetch(`https://zh.wikipedia.org/api/rest_v1/feed/onthisday/selected/${mo}/${d}`)
@@ -16,16 +14,13 @@ function HistoryCard() {
       .then(data => {
         const evs = (data.selected || data.events || []).sort((a, b) => a.year - b.year);
         if (evs.length) setEvents(evs);
-      })
-      .catch(() => {});
+      }).catch(() => {});
   }, []);
-
   if (!events.length) return (
     <div className="history-card">
       <div style={{ fontSize: 13, color: 'var(--mid)', textAlign: 'center', padding: '16px 0' }}>載入中…</div>
     </div>
   );
-
   const ev = events[idx];
   const text = ev.text || ev.pages?.[0]?.description || '';
   const now = new Date();
@@ -51,26 +46,26 @@ function HistoryCard() {
 export default function SettingsPage({ isActive, openDrawer, showToast }) {
   const { profiles, selectedStn, transportSettings } = useApp();
   const [clearing, setClearing] = useState(false);
-
   const cfg = loadAutoTabs();
   const active = profiles.filter(p => cfg[p.id]?.enabled);
   const { ctb, mtr, lrt } = transportSettings;
-  const enabled = ['九巴'];
+  const enabled = ['九巴', '龍運'];
   if (ctb) enabled.push('城巴');
   if (mtr) enabled.push('港鐵');
   if (lrt) enabled.push('輕鐵');
 
-  // 直接用 IDB helper 清除站點緩存，不依賴 useNearby.js
   const handleClearCache = async () => {
     if (clearing) return;
     setClearing(true);
     try {
-      await _idb.del('kmb_stops');
-      await _idb.del('ctb_stops');
-      showToast('✅ 已清除緩存，重新進入附近頁面即重新載入');
-    } catch {
-      showToast('❌ 清除失敗，請重試');
-    }
+      await Promise.all([
+        _idb.del('all_stops_v1'),
+        _idb.del('all_routes_v1'),
+        _idb.del('kmb_stops'),
+        _idb.del('ctb_stops'),
+      ]);
+      showToast('已清除緩存，重新進入附近頁面即重新載入');
+    } catch { showToast('清除失敗，請重試'); }
     setClearing(false);
   };
 
@@ -79,18 +74,14 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
       <div className="settings-scroll">
         <HistoryCard />
         <div className="sett-card" style={{ marginTop: 12 }}>
-
           <div className="sett-row" onClick={() => openDrawer('⏰ 自動跳轉版面', 'auto-tab')}>
             <div className="sett-ico">⏰</div>
             <div className="sett-lbl">
               <div className="sett-lbl-main">自動跳轉版面</div>
-              <div className="sett-lbl-sub">
-                {active.length ? `${active.map(p => p.name).join('、')} 已啟用` : '未啟用'}
-              </div>
+              <div className="sett-lbl-sub">{active.length ? `${active.map(p => p.name).join('、')} 已啟用` : '未啟用'}</div>
             </div>
             <div className="sett-chev">›</div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('天氣詳情', 'weather-details')}>
             <div className="sett-ico">🌤</div>
             <div className="sett-lbl">
@@ -99,7 +90,6 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('🚇 交通服務', 'transport')}>
             <div className="sett-ico">🚇</div>
             <div className="sett-lbl">
@@ -108,7 +98,6 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('🗂 資料管理', 'data')}>
             <div className="sett-ico">🗂</div>
             <div className="sett-lbl">
@@ -117,21 +106,14 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
-
-          <div
-            className="sett-row"
-            onClick={handleClearCache}
-            style={{ opacity: clearing ? 0.5 : 1, cursor: clearing ? 'default' : 'pointer' }}
-          >
+          <div className="sett-row" onClick={handleClearCache}
+            style={{ opacity: clearing ? 0.5 : 1, cursor: clearing ? 'default' : 'pointer' }}>
             <div className="sett-ico">{clearing ? '⏳' : '🗑'}</div>
             <div className="sett-lbl">
               <div className="sett-lbl-main">清除站點緩存</div>
-              <div className="sett-lbl-sub">
-                {clearing ? '清除中…' : '重新抓取九巴 / 城巴站點（城巴首次約需 15 秒）'}
-              </div>
+              <div className="sett-lbl-sub">{clearing ? '清除中…' : '強制重新下載站點 / 路線資料（每日自動更新）'}</div>
             </div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('📲 安裝到手機', 'install')}>
             <div className="sett-ico">📲</div>
             <div className="sett-lbl">
@@ -140,18 +122,14 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('🔔 天氣警告通知', 'notify')}>
             <div className="sett-ico">🔔</div>
             <div className="sett-lbl">
               <div className="sett-lbl-main">天氣警告推播</div>
-              <div className="sett-lbl-sub">
-                {typeof Notification !== 'undefined' && Notification.permission === 'granted' ? '✅ 已啟用' : '未啟用'}
-              </div>
+              <div className="sett-lbl-sub">{typeof Notification !== 'undefined' && Notification.permission === 'granted' ? '✅ 已啟用' : '未啟用'}</div>
             </div>
             <div className="sett-chev">›</div>
           </div>
-
           <div className="sett-row" onClick={() => openDrawer('🌿 關於生活日常', 'about')}>
             <div className="sett-ico">🌿</div>
             <div className="sett-lbl">
@@ -160,7 +138,6 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
-
         </div>
       </div>
     </div>
