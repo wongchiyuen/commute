@@ -1,3 +1,4 @@
+// 生活日常 — rebuild trigger
 import { useState, useCallback } from 'react';
 import { AppProvider, useApp, NEARBY_PID,
   loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
@@ -74,7 +75,6 @@ function AppInner() {
 // ── Drawer 內容路由 ───────────────────────────────────────
 function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
-    deleteProfile, moveProfile,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
@@ -136,19 +136,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
     return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
-  }
-
-  // ── 管理版面（排序 + 刪除）────────────────────────────
-  if (drawerKey === 'manage-profiles') {
-    return (
-      <ManageProfilesDrawer
-        profiles={profiles}
-        deleteProfile={deleteProfile}
-        moveProfile={moveProfile}
-        closeDrawer={closeDrawer}
-        showToast={showToast}
-      />
-    );
   }
 
   // ── 資料管理 ──────────────────────────────────────────
@@ -283,80 +270,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
-// ── 管理版面：排序 + 刪除 ─────────────────────────────────
-function ManageProfilesDrawer({ profiles, deleteProfile, moveProfile, closeDrawer, showToast }) {
-  if (profiles.length === 0) {
-    return (
-      <div className="msg">
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-        沒有版面，點「＋」新增
-      </div>
-    );
-  }
-
-  const btnBase = {
-    width: 36, height: 36, borderRadius: 8, border: '1px solid var(--bdr2)',
-    background: 'var(--bg4)', fontSize: 15, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    fontFamily: 'var(--sans)',
-  };
-
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 12, lineHeight: 1.6 }}>
-        ↑↓ 調整版面顯示順序 · 🗑 刪除版面及其自動跳轉設定
-      </div>
-      {profiles.map((p, i) => (
-        <div key={p.id} style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: 'var(--bg3)', border: '1px solid var(--bdr)',
-          borderRadius: 11, padding: '12px 14px', marginBottom: 8,
-        }}>
-          {/* 版面名稱 */}
-          <div style={{ flex: 1, fontSize: 15, fontWeight: 500, color: 'var(--bright)' }}>
-            {p.name}
-          </div>
-
-          {/* 上移 */}
-          <button
-            onClick={() => moveProfile(p.id, -1)}
-            disabled={i === 0}
-            style={{
-              ...btnBase,
-              color: i === 0 ? 'var(--bdr2)' : 'var(--mid)',
-              cursor: i === 0 ? 'default' : 'pointer',
-            }}>↑</button>
-
-          {/* 下移 */}
-          <button
-            onClick={() => moveProfile(p.id, 1)}
-            disabled={i === profiles.length - 1}
-            style={{
-              ...btnBase,
-              color: i === profiles.length - 1 ? 'var(--bdr2)' : 'var(--mid)',
-              cursor: i === profiles.length - 1 ? 'default' : 'pointer',
-            }}>↓</button>
-
-          {/* 刪除 */}
-          <button
-            onClick={() => {
-              if (!confirm(`確定刪除「${p.name}」版面？\n路線收藏及自動跳轉設定將一併移除，不可復原。`)) return;
-              deleteProfile(p.id);
-              showToast(`已刪除「${p.name}」`);
-            }}
-            style={{
-              ...btnBase,
-              border: '1px solid rgba(255,71,87,.3)',
-              background: 'rgba(255,71,87,.1)',
-              color: '#ff8a96',
-            }}>🗑</button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── 自動跳轉版面 ──────────────────────────────────────────
+// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -367,23 +281,12 @@ function AutoTabDrawer({ profiles, showToast }) {
     saveAutoTabs(next);
   };
 
-  // 清除某個版面的全部自動跳轉設定
-  const clearProfile = (pid, name) => {
-    const next = { ...cfg };
-    delete next[pid];
-    setCfg(next);
-    saveAutoTabs(next);
-    showToast(`已清除「${name}」的自動跳轉設定`);
-  };
-
-  // 快捷選擇
   const PRESETS = [
     { label: '工作日', days: [false,true,true,true,true,true,false] },
     { label: '週末',   days: [true,false,false,false,false,false,true] },
     { label: '每天',   days: [true,true,true,true,true,true,true] },
   ];
 
-  // 常用時段
   const TIME_PRESETS = [
     { label: '早上通勤', from: '07:30', to: '09:30' },
     { label: '下午通勤', from: '17:00', to: '19:30' },
@@ -395,10 +298,8 @@ function AutoTabDrawer({ profiles, showToast }) {
     <div>
       {profiles.map(p => {
         const c = { ...DEF, ...(cfg[p.id] || {}) };
-        const hasConfig = !!cfg[p.id];
         return (
           <div key={p.id} className="auto-tab-card" style={{ marginBottom: 12 }}>
-            {/* 標題列 + 開關 */}
             <div className="auto-tab-hdr">
               <div className="auto-tab-name">{p.name}</div>
               <label className="toggle">
@@ -409,8 +310,6 @@ function AutoTabDrawer({ profiles, showToast }) {
             </div>
 
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
-
-              {/* 星期選擇 */}
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 {DAY.map((d, i) => (
@@ -426,7 +325,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
-              {/* 快捷日子 */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
                   <button key={ps.label}
@@ -440,7 +338,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
-              {/* 時間選擇 */}
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -466,7 +363,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 </div>
               </div>
 
-              {/* 常用時段快捷 */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
                   <button key={tp.label}
@@ -484,7 +380,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
-              {/* 當前設定預覽 */}
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
@@ -492,22 +387,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 </div>
               )}
             </div>
-
-            {/* 清除此版面設定 */}
-            {hasConfig && (
-              <div style={{ padding: '0 14px 12px' }}>
-                <button
-                  onClick={() => clearProfile(p.id, p.name)}
-                  style={{
-                    width: '100%', padding: '8px 0', borderRadius: 8, cursor: 'pointer',
-                    fontFamily: 'var(--sans)', fontSize: 12,
-                    background: 'transparent', border: '1px solid var(--bdr2)',
-                    color: 'var(--dim)', transition: 'all .15s',
-                  }}>
-                  清除「{p.name}」的自動跳轉設定
-                </button>
-              </div>
-            )}
           </div>
         );
       })}
