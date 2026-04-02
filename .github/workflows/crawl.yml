@@ -1,0 +1,47 @@
+name: Crawl Bus Data
+
+on:
+  schedule:
+    # 03:00 HKT = 19:00 UTC（前一天）
+    - cron: '0 19 * * *'
+  # 允許手動觸發（用於首次測試）
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run crawler
+        run: node scripts/crawl.js
+
+      - name: Check output
+        run: |
+          echo "=== stops.json ===" && wc -c scripts/output/stops.json
+          echo "=== routes.json ===" && wc -c scripts/output/routes.json
+          echo "=== 站點數 ===" && node -e "
+            const s = JSON.parse(require('fs').readFileSync('scripts/output/stops.json'));
+            const r = JSON.parse(require('fs').readFileSync('scripts/output/routes.json'));
+            console.log('stops:', s.stops.length, '| routes:', r.routes.length);
+            console.log('generated:', s.generated);
+          "
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./scripts/output
+          destination_dir: data
+          keep_files: false
+          commit_message: "chore: update bus data ${{ github.run_number }}"
+          enable_jekyll: false
