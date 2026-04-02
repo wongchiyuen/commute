@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp, loadAutoTabs } from '../context/AppContext.jsx';
+import { clearNearbyCache } from '../hooks/useNearby.js';
 
-// 版本號由 vite.config.js 的 define 注入
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1';
 
 function HistoryCard() {
@@ -57,6 +57,20 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
   if (mtr) enabled.push('港鐵');
   if (lrt) enabled.push('輕鐵');
 
+  // ── 清除交通快取 ──────────────────────────────────────
+  const [clearing, setClearing] = useState(false);
+  const doClearCache = async () => {
+    if (!confirm('確定清除附近班次快取？\n下次開啟「附近」時會重新下載站點資料（約需 10-15 秒）。')) return;
+    setClearing(true);
+    try {
+      await clearNearbyCache();
+      showToast('✅ 已清除快取，重新整理後生效');
+    } catch {
+      showToast('❌ 清除失敗，請重試');
+    }
+    setClearing(false);
+  };
+
   return (
     <div className="page" id="page-settings" style={isActive ? { display: 'flex' } : {}}>
       <div className="settings-scroll">
@@ -88,6 +102,23 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             </div>
             <div className="sett-chev">›</div>
           </div>
+          {/* 清除交通快取 */}
+          <div
+            className="sett-row"
+            onClick={clearing ? undefined : doClearCache}
+            style={{ cursor: clearing ? 'default' : 'pointer', opacity: clearing ? 0.6 : 1 }}
+          >
+            <div className="sett-ico">🗑</div>
+            <div className="sett-lbl">
+              <div className="sett-lbl-main" style={{ color: clearing ? 'var(--mid)' : 'var(--bright)' }}>
+                {clearing ? '清除中…' : '清除附近班次快取'}
+              </div>
+              <div className="sett-lbl-sub">
+                強制重新下載 KMB / CTB 站點資料
+              </div>
+            </div>
+            <div className="sett-chev" style={{ fontSize: 13 }}>{clearing ? '⏳' : '›'}</div>
+          </div>
           <div className="sett-row" onClick={() => openDrawer('🗂 資料管理', 'data')}>
             <div className="sett-ico">🗂</div>
             <div className="sett-lbl">
@@ -118,7 +149,6 @@ export default function SettingsPage({ isActive, openDrawer, showToast }) {
             <div className="sett-ico">🌿</div>
             <div className="sett-lbl">
               <div className="sett-lbl-main">關於生活日常</div>
-              {/* 版本號自動從 package.json 讀取，build 時注入 */}
               <div className="sett-lbl-sub">v{APP_VERSION} · 數據來源</div>
             </div>
             <div className="sett-chev">›</div>
