@@ -21,6 +21,8 @@ export async function getRouteUsage() {
 }
 
 // ── KMB stops cache ───────────────────────────────────────
+// KMB API (data.etabus.gov.hk) 涵蓋九巴(KMB)及龍運(LWB)
+// stop-eta 回應的 co 欄位 = "KMB" | "LWB"，用於分辨公司
 let _kmbStopsCache = null;
 async function fetchAllKMBStops() {
   if (_kmbStopsCache?.length) return _kmbStopsCache;
@@ -33,12 +35,17 @@ async function fetchAllKMBStops() {
 }
 export { fetchAllKMBStops };
 
+export function clearKMBCache() {
+  _kmbStopsCache = null;
+  _idb.del('kmb_stops');
+}
+
 // ── CTB stops cache ───────────────────────────────────────
-// CTB API v2 沒有 bulk GET /stop endpoint，必須透過路線資料建立 stop 索引：
-// Step 1: GET /route/CTB         → 取所有路線（1 call）
-// Step 2: GET /route-stop/CTB/{route}/outbound  → 取各路線站點 ID（批次 20）
-// Step 3: GET /stop/{id}         → 取各站座標（批次 30）
-// 結果緩存 IDB 24 小時；首次載入約 10-15 秒，之後即時命中
+// CTB API v2 無 bulk /stop endpoint，三步建立：
+// Step 1: GET /route/CTB            → 全部路線（含 bound: "O"/"I"）
+// Step 2: GET /route-stop/CTB/{route}/{dir} → 取雙向站點 ID（批次 40，並行）
+// Step 3: GET /stop/{id}            → 取各站座標（批次 50，並行）
+// 緩存 IDB 7 天（CTB 站點極少變動）
 let _ctbStopsCache = null;
 let _ctbStopsLoading = false;
 let _ctbStopsCallbacks = [];
@@ -50,7 +57,7 @@ export async function ensureCTBStops() {
     const cached = await _idb.fresh('ctb_stops');
     if (cached?.length) {
       _ctbStopsCache = cached;
-      console.log('[CTB stops] IDB hit:', cached.length);
+      console.log('[CTB] IDB hit:', cached.length, 'stops');
       return cached;
     }
   } catch {}
@@ -59,23 +66,29 @@ export async function ensureCTBStops() {
     return new Promise(resolve => _ctbStopsCallbacks.push(resolve));
   }
   _ctbStopsLoading = true;
-  console.log('[CTB stops] building from route data...');
+  console.log('[CTB] building stop index...');
 
   try {
-    const BATCH_ROUTES = 20;
-    const BATCH_STOPS  = 30;
-
+    // ── Step 1: 全部路線（含方向）────────────────────────
     const routesRes = await fetch(`${CTB}/route/CTB`).then(r => r.json());
-    const routes = [...new Set((routesRes.data || []).map(r => r.route).filter(Boolean))];
-    if (!routes.length) throw new Error('no CTB routes returned');
-    console.log('[CTB stops] routes found:', routes.length);
+    const routeEntries = (routesRes.data || []).filter(r => r.route && r.bound);
+    if (!routeEntries.length) throw new Error('no CTB route entries');
+    console.log('[CTB] route entries:', routeEntries.length);
 
+    // 每條路線+方向組合 → 對應的 API direction 字串
+    const BOUND_MAP = { O: 'outbound', I: 'inbound' };
+    const tasks = routeEntries
+      .map(r => ({ route: r.route, dir: BOUND_MAP[r.bound] || 'outbound' }))
+      .filter(t => t.dir); // 過濾無效方向
+
+    // ── Step 2: 批次取所有路線+方向的站點 ID（批次 40）──
     const stopIds = new Set();
-    for (let i = 0; i < routes.length; i += BATCH_ROUTES) {
-      const batch = routes.slice(i, i + BATCH_ROUTES);
+    const BATCH2 = 40;
+    for (let i = 0; i < tasks.length; i += BATCH2) {
+      const batch = tasks.slice(i, i + BATCH2);
       const results = await Promise.all(
-        batch.map(route =>
-          fetch(`${CTB}/route-stop/CTB/${route}/outbound`)
+        batch.map(({ route, dir }) =>
+          fetch(`${CTB}/route-stop/CTB/${route}/${dir}`)
             .then(r => r.json())
             .catch(() => ({ data: [] }))
         )
@@ -84,13 +97,15 @@ export async function ensureCTBStops() {
         (res.data || []).forEach(s => { if (s.stop) stopIds.add(s.stop); })
       );
     }
-    if (!stopIds.size) throw new Error('no stop IDs collected from routes');
-    console.log('[CTB stops] unique stop IDs:', stopIds.size);
+    if (!stopIds.size) throw new Error('no stop IDs from route-stops');
+    console.log('[CTB] unique stop IDs:', stopIds.size);
 
+    // ── Step 3: 批次取站點座標（批次 50）────────────────
     const stopIdArr = [...stopIds];
     const stops = [];
-    for (let i = 0; i < stopIdArr.length; i += BATCH_STOPS) {
-      const batch = stopIdArr.slice(i, i + BATCH_STOPS);
+    const BATCH3 = 50;
+    for (let i = 0; i < stopIdArr.length; i += BATCH3) {
+      const batch = stopIdArr.slice(i, i + BATCH3);
       const results = await Promise.all(
         batch.map(id =>
           fetch(`${CTB}/stop/${id}`)
@@ -99,16 +114,17 @@ export async function ensureCTBStops() {
             .catch(() => null)
         )
       );
-      results.forEach(s => { if (s) stops.push(s); });
+      results.forEach(s => { if (s && s.stop) stops.push(s); });
     }
-    if (!stops.length) throw new Error('no stop coordinate data fetched');
+    if (!stops.length) throw new Error('no stop coordinates fetched');
 
     _ctbStopsCache = stops;
-    _idb.set('ctb_stops', stops, 24 * 60 * 60 * 1000);
-    console.log('[CTB stops] ready:', stops.length, 'stops cached');
+    // 7 天緩存，CTB 站點極少變動
+    _idb.set('ctb_stops', stops, 7 * 24 * 60 * 60 * 1000);
+    console.log('[CTB] ready:', stops.length, 'stops cached (7d)');
 
   } catch (e) {
-    console.warn('[CTB stops] build failed:', e.message);
+    console.warn('[CTB] build failed:', e.message);
     _ctbStopsCache = null;
   } finally {
     _ctbStopsLoading = false;
@@ -118,24 +134,18 @@ export async function ensureCTBStops() {
   return _ctbStopsCache || [];
 }
 
-// ── 清除所有附近班次快取（IDB + 模組變數）─────────────────
-export async function clearNearbyCache() {
-  _kmbStopsCache = null;
+export function clearCTBCache() {
   _ctbStopsCache = null;
   _ctbStopsLoading = false;
-  _ctbStopsCallbacks = [];
-  await Promise.all([
-    _idb.del('kmb_stops'),
-    _idb.del('ctb_stops'),
-  ]);
-  console.log('[nearbyCache] cleared');
+  _ctbStopsCallbacks.splice(0);
+  _idb.del('ctb_stops');
 }
 
 // ── CTB nearby ────────────────────────────────────────────
 async function fetchCTBNearbyRaw(lat, lng, radius) {
   const ctbStops = await ensureCTBStops();
   if (!ctbStops?.length) {
-    console.warn('[CTB nearby] no stops data available');
+    console.warn('[CTB nearby] no stops data');
     return [];
   }
 
@@ -147,14 +157,13 @@ async function fetchCTBNearbyRaw(lat, lng, radius) {
     })
     .filter(s => s.dist <= radius && s.dist > 0 && !isNaN(s.dist))
     .sort((a, b) => a.dist - b.dist)
-    .slice(0, 6);
+    .slice(0, 8); // 多取幾個站
 
   if (!nearby.length) {
     console.log('[CTB nearby] no stops within', radius, 'm');
     return [];
   }
 
-  console.log('[CTB nearby] checking', nearby.length, 'stops');
   const now = Date.now();
   const results = [];
 
@@ -167,8 +176,6 @@ async function fetchCTBNearbyRaw(lat, lng, radius) {
       ).then(r => r.json());
 
       const etaData = d.data || [];
-      if (!etaData.length) return;
-
       const routeMap = new Map();
       etaData.forEach(e => {
         if (!e.eta) return;
@@ -177,24 +184,26 @@ async function fetchCTBNearbyRaw(lat, lng, radius) {
         const key = `${e.route}_${e.dir || 'O'}`;
         if (!routeMap.has(key)) {
           routeMap.set(key, {
-            route: e.route, dest: e.dest_tc || '',
+            route: e.route,
+            dest: e.dest_tc || '',
             stopName: stop.name_tc || stop.stop,
-            stopId: stop.stop, dist: Math.round(stop.dist),
-            dir: e.dir || 'O', etasWithType: [{ ts, type: 'ctb' }],
+            stopId: stop.stop,
+            dist: Math.round(stop.dist),
+            dir: e.dir || 'O',
+            etasWithType: [{ ts, type: 'ctb' }],
           });
         } else {
           const ex = routeMap.get(key);
           if (ex.etasWithType.length < 3) ex.etasWithType.push({ ts, type: 'ctb' });
         }
       });
-
       routeMap.forEach(r => results.push(r));
     } catch (e) {
       console.warn('[CTB nearby] stop', stop.stop, 'failed:', e.message);
     }
   }));
 
-  console.log('[CTB nearby] total:', results.length, 'routes');
+  console.log('[CTB nearby]', results.length, 'routes found');
   return results;
 }
 
@@ -309,7 +318,10 @@ async function buildRows(routeMap, lat, lng, dist, transportSettings) {
 
   const renderRows = allRows.slice(0, 25);
 
-  const fareRows = renderRows.filter(r => r.companyType === 'kmb' || r.companyType === 'joint');
+  // 車費（KMB/LWB/joint 均從 KMB API 取）
+  const fareRows = renderRows.filter(r =>
+    r.companyType === 'kmb' || r.companyType === 'lwb' || r.companyType === 'joint'
+  );
   await Promise.race([
     Promise.all(fareRows.map(r =>
       fetchKMBFare(r.route, r.dir, r.serviceType)
@@ -334,7 +346,9 @@ export function useNearby(transportSettings) {
     setStatus('loading');
 
     try {
-      // ── Phase 1: KMB ──────────────────────────────────
+      // ── Phase 1: KMB + LWB ────────────────────────────
+      // KMB API 同時涵蓋九巴(KMB)及龍運(LWB)
+      // stop-eta 回應的 e.co 欄位 = "KMB" | "LWB" 用於分辨
       const stops = await fetchAllKMBStops();
       const nearby = stops
         .map(s => ({ ...s, dist: haverDist(lat, lng, parseFloat(s.lat), parseFloat(s.long)) }))
@@ -362,22 +376,34 @@ export function useNearby(transportSettings) {
           if (!e.eta) return;
           const ts = new Date(e.eta).getTime();
           if (ts < now - 30000) return;
-          const key = `${e.route}_${e.dir}`;
+
+          // co 欄位區分九巴/龍運，轉小寫作為 companyType
+          const co = (e.co || 'KMB').toUpperCase();
+          const companyType = co === 'LWB' ? 'lwb' : 'kmb';
+
+          const key = `${e.route}_${e.dir}_${companyType}`;
           if (!routeMap.has(key)) {
             routeMap.set(key, {
-              route: e.route, dest: e.dest_tc || '', stopName: stop.name_tc,
-              stopId: stop.stop, dist: Math.round(stop.dist),
-              serviceType: e.service_type || '1', dir: e.dir,
-              companyType: 'kmb', etasWithType: [{ ts, type: 'kmb' }], fare: null,
+              route: e.route,
+              dest: e.dest_tc || '',
+              stopName: stop.name_tc,
+              stopId: stop.stop,
+              dist: Math.round(stop.dist),
+              serviceType: e.service_type || '1',
+              dir: e.dir,
+              companyType,
+              etasWithType: [{ ts, type: companyType }],
+              fare: null,
             });
           } else {
             const ex = routeMap.get(key);
             if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === ts))
-              ex.etasWithType.push({ ts, type: 'kmb' });
+              ex.etasWithType.push({ ts, type: companyType });
           }
         });
       });
 
+      // 先渲染 KMB+LWB
       const kmbRows = await buildRows(new Map(routeMap), lat, lng, dist, transportSettings);
       if (myId !== loadId.current) return;
       setRows(kmbRows);
@@ -391,13 +417,15 @@ export function useNearby(transportSettings) {
 
           if (ctbRows.length > 0) {
             ctbRows.forEach(r => {
+              // 嘗試與已有的 KMB 路線合併（joint）
               const matchKey =
-                routeMap.has(`${r.route}_O`) ? `${r.route}_O` :
-                routeMap.has(`${r.route}_I`) ? `${r.route}_I` : null;
+                routeMap.has(`${r.route}_O_kmb`) ? `${r.route}_O_kmb` :
+                routeMap.has(`${r.route}_I_kmb`) ? `${r.route}_I_kmb` :
+                routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` : null;
 
               if (matchKey) {
                 const ex = routeMap.get(matchKey);
-                if (ex.companyType === 'kmb') ex.companyType = 'joint';
+                ex.companyType = 'joint';
                 r.etasWithType.forEach(e => {
                   if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === e.ts))
                     ex.etasWithType.push(e);
@@ -407,7 +435,7 @@ export function useNearby(transportSettings) {
                 const newKey = `${r.route}_CTB_${r.stopId}`;
                 if (!routeMap.has(newKey)) {
                   routeMap.set(newKey, {
-                    ...r, serviceType: '1', dir: 'O', companyType: 'ctb', fare: null,
+                    ...r, serviceType: '1', dir: r.dir || 'O', companyType: 'ctb', fare: null,
                   });
                 }
               }
@@ -419,6 +447,7 @@ export function useNearby(transportSettings) {
           }
         } catch (e) {
           console.warn('[CTB phase2]', e);
+          // CTB 失敗不影響已顯示的 KMB/LWB 結果
         }
       }
     } catch (e) {
