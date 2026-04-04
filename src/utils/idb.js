@@ -34,7 +34,6 @@ const _idb = {
       });
     } catch {}
   },
-  /** 刪除指定 key */
   async del(key) {
     try {
       const db = await this.open();

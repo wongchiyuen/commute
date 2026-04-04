@@ -37,7 +37,6 @@ export default function HomePage({ openDrawer, showToast }) {
   const { getCurrentPosition, checkPermission } = useGeolocation();
   const nearbyHook = useNearby(transportSettings);
 
-  // ── GPS ──────────────────────────────────────────────────
   const doLocate = useCallback(() => {
     getCurrentPosition(pos => {
       saveGps(pos.coords.latitude, pos.coords.longitude);
@@ -49,7 +48,6 @@ export default function HomePage({ openDrawer, showToast }) {
     });
   }, [getCurrentPosition, saveGps, selectedStn, setSelectedStn, isNearby, nearbyDist, gpsCoords, nearbyHook]);
 
-  // ── Init ──────────────────────────────────────────────────
   useEffect(() => {
     loadWeather();
     if (gpsCoords && isNearby) {
@@ -72,13 +70,11 @@ export default function HomePage({ openDrawer, showToast }) {
   // eslint-disable-next-line
   }, []);
 
-  // 距離變化時重新載入
   useEffect(() => {
     if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
   // eslint-disable-next-line
   }, [nearbyDist]);
 
-  // ── Favs ──────────────────────────────────────────────────
   const _refreshFavs = useCallback(async () => {
     const favList = loadFavs(activePid);
     if (!favList.length) { setFavRows([]); return; }
@@ -87,16 +83,13 @@ export default function HomePage({ openDrawer, showToast }) {
       try {
         const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
         const etas = (d.data || []).filter(e => e.eta)
-          .slice(0, 3)
-          .map(e => new Date(e.eta).getTime())
-          .filter(ts => ts > now - 30000);
+          .slice(0, 3).map(e => new Date(e.eta).getTime()).filter(ts => ts > now - 30000);
         return { ...fav, etasWithType: etas.map(ts => ({ ts, type: fav.type || 'kmb' })), companyType: fav.type || 'kmb', fare: null };
       } catch {
         return { ...fav, etasWithType: [], companyType: fav.type || 'kmb', fare: null };
       }
     }));
     setFavRows(results);
-    // 車費背景更新
     results.forEach(async (r, i) => {
       if (r.companyType !== 'kmb' && r.companyType !== 'joint') return;
       const fare = await fetchKMBFare(r.route, 'O', r.serviceType).catch(() => null);
@@ -112,7 +105,6 @@ export default function HomePage({ openDrawer, showToast }) {
     setFavRows(prev => prev.filter((_, i) => i !== idx));
   }, [activePid]);
 
-  // ── Refresh ───────────────────────────────────────────────
   const doRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -125,7 +117,6 @@ export default function HomePage({ openDrawer, showToast }) {
     setRefreshing(false);
   };
 
-  // ── Profile switch ────────────────────────────────────────
   const switchToNearby = () => {
     setActivePid(NEARBY_PID);
     if (gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
@@ -140,11 +131,9 @@ export default function HomePage({ openDrawer, showToast }) {
   const switchProfile = (pid) => {
     setActivePid(pid);
     reloadFavs(pid);
-    // 觸發重新抓 ETA
     setTimeout(() => _refreshFavs(), 0);
   };
 
-  // ── Nearby content ────────────────────────────────────────
   const renderNearbyContent = () => {
     switch (nearbyHook.status) {
       case 'loading': return <Spinner />;
@@ -153,8 +142,7 @@ export default function HomePage({ openDrawer, showToast }) {
           <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
           <div style={{ fontSize: 15, color: 'var(--bright)', marginBottom: 8 }}>需要位置權限</div>
           <div style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>為搜尋附近班次，需要使用你的位置。</div>
-          <button
-            onClick={() => { nearbyHook.setStatus('loading'); doLocate(); }}
+          <button onClick={() => { nearbyHook.setStatus('loading'); doLocate(); }}
             style={{ background: 'var(--blu)', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             📡 允許位置使用
           </button>
@@ -173,7 +161,8 @@ export default function HomePage({ openDrawer, showToast }) {
           <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
             onClick={row.companyType !== 'mtr' ? () => {
               incrementRouteUsage(row.route, row.companyType);
-              openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+              // ★ 修改：傳遞 row 資料供路線詳情 drawer 使用
+              openDrawer(`${row.route} 路線詳情`, 'bus-detail', row);
             } : undefined}
           />
         ));
@@ -185,7 +174,6 @@ export default function HomePage({ openDrawer, showToast }) {
 
   return (
     <div className="page active" id="page-home">
-      {/* 天氣面板 */}
       <WeatherPanel
         weatherData={weatherData}
         selectedStn={selectedStn}
@@ -194,11 +182,8 @@ export default function HomePage({ openDrawer, showToast }) {
         onOpenDetails={() => openDrawer('天氣詳情', 'weather-details')}
       />
 
-      {/* Profiles bar — 天氣面板之下 */}
       <div className="profiles-bar">
-        <button
-          className={`profile-tab nearby-tab${isNearby ? ' active' : ''}`}
-          onClick={switchToNearby}>
+        <button className={`profile-tab nearby-tab${isNearby ? ' active' : ''}`} onClick={switchToNearby}>
           📍 附近
         </button>
         {profiles.map(p => (
@@ -208,19 +193,9 @@ export default function HomePage({ openDrawer, showToast }) {
             {p.name}
           </button>
         ))}
-        {/* 新增版面 */}
         <button className="add-profile-btn" onClick={() => openDrawer('新增版面', 'add-profile')}>＋</button>
-        {/* 管理版面（排序 / 刪除） */}
-        <button
-          className="add-profile-btn"
-          title="管理版面"
-          onClick={() => openDrawer('📋 管理版面', 'manage-profiles')}
-          style={{ fontSize: 18, color: 'var(--dim)' }}>
-          ⚙
-        </button>
       </div>
 
-      {/* 巴士區域 */}
       <div className="bus-sec">
         <div className="bus-hdr">
           <div className="bus-hdr-lbl">
@@ -269,7 +244,8 @@ export default function HomePage({ openDrawer, showToast }) {
                 onRemove={removeFav}
                 onClick={() => {
                   incrementRouteUsage(row.route, row.companyType);
-                  openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+                  // ★ 修改：傳遞 row 資料供路線詳情 drawer 使用
+                  openDrawer(`${row.route} 路線詳情`, 'bus-detail', row);
                 }}
               />
             ))
@@ -281,7 +257,6 @@ export default function HomePage({ openDrawer, showToast }) {
         )}
       </div>
 
-      {/* 自訂距離 slider */}
       {showSlider && (
         <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h) + 8px)', left: 0, right: 0, zIndex: 40, display: 'flex', justifyContent: 'center', padding: '0 12px' }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--bdr2)', borderRadius: 14, padding: '14px 16px 12px', width: '100%', maxWidth: 480, boxShadow: '0 6px 28px rgba(0,0,0,.6)' }}>
