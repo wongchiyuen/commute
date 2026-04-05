@@ -473,8 +473,6 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
 // ── 路線詳情 Drawer ───────────────────────────────────────
 const KMB_API = 'https://data.etabus.gov.hk/v1/transport/kmb';
 const CTB_API = 'https://rt.data.gov.hk/v2/transport/citybus';
-const { useState: buseState, useEffect: bUseEffect } = await import('react').catch(() => ({ useState, useEffect }));
-
 function BusDetailDrawer({ row, showToast }) {
   const [stops, setStops] = useState([]);
   const [etas, setEtas] = useState({});
