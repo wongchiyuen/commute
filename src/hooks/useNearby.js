@@ -5,9 +5,9 @@ import { haverDist } from '../utils/geo.js';
 import { fetchKMBFare } from '../utils/fare.js';
 import _idb from '../utils/idb.js';
 
-// ── 靜態站點資料庫（gh-pages 每日爬取）──────────────────
+// gh-pages 每日自動爬取的靜態站點資料庫
 const STOPS_URL = 'https://wongchiyuen.github.io/commute/data/stops.json';
-const STOPS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
+const STOPS_TTL = 7 * 24 * 60 * 60 * 1000;
 
 // ── Route usage ───────────────────────────────────────────
 const USAGE_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -24,7 +24,7 @@ export async function getRouteUsage() {
   try { const e = await _idb.get('route_usage'); return e?.data || {}; } catch { return {}; }
 }
 
-// ── 全港站點快取（stops.json，IDB 7 天）──────────────────
+// ── 全港站點快取 ──────────────────────────────────────────
 let _stopsCache = null;
 let _stopsLoading = false;
 let _stopsCallbacks = [];
@@ -61,7 +61,7 @@ export function clearStopsCache() {
   _idb.del('all_routes_v1');
 }
 
-// 相容舊 import（HomePage 有 import fetchAllKMBStops）
+// 相容舊 import（HomePage 仍有 import fetchAllKMBStops）
 export async function fetchAllKMBStops() {
   const stops = await ensureStops();
   return stops.filter(s => s.co === 'kmb').map(s => ({
@@ -69,17 +69,16 @@ export async function fetchAllKMBStops() {
   }));
 }
 
-// ── ETA 抓取 ─────────────────────────────────────────────
-
-// KMB + LWB：同一 API，e.co 欄位區分
+// ── KMB + LWB ETA ─────────────────────────────────────────
+// 同一 API (data.etabus.gov.hk)，e.co 欄位區分九巴/龍運
 async function fetchKMBLWBEtas(nearby, now) {
   const stops = nearby.filter(s => s.co === 'kmb').slice(0, 20);
   if (!stops.length) return new Map();
-
   const results = await Promise.all(
-    stops.map(s => fetch(`${KMB}/stop-eta/${s.id}`).then(r => r.json()).catch(() => ({ data: [] })))
+    stops.map(s =>
+      fetch(`${KMB}/stop-eta/${s.id}`).then(r => r.json()).catch(() => ({ data: [] }))
+    )
   );
-
   const routeMap = new Map();
   results.forEach((res, i) => {
     const stop = stops[i];
@@ -87,14 +86,14 @@ async function fetchKMBLWBEtas(nearby, now) {
       if (!e.eta) return;
       const ts = new Date(e.eta).getTime();
       if (ts < now - 30000) return;
-      // ★ e.co 欄位：'KMB' = 九巴，'LWB' = 龍運
+      // e.co = 'KMB' 九巴 | 'LWB' 龍運
       const co = (e.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb';
       const key = `${e.route}_${e.dir}_${co}`;
       if (!routeMap.has(key)) {
         routeMap.set(key, {
           route: e.route, dest: e.dest_tc || '',
           stopName: stop.n, stopId: stop.id,
-          stopLat: stop.lat, stopLng: stop.lng,  // ★ 供地圖使用
+          stopLat: stop.lat, stopLng: stop.lng, // 供地圖標記
           dist: Math.round(stop.dist),
           serviceType: e.service_type || '1', dir: e.dir,
           companyType: co,
@@ -110,7 +109,8 @@ async function fetchKMBLWBEtas(nearby, now) {
   return routeMap;
 }
 
-// CTB：stops.json 已有座標，直接用 ETA API
+// ── CTB ETA ───────────────────────────────────────────────
+// stops.json 已有 CTB 座標，直接取 ETA
 async function fetchCTBEtas(nearby, now) {
   const stops = nearby.filter(s => s.co === 'ctb').slice(0, 8);
   if (!stops.length) return [];
@@ -118,7 +118,10 @@ async function fetchCTBEtas(nearby, now) {
   await Promise.all(stops.map(async stop => {
     try {
       const sig = AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined;
-      const d = await fetch(`${CTB}/eta/CTB/${stop.id}/all`, sig ? { signal: sig } : {}).then(r => r.json());
+      const d = await fetch(
+        `${CTB}/eta/CTB/${stop.id}/all`,
+        sig ? { signal: sig } : {}
+      ).then(r => r.json());
       const routeMap = new Map();
       (d.data || []).forEach(e => {
         if (!e.eta) return;
@@ -144,7 +147,7 @@ async function fetchCTBEtas(nearby, now) {
   return results;
 }
 
-// MTR：stops.json 有 MTR 站點（含 lines 欄位）
+// ── MTR ETA ───────────────────────────────────────────────
 async function fetchMTREtas(nearby) {
   const stops = nearby.filter(s => s.co === 'mtr').slice(0, 3);
   if (!stops.length) return [];
@@ -161,8 +164,7 @@ async function fetchMTREtas(nearby) {
             .map(t => new Date(t.time).getTime())
             .filter(ts => ts > Date.now() - 30000);
           if (etas.length) results.push({
-            route: line,
-            dest: dir === 'UP' ? '往上行' : '往下行',
+            route: line, dest: dir === 'UP' ? '往上行' : '往下行',
             stopName: stop.n, stopId: stop.id,
             stopLat: stop.lat, stopLng: stop.lng,
             dist: Math.round(stop.dist),
@@ -177,7 +179,7 @@ async function fetchMTREtas(nearby) {
   return results;
 }
 
-// LRT：stops.json 有 LRT 站點
+// ── LRT ETA ───────────────────────────────────────────────
 async function fetchLRTEtas(nearby) {
   const stops = nearby.filter(s => s.co === 'lrt').slice(0, 4);
   if (!stops.length) return [];
@@ -209,13 +211,12 @@ async function fetchLRTEtas(nearby) {
 async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   const routeMap = new Map(kmbMap);
 
-  // CTB 合併：同路線與 KMB 合為 joint
+  // CTB 合併：同路線 KMB 改為 joint
   ctbRows.forEach(r => {
     const matchKey =
       routeMap.has(`${r.route}_O_kmb`) ? `${r.route}_O_kmb` :
       routeMap.has(`${r.route}_I_kmb`) ? `${r.route}_I_kmb` :
       routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` : null;
-
     if (matchKey) {
       const ex = routeMap.get(matchKey);
       ex.companyType = 'joint';
@@ -234,7 +235,6 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   lrtRows.forEach((r, i) => routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`, r));
 
   let allRows = [...routeMap.values()].filter(r => r.etasWithType?.length > 0);
-
   const usage = await getRouteUsage();
   const now = Date.now();
   allRows.sort((a, b) => {
@@ -249,8 +249,6 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   });
 
   const renderRows = allRows.slice(0, 25);
-
-  // 車費（KMB / LWB / joint 均從 KMB API 取）
   const fareRows = renderRows.filter(r => ['kmb', 'lwb', 'joint'].includes(r.companyType));
   await Promise.race([
     Promise.all(fareRows.map(r =>
@@ -271,15 +269,11 @@ export function useNearby(transportSettings) {
   const load = useCallback(async (lat, lng, dist) => {
     const myId = ++loadId.current;
     setStatus('loading');
-
     try {
-      // 從 stops.json 取全港站點（IDB 7 天緩存）
       const allStops = await ensureStops();
-      if (!allStops.length) throw new Error('站點資料未就緒，請稍後再試或清除緩存');
+      if (!allStops.length) throw new Error('站點資料未就緒，請到設定清除緩存後重試');
 
       const now = Date.now();
-
-      // 一次過找所有公司附近站點
       const nearby = allStops
         .map(s => ({ ...s, dist: haverDist(lat, lng, s.lat, s.lng) }))
         .filter(s => s.dist <= dist && s.dist > 0 && !isNaN(s.dist))
@@ -290,27 +284,25 @@ export function useNearby(transportSettings) {
         setRows([]); setStatus('ready'); return;
       }
 
-      // Phase 1：KMB + LWB（最快，先顯示）
+      // Phase 1: KMB + LWB
       const kmbMap = await fetchKMBLWBEtas(nearby, now);
-      const phase1Rows = await buildFinalRows(new Map(kmbMap), [], [], []);
+      const phase1 = await buildFinalRows(new Map(kmbMap), [], [], []);
       if (myId !== loadId.current) return;
-      setRows(phase1Rows);
+      setRows(phase1);
       setStatus('ready');
 
-      // Phase 2：CTB + MTR + LRT 並行（背景合併後更新）
+      // Phase 2: CTB + MTR + LRT 並行背景更新
       const [ctbRows, mtrRows, lrtRows] = await Promise.all([
         transportSettings.ctb ? fetchCTBEtas(nearby, now) : Promise.resolve([]),
         transportSettings.mtr ? fetchMTREtas(nearby) : Promise.resolve([]),
         transportSettings.lrt ? fetchLRTEtas(nearby) : Promise.resolve([]),
       ]);
       if (myId !== loadId.current) return;
-
       if (ctbRows.length || mtrRows.length || lrtRows.length) {
-        const finalRows = await buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows);
+        const final = await buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows);
         if (myId !== loadId.current) return;
-        setRows(finalRows);
+        setRows(final);
       }
-
     } catch (e) {
       console.warn('[nearby]', e);
       if (myId !== loadId.current) return;

@@ -13,42 +13,36 @@ import { Spinner } from '../components/Overlay.jsx';
 
 const DIST_STEPS = [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 8000, 10000];
 const STD_DISTS = [100, 300, 500, 1000, 3000, 5000];
-
 function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
-// ── Leaflet 動態載入 ──────────────────────────────────────
-let _leafletReady = false;
-let _leafletCallbacks = [];
+// 公司顏色（地圖標記）
+const CO_COLOR = {
+  kmb: '#f0a500', lwb: '#ff9f43', ctb: '#2ed573',
+  joint: '#5b8fff', mtr: '#e74c3c', lrt: '#a29bfe',
+};
 
+// Leaflet 動態載入
+let _leafletLoaded = false;
+let _leafletCbs = [];
 function loadLeaflet() {
   return new Promise(resolve => {
-    if (_leafletReady) { resolve(); return; }
-    _leafletCallbacks.push(resolve);
-    if (_leafletCallbacks.length > 1) return; // 已在載入中
-
-    // CSS
+    if (_leafletLoaded && window.L) { resolve(window.L); return; }
+    _leafletCbs.push(resolve);
+    if (_leafletCbs.length > 1) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
     document.head.appendChild(link);
-
-    // JS
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
     script.onload = () => {
-      _leafletReady = true;
-      _leafletCallbacks.splice(0).forEach(cb => cb());
+      _leafletLoaded = true;
+      _leafletCbs.splice(0).forEach(cb => cb(window.L));
     };
-    script.onerror = () => _leafletCallbacks.splice(0).forEach(cb => cb());
+    script.onerror = () => _leafletCbs.splice(0).forEach(cb => cb(null));
     document.head.appendChild(script);
   });
 }
-
-// ── 公司顏色（地圖標記）──────────────────────────────────
-const CO_MARKER_COLOR = {
-  kmb: '#ffc03a', lwb: '#ff9f43', ctb: '#2ed573',
-  joint: '#7ba8ff', mtr: '#e74c3c', lrt: '#a29bfe',
-};
 
 export default function HomePage({ openDrawer, showToast }) {
   const {
@@ -66,15 +60,13 @@ export default function HomePage({ openDrawer, showToast }) {
   const [showSlider, setShowSlider] = useState(false);
   const [sliderIdx, setSliderIdx] = useState(3);
   const [mapView, setMapView] = useState(false);
-
-  const leafletMapRef = useRef(null);
-  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);       // Leaflet map instance
+  const mapDivRef = useRef(null);    // DOM container ref
 
   const { weatherData, loadWeather } = useWeather(selectedStn, gpsCoords);
   const { getCurrentPosition, checkPermission } = useGeolocation();
   const nearbyHook = useNearby(transportSettings);
 
-  // ── GPS ──────────────────────────────────────────────────
   const doLocate = useCallback(() => {
     getCurrentPosition(pos => {
       saveGps(pos.coords.latitude, pos.coords.longitude);
@@ -86,7 +78,6 @@ export default function HomePage({ openDrawer, showToast }) {
     });
   }, [getCurrentPosition, saveGps, selectedStn, setSelectedStn, isNearby, nearbyDist, gpsCoords, nearbyHook]);
 
-  // ── Init ──────────────────────────────────────────────────
   useEffect(() => {
     loadWeather();
     if (gpsCoords && isNearby) {
@@ -116,104 +107,99 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // ── 地圖初始化 ────────────────────────────────────────
   useEffect(() => {
-    if (!mapView || !gpsCoords || nearbyHook.status !== 'ready') return;
+    if (!mapView || !gpsCoords) return;
+    let cancelled = false;
 
-    loadLeaflet().then(() => {
-      if (!window.L) return;
-      const L = window.L;
-      const container = mapContainerRef.current;
-      if (!container) return;
+    loadLeaflet().then(L => {
+      if (!L || cancelled || !mapDivRef.current) return;
 
       // 銷毀舊地圖
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
-      const map = L.map(container, {
+      const map = L.map(mapDivRef.current, {
         center: [gpsCoords.lat, gpsCoords.lng],
         zoom: 16,
         zoomControl: true,
       });
 
-      // 深色底圖
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO',
         maxZoom: 19,
       }).addTo(map);
 
-      // 用戶位置
+      // 用戶位置（藍點）
       L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
-        radius: 8, color: '#5b8fff', fillColor: '#5b8fff',
-        fillOpacity: 0.9, weight: 2,
-      }).addTo(map).bindPopup('📍 你的位置');
+        radius: 9, color: '#5b8fff', fillColor: '#5b8fff',
+        fillOpacity: 1, weight: 3,
+      }).addTo(map).bindPopup('<b style="color:#fff">📍 你的位置</b>');
 
-      // 按站點分組路線
+      // 按站點分組
       const stopGroups = new Map();
-      nearbyHook.rows.forEach(row => {
-        if (!row.stopLat || !row.stopLng) return;
+      (nearbyHook.rows || []).forEach(row => {
+        // 用 stopId + stopLat/stopLng（新 useNearby 有，舊版無）
+        const lat = row.stopLat;
+        const lng = row.stopLng;
+        if (!lat || !lng) return;
         const key = row.stopId;
         if (!stopGroups.has(key)) {
-          stopGroups.set(key, {
-            lat: row.stopLat, lng: row.stopLng,
-            name: row.stopName, dist: row.dist,
-            rows: [],
-          });
+          stopGroups.set(key, { lat, lng, name: row.stopName, dist: row.dist, rows: [] });
         }
         stopGroups.get(key).rows.push(row);
       });
 
-      // 為每個站點畫標記
-      stopGroups.forEach((grp, stopId) => {
-        // 用最接近的路線公司決定顏色
-        const dominantCo = grp.rows[0]?.companyType || 'kmb';
-        const color = CO_MARKER_COLOR[dominantCo] || '#ffc03a';
+      // 每站一個彩色圓形標記
+      stopGroups.forEach((grp) => {
+        const co = grp.rows[0]?.companyType || 'kmb';
+        const color = CO_COLOR[co] || '#f0a500';
+        const count = grp.rows.length;
 
+        // 圓形標記：深色背景、白色數字、彩色邊框
         const icon = L.divIcon({
           html: `<div style="
-            width:32px;height:32px;border-radius:50%;
-            background:${color};
-            border:2px solid rgba(0,0,0,.4);
+            width:36px;height:36px;border-radius:50%;
+            background:rgba(13,15,24,0.9);
+            border:2.5px solid ${color};
             display:flex;align-items:center;justify-content:center;
-            font-size:11px;font-weight:700;color:#000;
-            box-shadow:0 2px 6px rgba(0,0,0,.5);
-          ">${grp.rows.length}</div>`,
+            font-size:13px;font-weight:800;color:#fff;
+            box-shadow:0 2px 8px rgba(0,0,0,.7);
+            font-family:'Azeret Mono',monospace;
+          ">${count}</div>`,
           className: '',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
         });
 
-        // Popup 內容
+        // Popup：中文站名 + 路線及分鐘數
+        const now = Date.now();
         const routeTags = grp.rows.map(r => {
-          const c = CO_MARKER_COLOR[r.companyType] || '#ffc03a';
+          const c = CO_COLOR[r.companyType] || '#f0a500';
           const eta = r.etasWithType?.[0];
-          const mins = eta ? Math.round((eta.ts - Date.now()) / 60000) : null;
-          const etaStr = mins === null ? '' : mins <= 0 ? ' · 即將' : ` · ${mins}分`;
-          return `<span class="route-tag" style="border-color:${c};color:${c}">${r.route}${etaStr}</span>`;
+          const mins = eta ? Math.round((eta.ts - now) / 60000) : null;
+          const etaStr = mins === null ? '' : mins <= 0 ? '<span style="color:#ff4757"> · 即將</span>' : `<span style="color:#aaa"> · ${mins}分</span>`;
+          return `<div style="display:inline-flex;align-items:center;background:rgba(255,255,255,.07);border:1px solid ${c}40;border-radius:5px;padding:2px 7px;margin:2px;font-size:12px;font-weight:700;color:${c};">${r.route}${etaStr}</div>`;
         }).join('');
 
         const popup = `
-          <div class="map-stop-popup">
-            <div class="stop-name">${grp.name}</div>
-            <div style="font-size:10px;color:#8898b8;margin-bottom:5px">${grp.dist}m</div>
-            <div>${routeTags}</div>
+          <div style="font-family:'Noto Sans HK',sans-serif;min-width:160px;max-width:240px;">
+            <div style="font-size:14px;font-weight:700;color:#edf1fb;margin-bottom:3px;">${grp.name}</div>
+            <div style="font-size:10px;color:#8898b8;margin-bottom:7px;">${grp.dist}m</div>
+            <div style="display:flex;flex-wrap:wrap;gap:2px;">${routeTags}</div>
           </div>`;
 
         L.marker([grp.lat, grp.lng], { icon })
           .addTo(map)
-          .bindPopup(popup, { maxWidth: 260 });
+          .bindPopup(popup, { maxWidth: 260, className: 'dark-popup' });
       });
 
-      leafletMapRef.current = map;
+      mapRef.current = map;
     });
 
     return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
+      cancelled = true;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-  }, [mapView, gpsCoords, nearbyHook.status, nearbyHook.rows]);
+  // eslint-disable-next-line
+  }, [mapView, gpsCoords, nearbyHook.rows]);
 
   // ── Favs ──────────────────────────────────────────────────
   const _refreshFavs = useCallback(async () => {
@@ -223,8 +209,8 @@ export default function HomePage({ openDrawer, showToast }) {
     const results = await Promise.all(favList.map(async fav => {
       try {
         const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
-        const etas = (d.data || []).filter(e => e.eta)
-          .slice(0, 3).map(e => new Date(e.eta).getTime()).filter(ts => ts > now - 30000);
+        const etas = (d.data || []).filter(e => e.eta).slice(0, 3)
+          .map(e => new Date(e.eta).getTime()).filter(ts => ts > now - 30000);
         return { ...fav, etasWithType: etas.map(ts => ({ ts, type: fav.type || 'kmb' })), companyType: fav.type || 'kmb', fare: null };
       } catch {
         return { ...fav, etasWithType: [], companyType: fav.type || 'kmb', fare: null };
@@ -246,7 +232,6 @@ export default function HomePage({ openDrawer, showToast }) {
     setFavRows(prev => prev.filter((_, i) => i !== idx));
   }, [activePid]);
 
-  // ── Refresh ───────────────────────────────────────────────
   const doRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -259,16 +244,13 @@ export default function HomePage({ openDrawer, showToast }) {
     setRefreshing(false);
   };
 
-  // ── Profile switch ────────────────────────────────────────
   const switchToNearby = () => {
     setActivePid(NEARBY_PID);
     if (gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-    else {
-      checkPermission().then(state => {
-        if (state === 'granted') doLocate();
-        else nearbyHook.setStatus('no-permission');
-      });
-    }
+    else checkPermission().then(state => {
+      if (state === 'granted') doLocate();
+      else nearbyHook.setStatus('no-permission');
+    });
   };
 
   const switchProfile = (pid) => {
@@ -277,18 +259,6 @@ export default function HomePage({ openDrawer, showToast }) {
     setTimeout(() => _refreshFavs(), 0);
   };
 
-  // ── 關閉地圖時切回列表 ────────────────────────────────────
-  const toggleMapView = () => {
-    setMapView(v => {
-      if (v && leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
-      return !v;
-    });
-  };
-
-  // ── Nearby content ────────────────────────────────────────
   const renderNearbyContent = () => {
     switch (nearbyHook.status) {
       case 'loading': return <Spinner />;
@@ -307,8 +277,8 @@ export default function HomePage({ openDrawer, showToast }) {
         <div className="msg">
           {nearbyHook.errorMsg}
           <br />
-          <button onClick={() => nearbyHook.load(gpsCoords?.lat, gpsCoords?.lng, nearbyDist)}
-            style={{ marginTop: 12, background: 'var(--bg3)', border: '1px solid var(--bdr2)', color: 'var(--mid)', borderRadius: 8, padding: '7px 16px', fontSize: 12, cursor: 'pointer' }}>
+          <button onClick={() => gpsCoords && nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist)}
+            style={{ marginTop: 10, background: 'var(--bg3)', border: '1px solid var(--bdr2)', color: 'var(--mid)', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
             重試
           </button>
         </div>
@@ -367,7 +337,7 @@ export default function HomePage({ openDrawer, showToast }) {
           {isNearby && (
             <button
               className={`map-toggle-btn${mapView ? ' active' : ''}`}
-              onClick={toggleMapView}
+              onClick={() => setMapView(v => !v)}
             >
               {mapView ? '📋 列表' : '🗺 地圖'}
             </button>
@@ -397,7 +367,6 @@ export default function HomePage({ openDrawer, showToast }) {
           </div>
         )}
 
-        {/* 列表 */}
         <div className="bus-list" style={{ display: mapView ? 'none' : undefined }}>
           {isNearby ? renderNearbyContent() : (
             favRows.length === 0 ? (
@@ -418,10 +387,9 @@ export default function HomePage({ openDrawer, showToast }) {
           )}
         </div>
 
-        {/* 地圖（Leaflet 動態載入）*/}
+        {/* 地圖容器 */}
         <div
-          ref={mapContainerRef}
-          id="nearby-map"
+          ref={mapDivRef}
           style={{
             flex: 1, minHeight: 0, position: 'relative',
             display: mapView ? 'block' : 'none',
@@ -429,7 +397,6 @@ export default function HomePage({ openDrawer, showToast }) {
         />
       </div>
 
-      {/* 自訂距離 slider */}
       {showSlider && (
         <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h) + 8px)', left: 0, right: 0, zIndex: 40, display: 'flex', justifyContent: 'center', padding: '0 12px' }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--bdr2)', borderRadius: 14, padding: '14px 16px 12px', width: '100%', maxWidth: 480, boxShadow: '0 6px 28px rgba(0,0,0,.6)' }}>
