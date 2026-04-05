@@ -1,5 +1,18 @@
 import { pad } from '../utils/format.js';
 
+// ── 公司顯示設定 ─────────────────────────────────────────
+const CO_CONFIG = {
+  kmb:   { label: '九巴',      badgeBg: 'var(--amb-bg)',              badgeBdr: 'var(--amb-bdr)',              routeCol: 'var(--amb2)',  etaTag: '九巴' },
+  lwb:   { label: '龍運',      badgeBg: 'rgba(255,159,67,.13)',       badgeBdr: 'rgba(255,159,67,.38)',        routeCol: '#ff9f43',     etaTag: '龍運' },
+  ctb:   { label: '城巴',      badgeBg: 'rgba(46,213,115,.1)',        badgeBdr: 'rgba(46,213,115,.3)',         routeCol: '#2ed573',     etaTag: '城巴' },
+  joint: { label: '九巴+城巴', badgeBg: 'rgba(91,143,255,.1)',        badgeBdr: 'rgba(91,143,255,.3)',         routeCol: '#7ba8ff',     etaTag: null   },
+  mtr:   { label: '港鐵',      badgeBg: 'rgba(231,76,60,.12)',        badgeBdr: 'rgba(231,76,60,.35)',         routeCol: '#ff8a96',     etaTag: '港鐵' },
+  lrt:   { label: '輕鐵',      badgeBg: 'rgba(162,155,254,.12)',      badgeBdr: 'rgba(162,155,254,.38)',       routeCol: '#a29bfe',     etaTag: '輕鐵' },
+};
+
+// joint 各班次的公司標籤
+const ETA_TYPE_TAG = { kmb: '九巴', lwb: '龍運', ctb: '城巴', mtr: '港鐵', lrt: '輕鐵' };
+
 export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
   const { route, dest, stopName, dist, fare, companyType, etasWithType } = row;
   const now = Date.now();
@@ -7,20 +20,12 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
   const firstM = validEtas.length ? Math.round((validEtas[0].ts - now) / 60000) : null;
   const urgency = firstM === null ? '' : firstM <= 2 ? 'soon' : firstM <= 8 ? 'coming' : 'ok';
 
-  const isCTB = companyType === 'ctb';
-  const isLRT = companyType === 'lrt';
-  const isMTR = companyType === 'mtr';
-  const isJoint = companyType === 'joint';
-
-  const coLabel = isJoint ? '九巴+城巴' : isCTB ? '城巴' : isLRT ? '輕鐵' : isMTR ? '港鐵' : '九巴';
-  const badgeBg = isCTB ? 'rgba(46,213,115,.1)' : isLRT ? 'rgba(255,165,0,.1)' : isMTR ? 'rgba(255,71,87,.12)' : 'var(--amb-bg)';
-  const badgeBdr = isCTB ? 'rgba(46,213,115,.3)' : isLRT ? 'rgba(255,165,0,.35)' : isMTR ? 'rgba(255,71,87,.35)' : 'var(--amb-bdr)';
-  const routeCol = isCTB ? '#2ed573' : isLRT ? '#ffaa33' : isMTR ? '#ff8a96' : 'var(--amb2)';
+  const cfg = CO_CONFIG[companyType] || CO_CONFIG.kmb;
   const routeFontSize = route.length <= 3 ? '24px' : route.length === 4 ? '19px' : '15px';
 
   const distStr = dist ? `${dist}m` : '';
   const fareStr = fare != null ? ` ($${fare})` : '';
-  const stopInfo = stopName + (distStr ? ` - ${distStr}` : '') + fareStr;
+  const stopInfo = stopName + (distStr ? ` · ${distStr}` : '') + fareStr;
 
   return (
     <div
@@ -32,14 +37,24 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
       {onDragStart && (
         <div className="bcv2-drag-hdl" onTouchStart={e => onDragStart(e, idx)}>⠿</div>
       )}
-      <div className="bcv2-badge" style={{ background: badgeBg, borderColor: badgeBdr }}>
-        <div className="bcv2-route-no" style={{ color: routeCol, fontSize: routeFontSize }}>{route}</div>
-        <div className="bcv2-co-name">{coLabel}</div>
+
+      {/* 路線 badge */}
+      <div className="bcv2-badge" style={{ background: cfg.badgeBg, borderColor: cfg.badgeBdr }}>
+        <div className="bcv2-route-no" style={{ color: cfg.routeCol, fontSize: routeFontSize }}>
+          {route}
+        </div>
+        <div className="bcv2-co-name" style={{ color: cfg.routeCol, opacity: 0.85 }}>
+          {cfg.label}
+        </div>
       </div>
+
+      {/* 目的地 + 站點 */}
       <div className="bcv2-mid">
         <div className="bcv2-dest-lbl">往 {dest}</div>
         <div className="bcv2-stop-lbl">{stopInfo}</div>
       </div>
+
+      {/* ETA */}
       <div className="bcv2-etas">
         {validEtas.length === 0 ? (
           <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)' }}>無班次</div>
@@ -47,18 +62,27 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
           const m = Math.round((e.ts - now) / 60000);
           const dv = new Date(e.ts);
           const timeStr = `${pad(dv.getHours())}:${pad(dv.getMinutes())}`;
-          const minStr = m <= 0 ? '即將' : m + '分';
+          const minStr = m <= 0 ? '即將' : `${m}分`;
           const mc = m <= 2 ? 'sc' : m <= 8 ? 'cc' : 'oc';
-          const coTag = isJoint ? (e.type === 'ctb' ? '城巴' : e.type === 'lrt' ? '輕' : e.type === 'mtr' ? '港鐵' : '九巴') : '';
+          // joint 路線標明每班次的公司
+          const coTag = companyType === 'joint' ? (ETA_TYPE_TAG[e.type] || '') : '';
           return (
             <div key={i} className={`bcv2-eta-row${i === 0 ? ' e-first' : ''}`}>
-              {isJoint && <span className="bcv2-eta-co">{coTag}</span>}
+              {companyType === 'joint' && (
+                <span className="bcv2-eta-co" style={{
+                  color: e.type === 'ctb' ? '#2ed573' : 'var(--amb2)',
+                  minWidth: 24,
+                }}>
+                  {coTag}
+                </span>
+              )}
               <span className="bcv2-eta-time">{timeStr}</span>
               <span className={`bcv2-eta-mins ${mc}`}>{minStr}</span>
             </div>
           );
         })}
       </div>
+
       {onRemove && (
         <button className="bcv2-rm-btn" onClick={e => { e.stopPropagation(); onRemove(idx); }}>×</button>
       )}
