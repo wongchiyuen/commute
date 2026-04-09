@@ -105,7 +105,7 @@ function ETAPills({ etas }) {
 
 // ── 主組件 ────────────────────────────────────────────────
 export default function RoutePage({ row, closeDrawer, showToast }) {
-  const { activePid, profiles } = useApp();
+  const { activePid, profiles, addRouteTargetPid, setAddRouteTargetPid } = useApp();
   const initDir = row?.dir || 'O';
   const [dir, setDir]             = useState(initDir);
   const [routeInfo, setRouteInfo] = useState(null);
@@ -121,6 +121,7 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
   const svcType     = row?.serviceType || '1';
   const nearStopId  = row?.stopId      || '';
   const rowDest     = row?.dest        || '';
+  const targetPidFromRow = row?.targetPid || null;
 
   const isCtb     = companyType === 'ctb';
   const isKmbLike = companyType === 'kmb' || companyType === 'joint';
@@ -214,8 +215,14 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
   }
 
   const rfs = route.length <= 3 ? '22px' : route.length <= 4 ? '17px' : '13px';
+  const previewTargetPid =
+    targetPidFromRow || addRouteTargetPid || (activePid === NEARBY_PID ? (profiles[0]?.id || null) : activePid);
+  const previewTargetName = profiles.find(p => p.id === previewTargetPid)?.name || '目前版面';
   const addToFavs = useCallback((stop) => {
-    const targetPid = activePid === NEARBY_PID ? (profiles[0]?.id || null) : activePid;
+    const targetPid =
+      targetPidFromRow ||
+      addRouteTargetPid ||
+      (activePid === NEARBY_PID ? (profiles[0]?.id || null) : activePid);
     if (!targetPid) {
       showToast?.('請先新增版面');
       return;
@@ -241,9 +248,11 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
       type: favType,
     });
     saveFavs(targetPid, list);
-    showToast?.(activePid === NEARBY_PID ? `已加入「${profiles[0]?.name || '版面'}」` : '已加入目前版面');
+    const targetName = profiles.find(p => p.id === targetPid)?.name || '版面';
+    showToast?.(`已加入「${targetName}」`);
+    setAddRouteTargetPid(null);
     closeDrawer?.();
-  }, [activePid, profiles, companyType, route, svcType, destText, closeDrawer, showToast]);
+  }, [activePid, profiles, companyType, route, svcType, destText, closeDrawer, showToast, targetPidFromRow, addRouteTargetPid, setAddRouteTargetPid]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
@@ -269,6 +278,10 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
               {orig ? `${orig} → ${destText}` : `往 ${destText}`}
             </div>
             <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, padding: '2px 7px', borderRadius: 10,
+                background: 'var(--bg3)', border: '1px solid var(--bdr)', color: 'var(--mid)',
+              }}>加入至：{previewTargetName}</span>
               {fare != null && (
                 <span style={{
                   fontSize: 11, padding: '2px 7px', borderRadius: 10,

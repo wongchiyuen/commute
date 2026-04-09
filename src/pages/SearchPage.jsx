@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
 import { Spinner } from '../components/Overlay.jsx';
+import { useApp } from '../context/AppContext.jsx';
 
 // 營辦商色彩（與 RoutePage / BusCard 一致）
 const CO_COL  = { kmb: '#D85A30', ctb: '#0F6E56', joint: '#D85A30' };
@@ -8,6 +9,7 @@ const CO_BG   = { kmb: 'rgba(216,90,48,.1)', ctb: 'rgba(29,158,117,.1)', joint: 
 const CO_LBL  = { kmb: '九巴', ctb: '城巴', joint: '九巴+城巴' };
 
 export default function SearchPage({ isActive, openDrawer }) {
+  const { addRouteTargetPid } = useApp();
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -69,6 +71,7 @@ export default function SearchPage({ isActive, openDrawer }) {
       dir:         dir === 'I' || dir === 'inbound' ? 'I' : 'O',
       serviceType: r.service_type || '1',
       stopId:      null,   // 搜尋不帶特定站，不高亮
+      targetPid:   addRouteTargetPid || null,
       fare:        null,
     };
     openDrawer(`${r.route} 路線詳情`, 'bus-detail', row);

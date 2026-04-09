@@ -26,6 +26,7 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   // Page navigation
   const [activePage, setActivePage] = useState('home');
+  const [addRouteTargetPid, setAddRouteTargetPid] = useState(null);
 
   // Toast
   const [toast, setToast] = useState({ msg: '', visible: false });
@@ -197,6 +198,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       activePage, setActivePage,
+      addRouteTargetPid, setAddRouteTargetPid,
       toast, showToast,
       drawer, openDrawer, closeDrawer,
       profiles, updateProfiles,

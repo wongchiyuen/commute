@@ -19,6 +19,7 @@ function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 export default function HomePage({ openDrawer, showToast }) {
   const {
     setActivePage,
+    setAddRouteTargetPid,
     activePid, setActivePid, profiles,
     nearbyDist, setNearbyDist,
     gpsCoords, saveGps,
@@ -33,6 +34,9 @@ export default function HomePage({ openDrawer, showToast }) {
   const [showSlider, setShowSlider] = useState(false);
   const [sliderIdx, setSliderIdx] = useState(3);
   const [mapView, setMapView] = useState(false);
+  const mapElRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const markerLayerRef = useRef(null);
 
   const { weatherData, loadWeather } = useWeather(selectedStn, gpsCoords);
   const { getCurrentPosition, checkPermission } = useGeolocation();
@@ -78,6 +82,75 @@ export default function HomePage({ openDrawer, showToast }) {
     if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
   // eslint-disable-next-line
   }, [nearbyDist]);
+
+  // ── Nearby map（Leaflet）──────────────────────────────────
+  useEffect(() => {
+    if (!isNearby || !mapView) return;
+    if (!mapElRef.current) return;
+    const L = window.L;
+    if (!L) return;
+
+    // 首次建立地圖
+    if (!leafletMapRef.current) {
+      const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
+      const map = L.map(mapElRef.current, { zoomControl: true }).setView(center, gpsCoords ? 15 : 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap',
+      }).addTo(map);
+      leafletMapRef.current = map;
+      markerLayerRef.current = L.layerGroup().addTo(map);
+    }
+
+    const map = leafletMapRef.current;
+    const layer = markerLayerRef.current;
+    if (!map || !layer) return;
+
+    // 切換到地圖模式後需重算尺寸，否則會白格/不可拖動
+    setTimeout(() => map.invalidateSize(), 60);
+
+    // 清舊 marker
+    layer.clearLayers();
+
+    const points = [];
+    if (gpsCoords) {
+      points.push([gpsCoords.lat, gpsCoords.lng]);
+      L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
+        radius: 7, color: '#4da3ff', weight: 2, fillColor: '#4da3ff', fillOpacity: 0.35,
+      }).bindPopup('你的位置').addTo(layer);
+    }
+
+    // 取每個 stop 第一筆路線作 marker，避免重覆太多點
+    const stopMap = new Map();
+    (nearbyHook.rows || []).forEach(r => {
+      if (!r?.stopLat || !r?.stopLng || !r?.stopId) return;
+      if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, r);
+    });
+    stopMap.forEach((r) => {
+      const lat = Number(r.stopLat);
+      const lng = Number(r.stopLng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      points.push([lat, lng]);
+      const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
+      const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta} 分`;
+      L.circleMarker([lat, lng], {
+        radius: 6, color: '#f0a500', weight: 1.5, fillColor: '#f0a500', fillOpacity: 0.55,
+      }).bindPopup(`<b>${r.route}</b> 往 ${r.dest || ''}<br/>${r.stopName || ''}<br/>${etaTxt}`).addTo(layer);
+    });
+
+    // 自動框住目前可用點位
+    if (points.length > 1) map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
+    else if (points.length === 1) map.setView(points[0], 15);
+  }, [isNearby, mapView, gpsCoords, nearbyHook.rows]);
+
+  useEffect(() => {
+    if (isNearby) return;
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+      markerLayerRef.current = null;
+    }
+  }, [isNearby]);
 
   // ── Favs ──────────────────────────────────────────────────
   const fetchFavEtas = useCallback(async (fav, now) => {
@@ -288,7 +361,9 @@ export default function HomePage({ openDrawer, showToast }) {
             </button>
           )}
           {!isNearby && (
-            <button className="add-btn" onClick={() => setActivePage('search')}>＋ 加路線</button>
+            <button className="add-btn" onClick={() => { setAddRouteTargetPid(activePid); setActivePage('search'); }}>
+              ＋ 加路線
+            </button>
           )}
         </div>
 
@@ -330,7 +405,7 @@ export default function HomePage({ openDrawer, showToast }) {
         </div>
 
         {isNearby && mapView && (
-          <div id="nearby-map" style={{ flex: 1, minHeight: 0, position: 'relative' }} />
+          <div ref={mapElRef} id="nearby-map" style={{ flex: 1, minHeight: 0, position: 'relative' }} />
         )}
       </div>
 
