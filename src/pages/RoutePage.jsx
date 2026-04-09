@@ -257,11 +257,12 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
 
         const icon = L.divIcon({
           className: 'custom-stop-icon',
-          html: `<div class="stop-marker-inner ${isNear ? 'near' : ''}" style="background: ${isNear ? 'var(--amb)' : co.col}; width: ${isFirst || isLast || isNear ? '24px' : '12px'}; height: ${isFirst || isLast || isNear ? '24px' : '12px'}; border-width: ${isNear ? '3px' : '2px'}">
-                  ${isFirst ? '起' : isLast ? '終' : ''}
+          html: `<div class="stop-pill ${companyType} ${isNear ? 'near' : ''}" style="padding: ${isFirst || isLast ? '3px 10px' : '3px 6px'}">
+                  <div class="co-dot"></div>
+                  <span>${isFirst ? '起' : isLast ? '終' : s.seq}</span>
                  </div>`,
-          iconSize: isFirst || isLast || isNear ? [24, 24] : [12, 12],
-          iconAnchor: isFirst || isLast || isNear ? [12, 12] : [6, 6],
+          iconSize: [40, 24],
+          iconAnchor: [20, 12],
         });
 
         const etas = etaMap[s.stopId];

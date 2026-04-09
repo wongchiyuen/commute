@@ -154,11 +154,23 @@ export default function HomePage({ openDrawer, showToast }) {
         const lng = Number(r.stopLng);
         if (Number.isFinite(lat) && Number.isFinite(lng)) {
           points.push([lat, lng]);
+          
+          const routeCount = routes.length;
+          const displayRoute = r.route || '';
+          const hasMore = routeCount > 1;
+          
+          // 決定標記顏色：如果是聯營或有多種營辦商，用 joint 色
+          const cos = new Set(routes.map(x => x.companyType));
+          const mainCo = cos.size > 1 ? 'joint' : r.companyType;
+
           const icon = L.divIcon({
             className: 'custom-stop-icon',
-            html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">${r.route || ''}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            html: `<div class="stop-pill ${mainCo}">
+                    <div class="co-dot"></div>
+                    <span>${displayRoute}${hasMore ? `<small>+${routeCount-1}</small>` : ''}</span>
+                  </div>`,
+            iconSize: [hasMore ? 80 : 60, 24],
+            iconAnchor: [hasMore ? 40 : 30, 12],
           });
           const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
           const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta}分`;

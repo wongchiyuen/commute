@@ -211,7 +211,57 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
+.stop-pill {
+  display: flex;
+  align-items: center;
+  background: var(--bg2);
+  border: 1.5px solid #fff;
+  border-radius: 20px;
+  padding: 3px 8px 3px 5px;
+  gap: 5px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: transform 0.1s;
+}
+.stop-pill:active {
+  transform: scale(0.95);
+}
+.stop-pill .co-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.stop-pill.joint .co-dot { background: linear-gradient(135deg, #D85A30 50%, #0F6E56 50%); }
+.stop-pill.kmb .co-dot { background: #D85A30; }
+.stop-pill.lwb .co-dot { background: #ff9f43; }
+.stop-pill.ctb .co-dot { background: #0F6E56; }
+.stop-pill.mtr .co-dot { background: #185FA5; }
+.stop-pill.lrt .co-dot { background: #BA7517; }
+
+.stop-pill span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.stop-pill small {
+  font-size: 8px;
+  opacity: 0.8;
+  background: rgba(0,0,0,0.2);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.stop-pill.near {
+  border-color: var(--amb);
+  box-shadow: 0 0 10px var(--amb);
+}
+
 .stop-marker-inner {
   width: 32px;
   height: 32px;

@@ -113,8 +113,8 @@ async function fetchKMBLWBEtas(nearby, now) {
 // ── CTB ETA ───────────────────────────────────────────────
 // stops.json 已有 CTB 座標，直接取 ETA
 async function fetchCTBEtas(nearby, now) {
-  // 修正：增加掃描站點數量由 8 個到 15 個
-  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 15);
+  // 修正：增加掃描站點數量由 15 個到 30 個，確保涵蓋更多路線
+  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 30);
   if (!stops.length) return [];
   const results = [];
   await Promise.all(stops.map(async stop => {
@@ -140,7 +140,8 @@ async function fetchCTBEtas(nearby, now) {
           });
         } else {
           const ex = routeMap.get(key);
-          if (ex.etasWithType.length < 3) ex.etasWithType.push({ ts, type: 'ctb' });
+          if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === ts))
+            ex.etasWithType.push({ ts, type: 'ctb' });
         }
       });
       routeMap.forEach(r => results.push(r));
@@ -233,9 +234,11 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
       });
       ex.etasWithType.sort((a, b) => a.ts - b.ts);
     } else {
-      // 如果附近無九巴站，但係聯營線（例如過海線 1xx, 6xx, 9xx）
-      // 或者係純城巴線，就直接加落去
-      const isJointRoute = /^(1|6|9|101|102|103|104|106|107|111|112|113|115|116|117|118|170|171|182|307|601|603|606|619|671|680|681|690|904|905|914|930|948|960|961|962|967|968|969|970|971|973|978|980|981|982|985)/.test(r.route);
+      // 聯營線規則：
+      // 1xx, 3xx, 6xx, 9xx, N1xx, N3xx, N6xx, N9xx 是過海聯營線的主力
+      // 還有一些特定的路線如 101-118, 170, 171, 182, 307, 601, 681 等
+      const isJointRoute = /^(1|3|6|9|N1|N3|N6|N9)/.test(r.route) || 
+                          ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
       
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
