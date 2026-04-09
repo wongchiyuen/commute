@@ -88,6 +88,7 @@ export default function HomePage({ openDrawer, showToast }) {
     let mapInstance = null;
     let timer = null;
 
+    // 只有在 isNearby && mapView 為真時才嘗試操作地圖
     if (!isNearby || !mapView || !mapElRef.current) {
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
@@ -101,7 +102,6 @@ export default function HomePage({ openDrawer, showToast }) {
     if (!L) return;
 
     try {
-      // 首次建立地圖
       if (!leafletMapRef.current) {
         const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
         mapInstance = L.map(mapElRef.current, { 
@@ -122,15 +122,14 @@ export default function HomePage({ openDrawer, showToast }) {
       const layer = markerLayerRef.current;
       if (!map || !layer) return;
 
-      // 每次重新進入地圖或容器改變時都要重算尺寸
+      // 重要：給予一些時間讓 React 完成 DOM 渲染
       timer = setTimeout(() => {
         if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
-      }, 100);
+      }, 200);
 
-      // 清舊 marker
       layer.clearLayers();
-
       const points = [];
+      
       if (gpsCoords) {
         points.push([gpsCoords.lat, gpsCoords.lng]);
         L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
@@ -141,53 +140,46 @@ export default function HomePage({ openDrawer, showToast }) {
         }).addTo(layer);
       }
 
-      // 取每個 stop 第一筆路線作 marker
       const stopMap = new Map();
       (nearbyHook.rows || []).forEach(r => {
-        if (!r?.stopLat || !r?.stopLng || !r?.stopId) return;
-        if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
-        stopMap.get(r.stopId).push(r);
+        if (r?.stopLat && r?.stopLng && r?.stopId) {
+          if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
+          stopMap.get(r.stopId).push(r);
+        }
       });
 
       stopMap.forEach((routes, stopId) => {
         const r = routes[0];
         const lat = Number(r.stopLat);
         const lng = Number(r.stopLng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        points.push([lat, lng]);
-
-        const icon = L.divIcon({
-          className: 'custom-stop-icon',
-          html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">
-                  ${r.route || ''}
-                 </div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        });
-
-        const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
-        const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta} 分`;
-        
-        const popupContent = `
-          <div class="map-popup">
-            <div class="map-popup-title">${r.stopName || '未知站點'}</div>
-            <div class="map-popup-routes">${routes.map(x => `<b>${x.route || ''}</b>`).join(' ')}</div>
-            <div class="map-popup-eta">下一班：${etaTxt}</div>
-          </div>
-        `;
-
-        L.marker([lat, lng], { icon }).bindPopup(popupContent).addTo(layer);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          points.push([lat, lng]);
+          const icon = L.divIcon({
+            className: 'custom-stop-icon',
+            html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">${r.route || ''}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          });
+          const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
+          const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta}分`;
+          const popup = `
+            <div class="map-popup">
+              <div class="map-popup-title">${r.stopName || '未知站點'}</div>
+              <div class="map-popup-routes">${routes.map(x => `<b>${x.route || ''}</b>`).join(' ')}</div>
+              <div class="map-popup-eta">下一班：${etaTxt}</div>
+            </div>
+          `;
+          L.marker([lat, lng], { icon }).bindPopup(popup).addTo(layer);
+        }
       });
 
       if (points.length > 1) map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
       else if (points.length === 1) map.setView(points[0], 15);
-    } catch (err) {
-      console.error('Map error:', err);
+    } catch (e) {
+      console.error('Home map error:', e);
     }
 
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    return () => { if (timer) clearTimeout(timer); };
   }, [isNearby, mapView, gpsCoords, nearbyHook.rows, nearbyDist]);
 
   // 移除舊有的 [isNearby] 清理 effect，因為上面已經整合咗

@@ -233,7 +233,7 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
       
       timer = setTimeout(() => {
         if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
-      }, 100);
+      }, 200);
 
       // 清除現有標記
       map.eachLayer(l => { 
@@ -244,8 +244,11 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
 
       const points = [];
       stops.forEach((s, i) => {
-        if (!s.lat || !s.lng) return;
-        const pos = [Number(s.lat), Number(s.lng)];
+        const lat = Number(s.lat);
+        const lng = Number(s.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const pos = [lat, lng];
         points.push(pos);
 
         const isFirst = i === 0;
@@ -271,13 +274,11 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
         L.polyline(points, { color: co.col, weight: 4, opacity: 0.8, lineJoin: 'round' }).addTo(map);
         map.fitBounds(points, { padding: [40, 40] });
       }
-    } catch (err) {
-      console.error('Route Map error:', err);
+    } catch (e) {
+      console.error('Route map error:', e);
     }
 
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    return () => { if (timer) clearTimeout(timer); };
   }, [mapView, stops, etaMap, co.col, nearStopId]);
 
   if (!row) return <div style={{ padding: 20, color: 'var(--dim)', fontSize: 13 }}>路線資料缺失</div>;
