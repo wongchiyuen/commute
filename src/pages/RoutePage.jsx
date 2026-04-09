@@ -1,15 +1,28 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
-import { fetchAllKMBStops, ensureCTBStops } from '../hooks/useNearby.js';
+import { fetchAllKMBStops } from '../hooks/useNearby.js';
 import { fetchKMBFare } from '../utils/fare.js';
+
+// ── 本地 CTB stops cache（不依賴 useNearby.js）────────────
+let _ctbCache = null;
+async function getCtbStopNames() {
+  if (_ctbCache) return _ctbCache;
+  try {
+    const d = await fetch(`${CTB}/stop`).then(r => r.json());
+    _ctbCache = new Map((d.data || []).map(s => [s.stop, s.name_tc || s.name_en || s.stop]));
+  } catch {
+    _ctbCache = new Map();
+  }
+  return _ctbCache;
+}
 
 // ── 營辦商色彩 ────────────────────────────────────────────
 const CO = {
-  kmb:   { bg: 'rgba(216,90,48,.12)',   bdr: 'rgba(216,90,48,.3)',   col: '#D85A30', lbl: '九巴' },
-  joint: { bg: 'rgba(216,90,48,.12)',   bdr: 'rgba(216,90,48,.3)',   col: '#D85A30', lbl: '九巴+城巴' },
-  ctb:   { bg: 'rgba(29,158,117,.12)',  bdr: 'rgba(29,158,117,.3)',  col: '#0F6E56', lbl: '城巴' },
-  mtr:   { bg: 'rgba(55,138,221,.12)',  bdr: 'rgba(55,138,221,.3)',  col: '#185FA5', lbl: '港鐵' },
-  lrt:   { bg: 'rgba(255,170,51,.12)', bdr: 'rgba(255,170,51,.3)',  col: '#BA7517', lbl: '輕鐵' },
+  kmb:   { bg: 'rgba(216,90,48,.12)',  bdr: 'rgba(216,90,48,.3)',  col: '#D85A30', lbl: '九巴' },
+  joint: { bg: 'rgba(216,90,48,.12)',  bdr: 'rgba(216,90,48,.3)',  col: '#D85A30', lbl: '九巴+城巴' },
+  ctb:   { bg: 'rgba(29,158,117,.12)', bdr: 'rgba(29,158,117,.3)', col: '#0F6E56', lbl: '城巴' },
+  mtr:   { bg: 'rgba(55,138,221,.12)', bdr: 'rgba(55,138,221,.3)', col: '#185FA5', lbl: '港鐵' },
+  lrt:   { bg: 'rgba(255,170,51,.12)', bdr: 'rgba(255,170,51,.3)', col: '#BA7517', lbl: '輕鐵' },
 };
 
 function toApiDir(dir) { return dir === 'I' ? 'inbound' : 'outbound'; }
@@ -66,10 +79,7 @@ async function getCTBStopETA(stopId, route) {
 // ── ETA pills ─────────────────────────────────────────────
 function ETAPills({ etas }) {
   const now = Date.now();
-  // undefined = 仍在載入，[] = 無班次
-  if (etas === undefined) {
-    return <span style={{ fontSize: 11, color: 'var(--dim)' }}>…</span>;
-  }
+  if (etas === undefined) return <span style={{ fontSize: 11, color: 'var(--dim)' }}>…</span>;
   if (!etas.length) return null;
   return (
     <div style={{ display: 'flex', gap: 5, marginTop: 3, flexWrap: 'wrap' }}>
@@ -82,7 +92,7 @@ function ETAPills({ etas }) {
             fontSize: 11, padding: '2px 7px', borderRadius: 10,
             fontWeight: i === 0 ? 600 : 400,
             background: urgent ? 'rgba(46,213,115,.15)' : mid ? 'rgba(240,165,0,.12)' : 'var(--bg3)',
-            color:      urgent ? '#2ed573'               : mid ? 'var(--amb2)'          : 'var(--mid)',
+            color:      urgent ? '#2ed573'               : mid ? 'var(--amb2)'         : 'var(--mid)',
           }}>
             {m <= 0 ? '即將' : `${m}分`}
           </span>
@@ -94,14 +104,13 @@ function ETAPills({ etas }) {
 
 // ── 主組件 ────────────────────────────────────────────────
 export default function RoutePage({ row }) {
-  // ── 所有 hooks 必須在頂層，不受條件影響 ──
   const initDir = row?.dir || 'O';
-  const [dir, setDir]           = useState(initDir);
+  const [dir, setDir]             = useState(initDir);
   const [routeInfo, setRouteInfo] = useState(null);
-  const [stops, setStops]       = useState([]);
-  const [etaMap, setEtaMap]     = useState({});
-  const [loading, setLoading]   = useState(true);
-  const [fare, setFare]         = useState(row?.fare ?? null);
+  const [stops, setStops]         = useState([]);
+  const [etaMap, setEtaMap]       = useState({});
+  const [loading, setLoading]     = useState(true);
+  const [fare, setFare]           = useState(row?.fare ?? null);
   const nearRef = useRef(null);
   const genRef  = useRef(0);
 
@@ -111,9 +120,9 @@ export default function RoutePage({ row }) {
   const nearStopId  = row?.stopId      || '';
   const rowDest     = row?.dest        || '';
 
-  const isCtb   = companyType === 'ctb';
+  const isCtb     = companyType === 'ctb';
   const isKmbLike = companyType === 'kmb' || companyType === 'joint';
-  const co      = CO[companyType] || CO.kmb;
+  const co        = CO[companyType] || CO.kmb;
 
   const loadAll = useCallback(async (d) => {
     if (!route) return;
@@ -121,22 +130,24 @@ export default function RoutePage({ row }) {
     setLoading(true); setStops([]); setEtaMap({});
 
     try {
-      // 1. 路線資料（起點/終點名稱）
+      // 1. 路線資料
       const info = isCtb
         ? await getCTBRouteInfo(route)
         : await getKMBRouteInfo(route, d, svcType);
       if (gen !== genRef.current) return;
       setRouteInfo(info);
 
-      // 2. 站序（stop IDs）
+      // 2. 站序 IDs
       const ids = isCtb
         ? await getCTBStopIds(route, d)
         : await getKMBStopIds(route, d, svcType);
       if (gen !== genRef.current) return;
 
-      // 3. 站名（從現有快取取得，避免重複 API 請求）
-      const cache   = isCtb ? await ensureCTBStops() : await fetchAllKMBStops();
-      const nameMap = new Map(cache.map(s => [s.stop, s.name_tc || s.name_en || s.stop]));
+      // 3. 站名
+      const nameMap = isCtb
+        ? await getCtbStopNames()
+        : new Map((await fetchAllKMBStops()).map(s => [s.stop, s.name_tc || s.name_en || s.stop]));
+
       const stopsArr = ids.map((sid, i) => ({
         stopId: sid, seq: i + 1, name: nameMap.get(sid) || sid,
       }));
@@ -145,10 +156,9 @@ export default function RoutePage({ row }) {
       setStops(stopsArr);
       setLoading(false);
 
-      // 自動捲動至最近站
       setTimeout(() => nearRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
 
-      // 4. 分批取得各站 ETA（每批 6 站，避免同時發太多請求）
+      // 4. 分批取得各站 ETA（每批 6 站）
       const BATCH = 6;
       for (let i = 0; i < stopsArr.length; i += BATCH) {
         if (gen !== genRef.current) return;
@@ -177,10 +187,7 @@ export default function RoutePage({ row }) {
 
   useEffect(() => { loadAll(dir); }, [dir]);
 
-  // ── 早期返回（MTR/LRT 不顯示站序）──
-  if (!row) {
-    return <div style={{ padding: 20, color: 'var(--dim)', fontSize: 13 }}>路線資料缺失</div>;
-  }
+  if (!row) return <div style={{ padding: 20, color: 'var(--dim)', fontSize: 13 }}>路線資料缺失</div>;
   if (companyType === 'mtr' || companyType === 'lrt') {
     return (
       <div style={{ padding: '40px 16px', textAlign: 'center' }}>
@@ -193,7 +200,6 @@ export default function RoutePage({ row }) {
     );
   }
 
-  // ── 計算起點 / 終點文字 ──
   let orig = '', destText = rowDest;
   if (routeInfo) {
     if (isCtb) {
@@ -213,8 +219,6 @@ export default function RoutePage({ row }) {
       {/* ── 路線 Header ── */}
       <div style={{ flexShrink: 0, paddingBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-
-          {/* 營辦商 badge */}
           <div style={{
             width: 52, height: 52, borderRadius: 12, flexShrink: 0,
             background: co.bg, border: `1px solid ${co.bdr}`,
@@ -225,7 +229,6 @@ export default function RoutePage({ row }) {
             <span style={{ fontSize: 9, color: co.col, opacity: .65 }}>{co.lbl}</span>
           </div>
 
-          {/* 路線資訊 */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: 13, fontWeight: 500, color: 'var(--txt)',
@@ -249,7 +252,6 @@ export default function RoutePage({ row }) {
             </div>
           </div>
 
-          {/* 方向切換 */}
           <div style={{
             display: 'flex', borderRadius: 8, overflow: 'hidden',
             border: '1px solid var(--bdr2)', flexShrink: 0,
@@ -281,7 +283,7 @@ export default function RoutePage({ row }) {
           const isFirst = i === 0;
           const isLast  = i === stops.length - 1;
           const isNear  = s.stopId === nearStopId;
-          const etas    = etaMap[s.stopId]; // undefined＝載入中, []＝無班次
+          const etas    = etaMap[s.stopId];
 
           return (
             <div
@@ -294,18 +296,11 @@ export default function RoutePage({ row }) {
                 transition: 'background .2s',
               }}
             >
-              {/* 時間線 */}
               <div style={{
                 width: 28, flexShrink: 0,
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
               }}>
-                {/* 上方連線 */}
-                <div style={{
-                  width: 2, flex: 1,
-                  background: isFirst ? 'transparent' : co.col,
-                  opacity: .35,
-                }} />
-                {/* 站點圓點 */}
+                <div style={{ width: 2, flex: 1, background: isFirst ? 'transparent' : co.col, opacity: .35 }} />
                 <div style={{
                   width:  isFirst || isLast ? 12 : isNear ? 11 : 8,
                   height: isFirst || isLast ? 12 : isNear ? 11 : 8,
@@ -314,15 +309,9 @@ export default function RoutePage({ row }) {
                   border: `2px solid ${co.col}`,
                   zIndex: 1,
                 }} />
-                {/* 下方連線 */}
-                <div style={{
-                  width: 2, flex: 1,
-                  background: isLast ? 'transparent' : co.col,
-                  opacity: .35,
-                }} />
+                <div style={{ width: 2, flex: 1, background: isLast ? 'transparent' : co.col, opacity: .35 }} />
               </div>
 
-              {/* 站點內容 */}
               <div style={{
                 flex: 1, padding: '9px 6px 9px 4px',
                 borderBottom: isLast ? 'none' : '0.5px solid var(--bdr)',
@@ -339,15 +328,12 @@ export default function RoutePage({ row }) {
                     <span style={{
                       fontSize: 9, padding: '1px 5px', borderRadius: 8,
                       background: co.col, color: '#fff', flexShrink: 0,
-                    }}>
-                      你在附近
-                    </span>
+                    }}>你在附近</span>
                   )}
                 </div>
                 <ETAPills etas={etas} />
               </div>
 
-              {/* 站序號 */}
               <div style={{
                 paddingTop: 11, paddingRight: 6,
                 fontSize: 10, color: 'var(--dim)',
