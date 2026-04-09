@@ -216,6 +216,9 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
 
   // CTB 合併與處理
   ctbRows.forEach(r => {
+    const isJointRouteNumber =
+      /^(1|3|6|9|N1|N3|N6|N9)/.test(r.route) ||
+      ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
     // 聯營路線檢測邏輯
     // 1. 先搵有無現成嘅九巴/龍運 key
     const matchKey =
@@ -237,8 +240,7 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
       // 聯營線規則：
       // 1xx, 3xx, 6xx, 9xx, N1xx, N3xx, N6xx, N9xx 是過海聯營線的主力
       // 還有一些特定的路線如 101-118, 170, 171, 182, 307, 601, 681 等
-      const isJointRoute = /^(1|3|6|9|N1|N3|N6|N9)/.test(r.route) || 
-                          ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
+      const isJointRoute = isJointRouteNumber;
       
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
@@ -248,6 +250,18 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
           companyType: isJointRoute ? 'joint' : 'ctb', 
           fare: null 
         });
+      }
+    }
+  });
+
+  // 若屬聯營路線，但附近只有九巴站，仍以「聯營」顯示，ETA 保留九巴時間
+  routeMap.forEach((v, k) => {
+    if (v.companyType === 'kmb') {
+      const isJointRouteNumber =
+        /^(1|3|6|9|N1|N3|N6|N9)/.test(v.route) ||
+        ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(v.route);
+      if (isJointRouteNumber) {
+        v.companyType = 'joint';
       }
     }
   });
