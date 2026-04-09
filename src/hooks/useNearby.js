@@ -72,7 +72,8 @@ export async function fetchAllKMBStops() {
 // ── KMB + LWB ETA ─────────────────────────────────────────
 // 同一 API (data.etabus.gov.hk)，e.co 欄位區分九巴/龍運
 async function fetchKMBLWBEtas(nearby, now) {
-  const stops = nearby.filter(s => s.co === 'kmb').slice(0, 20);
+  // 修正：同時接收 kmb 同 lwb 嘅站點
+  const stops = nearby.filter(s => s.co === 'kmb' || s.co === 'lwb').slice(0, 20);
   if (!stops.length) return new Map();
   const results = await Promise.all(
     stops.map(s =>
@@ -93,7 +94,7 @@ async function fetchKMBLWBEtas(nearby, now) {
         routeMap.set(key, {
           route: e.route, dest: e.dest_tc || '',
           stopName: stop.n, stopId: stop.id,
-          stopLat: stop.lat, stopLng: stop.lng, // 供地圖標記
+          stopLat: stop.lat, stopLng: stop.lng,
           dist: Math.round(stop.dist),
           serviceType: e.service_type || '1', dir: e.dir,
           companyType: co,
@@ -112,7 +113,8 @@ async function fetchKMBLWBEtas(nearby, now) {
 // ── CTB ETA ───────────────────────────────────────────────
 // stops.json 已有 CTB 座標，直接取 ETA
 async function fetchCTBEtas(nearby, now) {
-  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 8);
+  // 修正：增加掃描站點數量由 8 個到 15 個
+  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 15);
   if (!stops.length) return [];
   const results = [];
   await Promise.all(stops.map(async stop => {
@@ -211,23 +213,39 @@ async function fetchLRTEtas(nearby) {
 async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   const routeMap = new Map(kmbMap);
 
-  // CTB 合併：同路線 KMB 改為 joint
+  // CTB 合併與處理
   ctbRows.forEach(r => {
+    // 聯營路線檢測邏輯
+    // 1. 先搵有無現成嘅九巴/龍運 key
     const matchKey =
       routeMap.has(`${r.route}_O_kmb`) ? `${r.route}_O_kmb` :
       routeMap.has(`${r.route}_I_kmb`) ? `${r.route}_I_kmb` :
-      routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` : null;
+      routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` : 
+      routeMap.has(`${r.route}_I_lwb`) ? `${r.route}_I_lwb` : null;
+
     if (matchKey) {
+      // 如果已經有九巴，就合併變做 joint
       const ex = routeMap.get(matchKey);
       ex.companyType = 'joint';
       r.etasWithType.forEach(e => {
-        if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === e.ts))
+        if (ex.etasWithType.length < 5 && !ex.etasWithType.find(x => x.ts === e.ts))
           ex.etasWithType.push(e);
       });
       ex.etasWithType.sort((a, b) => a.ts - b.ts);
     } else {
-      const k = `${r.route}_CTB_${r.stopId}`;
-      if (!routeMap.has(k)) routeMap.set(k, { ...r, serviceType: '1', companyType: 'ctb', fare: null });
+      // 如果附近無九巴站，但係聯營線（例如過海線 1xx, 6xx, 9xx）
+      // 或者係純城巴線，就直接加落去
+      const isJointRoute = /^(1|6|9|101|102|103|104|106|107|111|112|113|115|116|117|118|170|171|182|307|601|603|606|619|671|680|681|690|904|905|914|930|948|960|961|962|967|968|969|970|971|973|978|980|981|982|985)/.test(r.route);
+      
+      const k = `${r.route}_${r.dir}_ctb`;
+      if (!routeMap.has(k)) {
+        routeMap.set(k, { 
+          ...r, 
+          serviceType: '1', 
+          companyType: isJointRoute ? 'joint' : 'ctb', 
+          fare: null 
+        });
+      }
     }
   });
 
