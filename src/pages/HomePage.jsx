@@ -3,7 +3,7 @@ import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.js
 import { useWeather } from '../hooks/useWeather.js';
 import { useGeolocation } from '../hooks/useGeolocation.js';
 import { useNearby, incrementRouteUsage, fetchAllKMBStops } from '../hooks/useNearby.js';
-import { KMB } from '../constants/transport.js';
+import { KMB, CTB } from '../constants/transport.js';
 import { RHRREAD_STNS } from '../constants/weather.js';
 import { nearestOf } from '../utils/geo.js';
 import { fetchKMBFare } from '../utils/fare.js';
@@ -79,18 +79,62 @@ export default function HomePage({ openDrawer, showToast }) {
   }, [nearbyDist]);
 
   // ── Favs ──────────────────────────────────────────────────
+  const fetchFavEtas = useCallback(async (fav, now) => {
+    const favType = (fav.type || 'kmb').toLowerCase();
+
+    const loadKmbLike = async () => {
+      const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
+      const etas = (d.data || [])
+        .filter(e => e.eta)
+        .map(e => ({
+          ts: new Date(e.eta).getTime(),
+          type: (e.co || '').toUpperCase() === 'LWB' ? 'lwb' : 'kmb',
+        }))
+        .filter(e => e.ts > now - 30000)
+        .sort((a, b) => a.ts - b.ts)
+        .slice(0, 3);
+      const hasKmb = etas.some(e => e.type === 'kmb');
+      const hasLwb = etas.some(e => e.type === 'lwb');
+      const companyType = hasKmb && hasLwb ? 'joint' : hasLwb ? 'lwb' : 'kmb';
+      return { etasWithType: etas, companyType };
+    };
+
+    const loadCtb = async () => {
+      const d = await fetch(`${CTB}/eta/CTB/${fav.stopId}/${fav.route}`).then(r => r.json());
+      const etas = (d.data || [])
+        .filter(e => e.eta)
+        .map(e => ({ ts: new Date(e.eta).getTime(), type: 'ctb' }))
+        .filter(e => e.ts > now - 30000)
+        .sort((a, b) => a.ts - b.ts)
+        .slice(0, 3);
+      return { etasWithType: etas, companyType: 'ctb' };
+    };
+
+    if (favType === 'ctb') return loadCtb();
+    if (favType === 'joint') {
+      const [kmbRes, ctbRes] = await Promise.allSettled([loadKmbLike(), loadCtb()]);
+      const kmbEtas = kmbRes.status === 'fulfilled' ? kmbRes.value.etasWithType : [];
+      const ctbEtas = ctbRes.status === 'fulfilled' ? ctbRes.value.etasWithType : [];
+      const merged = [...kmbEtas, ...ctbEtas]
+        .filter(e => e.ts > now - 30000)
+        .sort((a, b) => a.ts - b.ts)
+        .slice(0, 3);
+      const hasKmbLike = merged.some(e => e.type === 'kmb' || e.type === 'lwb');
+      const hasCtb = merged.some(e => e.type === 'ctb');
+      const companyType = hasKmbLike && hasCtb ? 'joint' : hasCtb ? 'ctb' : 'kmb';
+      return { etasWithType: merged, companyType };
+    }
+    return loadKmbLike();
+  }, []);
+
   const _refreshFavs = useCallback(async () => {
     const favList = loadFavs(activePid);
     if (!favList.length) { setFavRows([]); return; }
     const now = Date.now();
     const results = await Promise.all(favList.map(async fav => {
       try {
-        const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
-        const etas = (d.data || []).filter(e => e.eta)
-          .slice(0, 3)
-          .map(e => new Date(e.eta).getTime())
-          .filter(ts => ts > now - 30000);
-        return { ...fav, etasWithType: etas.map(ts => ({ ts, type: fav.type || 'kmb' })), companyType: fav.type || 'kmb', fare: null };
+        const { etasWithType, companyType } = await fetchFavEtas(fav, now);
+        return { ...fav, etasWithType, companyType, fare: null };
       } catch {
         return { ...fav, etasWithType: [], companyType: fav.type || 'kmb', fare: null };
       }
@@ -102,7 +146,7 @@ export default function HomePage({ openDrawer, showToast }) {
       const fare = await fetchKMBFare(r.route, 'O', r.serviceType).catch(() => null);
       if (fare != null) setFavRows(prev => prev.map((row, j) => j === i ? { ...row, fare } : row));
     });
-  }, [activePid]);
+  }, [activePid, fetchFavEtas]);
 
   const removeFav = useCallback((idx) => {
     const favList = loadFavs(activePid);

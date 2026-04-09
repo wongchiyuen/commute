@@ -5,8 +5,8 @@
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
 
-# manifest.json：短快取
-/manifest.json
+# manifest.webmanifest：短快取
+/manifest.webmanifest
   Cache-Control: public, max-age=3600
 
 # index.html：不快取（確保最新版本）

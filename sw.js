@@ -11,7 +11,7 @@
 // ╚══════════════════════════════════════════════════════════╝
 
 const CACHE = 'swd-v1';
-const SHELL = ['/', '/index.html', '/manifest.json'];
+const SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 // ── TTL（毫秒）────────────────────────────────────────────
 const TTL = {
@@ -182,7 +182,7 @@ self.addEventListener('push', e => {
 
   const opts = {
     body: data.body || '',
-    icon: data.icon || '/manifest.json',
+    icon: data.icon || '/icon-192.png',
     badge: data.badge || '',
     tag: data.tag || 'swd-warn',
     renotify: true,
