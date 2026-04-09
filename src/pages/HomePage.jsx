@@ -80,7 +80,8 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // ── Favs ──────────────────────────────────────────────────
   const fetchFavEtas = useCallback(async (fav, now) => {
-    const favType = (fav.type || 'kmb').toLowerCase();
+    const favType = (fav.type || '').toLowerCase();
+    const isKnownType = ['kmb', 'lwb', 'ctb', 'joint'].includes(favType);
 
     const loadKmbLike = async () => {
       const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
@@ -124,6 +125,23 @@ export default function HomePage({ openDrawer, showToast }) {
       const companyType = hasKmbLike && hasCtb ? 'joint' : hasCtb ? 'ctb' : 'kmb';
       return { etasWithType: merged, companyType };
     }
+
+    // 舊資料可能沒有 type：並行探測 KMB/CTB，避免誤判導致城巴永遠空白
+    if (!isKnownType) {
+      const [kmbRes, ctbRes] = await Promise.allSettled([loadKmbLike(), loadCtb()]);
+      const kmbEtas = kmbRes.status === 'fulfilled' ? kmbRes.value.etasWithType : [];
+      const ctbEtas = ctbRes.status === 'fulfilled' ? ctbRes.value.etasWithType : [];
+      const merged = [...kmbEtas, ...ctbEtas]
+        .filter(e => e.ts > now - 30000)
+        .sort((a, b) => a.ts - b.ts)
+        .slice(0, 3);
+      if (!merged.length) return { etasWithType: [], companyType: 'kmb' };
+      const hasKmbLike = merged.some(e => e.type === 'kmb' || e.type === 'lwb');
+      const hasCtb = merged.some(e => e.type === 'ctb');
+      const companyType = hasKmbLike && hasCtb ? 'joint' : hasCtb ? 'ctb' : 'kmb';
+      return { etasWithType: merged, companyType };
+    }
+
     return loadKmbLike();
   }, []);
 

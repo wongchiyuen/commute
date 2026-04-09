@@ -79,6 +79,15 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .bcv2-route-no{font-family:var(--mono);font-weight:700;color:var(--amb2);letter-spacing:-1px;line-height:1;text-align:center;white-space:nowrap;overflow:hidden}
 .bcv2-co-name{font-size:9px;color:var(--mid);margin-top:3px;line-height:1.4;text-align:center;white-space:nowrap}
 .bcv2-mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:9px 6px 9px 10px}
+.bcv2-meta-row{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.bcv2-dir-pill{font-size:9px;padding:1px 6px;border-radius:999px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid);line-height:1.45}
+.bcv2-status-pill{font-size:9px;padding:1px 6px;border-radius:999px;line-height:1.45}
+.bcv2-status-pill.none{background:var(--bg3);border:1px solid var(--bdr2);color:var(--mid)}
+.bcv2-status-pill.soon{background:rgba(255,71,87,.14);border:1px solid rgba(255,71,87,.35);color:var(--red)}
+.bcv2-status-pill.coming{background:rgba(240,165,0,.12);border:1px solid var(--amb-bdr);color:var(--amb2)}
+.bcv2-status-pill.ok{background:rgba(46,213,115,.12);border:1px solid rgba(46,213,115,.33);color:var(--grn)}
+.bcv2-dirpair{font-size:10px;color:var(--dim);margin-bottom:3px;display:flex;align-items:center;gap:5px}
+.bcv2-dirpair-sep{opacity:.55}
 .bcv2-dest-lbl{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;color:var(--bright)}
 .bcv2-stop-lbl{font-size:11px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bcv2-etas{display:flex;flex-direction:column;justify-content:center;padding:7px 10px 7px 2px;flex-shrink:0;gap:2px;min-width:118px}

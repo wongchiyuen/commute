@@ -235,6 +235,23 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   lrtRows.forEach((r, i) => routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`, r));
 
   let allRows = [...routeMap.values()].filter(r => r.etasWithType?.length > 0);
+  const pairIndex = new Map();
+  allRows.forEach((r, idx) => {
+    if (!['kmb', 'lwb', 'ctb', 'joint'].includes(r.companyType)) return;
+    const groupKey = `${r.route}_${r.companyType}`;
+    if (!pairIndex.has(groupKey)) pairIndex.set(groupKey, { O: null, I: null });
+    const d = r.dir === 'I' ? 'I' : 'O';
+    const firstTs = r.etasWithType?.[0]?.ts || null;
+    const rec = pairIndex.get(groupKey);
+    if (!rec[d] || (firstTs && firstTs < rec[d].ts)) rec[d] = { ts: firstTs, idx };
+  });
+  pairIndex.forEach((rec) => {
+    if (!rec.O || !rec.I) return;
+    const oRow = allRows[rec.O.idx];
+    const iRow = allRows[rec.I.idx];
+    oRow.dirPair = { O: rec.O.ts, I: rec.I.ts };
+    iRow.dirPair = { O: rec.O.ts, I: rec.I.ts };
+  });
   const usage = await getRouteUsage();
   const now = Date.now();
   allRows.sort((a, b) => {
