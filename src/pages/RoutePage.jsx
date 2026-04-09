@@ -201,59 +201,83 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
 
   // ── 路線地圖 ─────────────────────────────────────────────
   useEffect(() => {
-    if (!mapView || !mapElRef.current || !stops.length) return;
+    let timer = null;
+
+    if (!mapView || !mapElRef.current || !stops.length) {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+      return;
+    }
+
     const L = window.L;
     if (!L) return;
 
-    if (!leafletMapRef.current) {
-      const map = L.map(mapElRef.current, { 
-        zoomControl: false, 
-        attributionControl: false 
-      }).setView([22.3193, 114.1694], 13);
+    try {
+      if (!leafletMapRef.current) {
+        const map = L.map(mapElRef.current, { 
+          zoomControl: false, 
+          attributionControl: false 
+        }).setView([22.3193, 114.1694], 13);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+        }).addTo(map);
+        
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        leafletMapRef.current = map;
+      }
+
+      const map = leafletMapRef.current;
       
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-      }).addTo(map);
-      
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-      leafletMapRef.current = map;
-    }
+      timer = setTimeout(() => {
+        if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+      }, 100);
 
-    const map = leafletMapRef.current;
-    // 清除現有標記
-    map.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
-
-    const points = [];
-    stops.forEach((s, i) => {
-      if (!s.lat || !s.lng) return;
-      const pos = [Number(s.lat), Number(s.lng)];
-      points.push(pos);
-
-      const isFirst = i === 0;
-      const isLast = i === stops.length - 1;
-      const isNear = s.stopId === nearStopId;
-
-      const icon = L.divIcon({
-        className: 'custom-stop-icon',
-        html: `<div class="stop-marker-inner ${isNear ? 'near' : ''}" style="background: ${isNear ? 'var(--amb)' : co.col}; width: ${isFirst || isLast || isNear ? '24px' : '12px'}; height: ${isFirst || isLast || isNear ? '24px' : '12px'}; border-width: ${isNear ? '3px' : '2px'}">
-                ${isFirst ? '起' : isLast ? '終' : ''}
-               </div>`,
-        iconSize: isFirst || isLast || isNear ? [24, 24] : [12, 12],
-        iconAnchor: isFirst || isLast || isNear ? [12, 12] : [6, 6],
+      // 清除現有標記
+      map.eachLayer(l => { 
+        if (l instanceof L.Marker || l instanceof L.Polyline || l instanceof L.CircleMarker) {
+          map.removeLayer(l); 
+        }
       });
 
-      const etas = etaMap[s.stopId];
-      const etaTxt = etas?.length ? Math.round((etas[0] - Date.now()) / 60000) + ' 分' : '…';
+      const points = [];
+      stops.forEach((s, i) => {
+        if (!s.lat || !s.lng) return;
+        const pos = [Number(s.lat), Number(s.lng)];
+        points.push(pos);
 
-      L.marker(pos, { icon }).bindPopup(`<b>${s.seq}. ${s.name}</b><br/>下一班：${etaTxt}`).addTo(map);
-    });
+        const isFirst = i === 0;
+        const isLast = i === stops.length - 1;
+        const isNear = s.stopId === nearStopId;
 
-    if (points.length > 1) {
-      L.polyline(points, { color: co.col, weight: 4, opacity: 0.8, lineJoin: 'round' }).addTo(map);
-      map.fitBounds(points, { padding: [40, 40] });
+        const icon = L.divIcon({
+          className: 'custom-stop-icon',
+          html: `<div class="stop-marker-inner ${isNear ? 'near' : ''}" style="background: ${isNear ? 'var(--amb)' : co.col}; width: ${isFirst || isLast || isNear ? '24px' : '12px'}; height: ${isFirst || isLast || isNear ? '24px' : '12px'}; border-width: ${isNear ? '3px' : '2px'}">
+                  ${isFirst ? '起' : isLast ? '終' : ''}
+                 </div>`,
+          iconSize: isFirst || isLast || isNear ? [24, 24] : [12, 12],
+          iconAnchor: isFirst || isLast || isNear ? [12, 12] : [6, 6],
+        });
+
+        const etas = etaMap[s.stopId];
+        const etaTxt = etas?.length ? Math.round((etas[0] - Date.now()) / 60000) + ' 分' : '…';
+
+        L.marker(pos, { icon }).bindPopup(`<b>${s.seq}. ${s.name || '未知站點'}</b><br/>下一班：${etaTxt}`).addTo(map);
+      });
+
+      if (points.length > 1) {
+        L.polyline(points, { color: co.col, weight: 4, opacity: 0.8, lineJoin: 'round' }).addTo(map);
+        map.fitBounds(points, { padding: [40, 40] });
+      }
+    } catch (err) {
+      console.error('Route Map error:', err);
     }
 
-    setTimeout(() => map.invalidateSize(), 100);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [mapView, stops, etaMap, co.col, nearStopId]);
 
   if (!row) return <div style={{ padding: 20, color: 'var(--dim)', fontSize: 13 }}>路線資料缺失</div>;

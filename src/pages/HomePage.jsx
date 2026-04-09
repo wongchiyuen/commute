@@ -85,107 +85,114 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // ── Nearby map（Leaflet）──────────────────────────────────
   useEffect(() => {
-    if (!isNearby || !mapView) return;
-    if (!mapElRef.current) return;
+    let mapInstance = null;
+    let timer = null;
+
+    if (!isNearby || !mapView || !mapElRef.current) {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markerLayerRef.current = null;
+      }
+      return;
+    }
+
     const L = window.L;
     if (!L) return;
 
-    // 首次建立地圖
-    if (!leafletMapRef.current) {
-      const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
-      const map = L.map(mapElRef.current, { 
-        zoomControl: false, 
-        attributionControl: false 
-      }).setView(center, gpsCoords ? 15 : 11);
-      
-      // 使用更現代、更暗色調的雲地圖
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-      }).addTo(map);
-      
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-      leafletMapRef.current = map;
-      markerLayerRef.current = L.layerGroup().addTo(map);
-    }
+    try {
+      // 首次建立地圖
+      if (!leafletMapRef.current) {
+        const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
+        mapInstance = L.map(mapElRef.current, { 
+          zoomControl: false, 
+          attributionControl: false 
+        }).setView(center, gpsCoords ? 15 : 11);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+        }).addTo(mapInstance);
+        
+        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+        leafletMapRef.current = mapInstance;
+        markerLayerRef.current = L.layerGroup().addTo(mapInstance);
+      }
 
-    const map = leafletMapRef.current;
-    const layer = markerLayerRef.current;
-    if (!map || !layer) return;
+      const map = leafletMapRef.current;
+      const layer = markerLayerRef.current;
+      if (!map || !layer) return;
 
-    // 切換到地圖模式後需重算尺寸，否則會白格/不可拖動
-    setTimeout(() => map.invalidateSize(), 60);
+      // 每次重新進入地圖或容器改變時都要重算尺寸
+      timer = setTimeout(() => {
+        if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+      }, 100);
 
-    // 清舊 marker
-    layer.clearLayers();
+      // 清舊 marker
+      layer.clearLayers();
 
-    const points = [];
-    if (gpsCoords) {
-      points.push([gpsCoords.lat, gpsCoords.lng]);
-      // 更好看的人位置標記
-      L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
-        radius: 8, color: '#fff', weight: 2, fillColor: '#007bff', fillOpacity: 0.9,
-      }).addTo(layer);
-      L.circle([gpsCoords.lat, gpsCoords.lng], {
-        radius: nearbyDist, color: '#007bff', weight: 1, fillColor: '#007bff', fillOpacity: 0.05, dashArray: '5, 5'
-      }).addTo(layer);
-    }
+      const points = [];
+      if (gpsCoords) {
+        points.push([gpsCoords.lat, gpsCoords.lng]);
+        L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
+          radius: 8, color: '#fff', weight: 2, fillColor: '#007bff', fillOpacity: 0.9,
+        }).addTo(layer);
+        L.circle([gpsCoords.lat, gpsCoords.lng], {
+          radius: nearbyDist, color: '#007bff', weight: 1, fillColor: '#007bff', fillOpacity: 0.05, dashArray: '5, 5'
+        }).addTo(layer);
+      }
 
-    // 取每個 stop 第一筆路線作 marker，避免重覆太多點
-    const stopMap = new Map();
-    (nearbyHook.rows || []).forEach(r => {
-      if (!r?.stopLat || !r?.stopLng || !r?.stopId) return;
-      if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
-      stopMap.get(r.stopId).push(r);
-    });
-
-    stopMap.forEach((routes, stopId) => {
-      const r = routes[0];
-      const lat = Number(r.stopLat);
-      const lng = Number(r.stopLng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-      points.push([lat, lng]);
-
-      // 製作包含路線編號的自訂標記
-      const routeLabels = routes.slice(0, 3).map(x => x.route).join(', ');
-      const moreCount = routes.length > 3 ? ` +${routes.length - 3}` : '';
-      
-      const icon = L.divIcon({
-        className: 'custom-stop-icon',
-        html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">
-                ${r.route}
-               </div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+      // 取每個 stop 第一筆路線作 marker
+      const stopMap = new Map();
+      (nearbyHook.rows || []).forEach(r => {
+        if (!r?.stopLat || !r?.stopLng || !r?.stopId) return;
+        if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
+        stopMap.get(r.stopId).push(r);
       });
 
-      const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
-      const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta} 分`;
-      
-      const popupContent = `
-        <div class="map-popup">
-          <div class="map-popup-title">${r.stopName}</div>
-          <div class="map-popup-routes">${routes.map(x => `<b>${x.route}</b>`).join(' ')}</div>
-          <div class="map-popup-eta">下一班：${etaTxt}</div>
-        </div>
-      `;
+      stopMap.forEach((routes, stopId) => {
+        const r = routes[0];
+        const lat = Number(r.stopLat);
+        const lng = Number(r.stopLng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        points.push([lat, lng]);
 
-      L.marker([lat, lng], { icon }).bindPopup(popupContent).addTo(layer);
-    });
+        const icon = L.divIcon({
+          className: 'custom-stop-icon',
+          html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">
+                  ${r.route || ''}
+                 </div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
 
-    // 自動框住目前可用點位
-    if (points.length > 1) map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
-    else if (points.length === 1) map.setView(points[0], 15);
-  }, [isNearby, mapView, gpsCoords, nearbyHook.rows]);
+        const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
+        const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta} 分`;
+        
+        const popupContent = `
+          <div class="map-popup">
+            <div class="map-popup-title">${r.stopName || '未知站點'}</div>
+            <div class="map-popup-routes">${routes.map(x => `<b>${x.route || ''}</b>`).join(' ')}</div>
+            <div class="map-popup-eta">下一班：${etaTxt}</div>
+          </div>
+        `;
 
-  useEffect(() => {
-    if (isNearby) return;
-    if (leafletMapRef.current) {
-      leafletMapRef.current.remove();
-      leafletMapRef.current = null;
-      markerLayerRef.current = null;
+        L.marker([lat, lng], { icon }).bindPopup(popupContent).addTo(layer);
+      });
+
+      if (points.length > 1) map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
+      else if (points.length === 1) map.setView(points[0], 15);
+    } catch (err) {
+      console.error('Map error:', err);
     }
-  }, [isNearby]);
 
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isNearby, mapView, gpsCoords, nearbyHook.rows, nearbyDist]);
+
+  // 移除舊有的 [isNearby] 清理 effect，因為上面已經整合咗
+  // (即係刪除原本 157-164 行嘅 useEffect)
+  
   // ── Favs ──────────────────────────────────────────────────
   const fetchFavEtas = useCallback(async (fav, now) => {
     const favType = (fav.type || '').toLowerCase();
