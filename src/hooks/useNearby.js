@@ -210,15 +210,33 @@ async function fetchLRTEtas(nearby) {
   return results;
 }
 
+// ── 聯營路線名單（排除已非聯營的 968, 978, 108 等） ───────────────
+const JOINT_ROUTES = new Set([
+  '101','102','103','104','106','107','109','110','111','112','113','115','116','117','118','170','171','182',
+  '301','307','373','601','606','608','619','621','641','671','678','680','681','690','694',
+  '904','905','914','930','948','962','967','969','970','971','973','980','981','982','985',
+  'N118','N121','N122','N170','N171','N182','N307','N368','N373','N619','N680','N691','N930','N952','N960','N962','N969'
+]);
+
+function isJointRoute(route) {
+  if (JOINT_ROUTES.has(route)) return true;
+  // 過海聯營線主力：1xx, 6xx, 9xx (排除已知純九巴或純城巴路線)
+  if (/^(1|6|9)\d{2}/.test(route)) {
+    const kmbOnly = ['108', '603', '613', '673', '681', '934', '935', '936', '960', '961', '968', '978'];
+    const ctbOnly = ['608', '629', '952', '962', '967', '969', '976', '979', '986', '987', '988', '989'];
+    if (kmbOnly.includes(route) || ctbOnly.includes(route)) return false;
+    return true;
+  }
+  return false;
+}
+
 // ── 合併、排序、車費 ──────────────────────────────────────
 async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   const routeMap = new Map(kmbMap);
 
   // CTB 合併與處理
   ctbRows.forEach(r => {
-    const isJointRouteNumber =
-      /^(1|3|6|9|N1|N3|N6|N9)/.test(r.route) ||
-      ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
+    const isJoint = isJointRoute(r.route);
     // 聯營路線檢測邏輯
     // 1. 先搵有無現成嘅九巴/龍運 key
     const matchKey =
@@ -237,17 +255,12 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
       });
       ex.etasWithType.sort((a, b) => a.ts - b.ts);
     } else {
-      // 聯營線規則修正：必須是 3 位數字且開頭為 1, 6, 9，或者以 N1, N6, N9 開頭
-      // 或者在特定的聯營清單中
-      const isJointRouteNumber = /^(1|6|9)\d{2}|^(N1|N6|N9)\d{2}/.test(r.route) || 
-                          ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','301','307','373','601','603','606','613','619','621','641','671','673','678','680','681','690','694','904','905','914','930','934','935','936','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
-      
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
         routeMap.set(k, { 
           ...r, 
           serviceType: '1', 
-          companyType: isJointRouteNumber ? 'joint' : 'ctb', 
+          companyType: isJoint ? 'joint' : 'ctb', 
           fare: null 
         });
       }
@@ -257,10 +270,7 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   // 若屬聯營路線，但附近只有九巴站，仍以「聯營」顯示，ETA 保留九巴時間
   routeMap.forEach((v, k) => {
     if (v.companyType === 'kmb') {
-      const isJointRouteNumber =
-        /^(1|3|6|9|N1|N3|N6|N9)/.test(v.route) ||
-        ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','307','601','603','606','619','671','680','681','690','904','905','914','930','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(v.route);
-      if (isJointRouteNumber) {
+      if (isJointRoute(v.route)) {
         v.companyType = 'joint';
       }
     }

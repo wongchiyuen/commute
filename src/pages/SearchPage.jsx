@@ -1,25 +1,49 @@
-import { useState } from 'react';
-import { KMB, CTB } from '../constants/transport.js';
+import { useState, useMemo } from 'react';
+import { KMB, CTB, MTR_LINE, MTR_STNS } from '../constants/transport.js';
+import { LRT_STNS, LRT_ROUTES_DATA } from '../constants/lrt.js';
 import { Spinner } from '../components/Overlay.jsx';
 import { useApp } from '../context/AppContext.jsx';
 
 // 營辦商色彩（與 RoutePage / BusCard 一致）
-const CO_COL  = { kmb: '#D85A30', ctb: '#0F6E56', joint: '#D85A30' };
-const CO_BG   = { kmb: 'rgba(216,90,48,.1)', ctb: 'rgba(29,158,117,.1)', joint: 'rgba(216,90,48,.1)' };
-const CO_LBL  = { kmb: '九巴', ctb: '城巴', joint: '九巴+城巴' };
+const CO_COL  = { kmb: '#D85A30', lwb: '#ff9f43', ctb: '#0F6E56', joint: '#7ba8ff', mtr: '#185FA5', lrt: '#BA7517' };
+const CO_BG   = { kmb: 'rgba(216,90,48,.1)', lwb: 'rgba(255,159,67,.1)', ctb: 'rgba(29,158,117,.1)', joint: 'rgba(123,168,255,.1)', mtr: 'rgba(24,95,165,.1)', lrt: 'rgba(186,117,23,.1)' };
+const CO_LBL  = { kmb: '九巴', lwb: '龍運', ctb: '城巴', joint: '九巴+城巴', mtr: '港鐵', lrt: '輕鐵' };
+
+// ── 聯營路線名單（排除已非聯營的 968, 978, 108 等） ───────────────
+const JOINT_ROUTES = new Set([
+  '101','102','103','104','106','107','109','110','111','112','113','115','116','117','118','170','171','182',
+  '301','307','373','601','606','608','619','621','641','671','678','680','681','690','694',
+  '904','905','914','930','948','962','967','969','970','971','973','980','981','982','985',
+  'N118','N121','N122','N170','N171','N182','N307','N368','N373','N619','N680','N691','N930','N952','N960','N962','N969'
+]);
+
+function isJointRoute(route) {
+  if (JOINT_ROUTES.has(route)) return true;
+  // 過海聯營線主力：1xx, 6xx, 9xx (排除已知純九巴或純城巴路線)
+  if (/^(1|6|9)\d{2}/.test(route)) {
+    const kmbOnly = ['108', '603', '613', '673', '681', '934', '935', '936', '960', '961', '968', '978'];
+    const ctbOnly = ['608', '629', '952', '962', '967', '969', '976', '979', '986', '987', '988', '989'];
+    if (kmbOnly.includes(route) || ctbOnly.includes(route)) return false;
+    return true;
+  }
+  return false;
+}
 
 export default function SearchPage({ isActive, openDrawer }) {
-  const { addRouteTargetPid } = useApp();
+  const { addRouteTargetPid, transportSettings } = useApp();
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // 判斷是否為龍運路線 (A, E, S, NA, R 等開頭)
+  const isLWB = (route) => /^(A|E|S|NA)\d/.test(route) || ['R8', 'R33', 'R42', 'N30', 'N31', 'N42', 'N64'].includes(route);
 
   const doSearch = async () => {
     const q = query.trim().toUpperCase();
     if (!q) return;
     setLoading(true); setResults(null);
     try {
-      // 同時搜尋 KMB + CTB
+      // 1. 同時搜尋 KMB + CTB
       const [kmbData, ctbData] = await Promise.allSettled([
         fetch(`${KMB}/route/`).then(r => r.json()),
         fetch(`${CTB}/route/CTB/`).then(r => r.json()),
@@ -30,51 +54,147 @@ export default function SearchPage({ isActive, openDrawer }) {
           r.route === q || r.route.startsWith(q) ||
           r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
         )
-        .map(r => ({ ...r, _co: 'kmb' }));
+        .map(r => ({ 
+          ...r, 
+          _co: isLWB(r.route) ? 'lwb' : (isJointRoute(r.route) ? 'joint' : 'kmb'),
+          _type: 'bus'
+        }));
 
       const ctbRoutes = (ctbData.status === 'fulfilled' ? ctbData.value.data || [] : [])
         .filter(r =>
           r.route === q || r.route.startsWith(q) ||
           r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
         )
-        .map(r => ({ ...r, _co: 'ctb' }));
+        .map(r => ({ 
+          ...r, 
+          _co: isJointRoute(r.route) ? 'joint' : 'ctb', 
+          _type: 'bus' 
+        }));
 
-      // 合拼：KMB+CTB 同路線號標示為 joint
-      const kmbSet = new Set(kmbRoutes.map(r => r.route));
-      const ctbSet = new Set(ctbRoutes.map(r => r.route));
-      const marked = [
-        ...kmbRoutes.map(r => ({ ...r, _co: ctbSet.has(r.route) ? 'joint' : 'kmb' })),
-        ...ctbRoutes.filter(r => !kmbSet.has(r.route)),
-      ];
+      // 合拼：避免重複顯示
+      const busResults = [];
+      const processedRoutes = new Map(); // route -> co
+
+      kmbRoutes.forEach(r => {
+        busResults.push(r);
+        processedRoutes.set(r.route, r._co);
+      });
+
+      ctbRoutes.forEach(r => {
+        if (!processedRoutes.has(r.route)) {
+          busResults.push(r);
+        } else if (processedRoutes.get(r.route) !== 'joint' && isJointRoute(r.route)) {
+          // 如果 KMB 沒標為 joint 但 CTB 標了（理論上不會發生，保險起見）
+          const idx = busResults.findIndex(x => x.route === r.route);
+          if (idx !== -1) busResults[idx]._co = 'joint';
+        }
+      });
+
+      // 2. MTR 搜尋 (如果設定中開啟了)
+      let mtrResults = [];
+      if (transportSettings.mtr) {
+        // 搜尋車站
+        const stnMatches = MTR_STNS.filter(s => s.n.includes(query) || query.includes(s.n))
+          .map(s => ({
+            route: s.n,
+            dest_tc: s.lines.map(l => MTR_LINE[l]).join(', '),
+            orig_tc: '港鐵站',
+            _co: 'mtr',
+            _type: 'mtr_stn',
+            _data: s
+          }));
+        
+        // 搜尋綫路
+        const lineMatches = Object.entries(MTR_LINE)
+          .filter(([id, name]) => name.includes(query) || id === q)
+          .map(([id, name]) => ({
+            route: name,
+            dest_tc: id,
+            orig_tc: '港鐵綫',
+            _co: 'mtr',
+            _type: 'mtr_line',
+            _id: id
+          }));
+        
+        mtrResults = [...stnMatches, ...lineMatches];
+      }
+
+      // 3. LRT 搜尋 (如果設定中開啟了)
+      let lrtResults = [];
+      if (transportSettings.lrt) {
+        // 搜尋路線
+        const routeMatches = Object.entries(LRT_ROUTES_DATA)
+          .filter(([no, data]) => no === q || data.desc.includes(query))
+          .map(([no, data]) => ({
+            route: no,
+            dest_tc: data.to,
+            orig_tc: data.from,
+            _co: 'lrt',
+            _type: 'lrt_route',
+            _data: data
+          }));
+        
+        // 搜尋車站
+        const stnMatches = LRT_STNS.filter(s => s.n.includes(query))
+          .map(s => ({
+            route: s.n,
+            dest_tc: '輕鐵站',
+            orig_tc: `編號: ${s.id}`,
+            _co: 'lrt',
+            _type: 'lrt_stn',
+            _id: s.id
+          }));
+        
+        lrtResults = [...routeMatches, ...stnMatches];
+      }
+
+      const allResults = [...busResults, ...mtrResults, ...lrtResults];
 
       // 排序：完全符合優先，再按字母
-      marked.sort((a, b) => {
+      allResults.sort((a, b) => {
         const aExact = a.route === q ? 0 : 1;
         const bExact = b.route === q ? 0 : 1;
         if (aExact !== bExact) return aExact - bExact;
         return a.route.localeCompare(b.route);
       });
 
-      setResults(marked);
-    } catch { setResults([]); }
+      setResults(allResults);
+    } catch (e) { 
+      console.error('Search error:', e);
+      setResults([]); 
+    }
     setLoading(false);
   };
 
   // 點擊路線 → 開路線詳情 drawer
   const openRoute = (r) => {
     if (!openDrawer) return;
-    const dir = r.bound || r.direction || 'O';  // KMB 用 bound，CTB 用 direction
-    const row = {
-      route:       r.route,
-      dest:        r.dest_tc || '',
-      companyType: r._co || 'kmb',
-      dir:         dir === 'I' || dir === 'inbound' ? 'I' : 'O',
-      serviceType: r.service_type || '1',
-      stopId:      null,   // 搜尋不帶特定站，不高亮
-      targetPid:   addRouteTargetPid || null,
-      fare:        null,
-    };
-    openDrawer(`${r.route} 路線詳情`, 'bus-detail', row);
+
+    if (r._type === 'bus') {
+      const dir = r.bound || r.direction || 'O';
+      const row = {
+        route:       r.route,
+        dest:        r.dest_tc || '',
+        companyType: r._co || 'kmb',
+        dir:         dir === 'I' || dir === 'inbound' ? 'I' : 'O',
+        serviceType: r.service_type || '1',
+        stopId:      null,
+        targetPid:   addRouteTargetPid || null,
+        fare:        null,
+      };
+      openDrawer(`${r.route} 路線詳情`, 'bus-detail', row);
+    } else {
+      // MTR / LRT 暫時直接顯示提示或跳轉 (目前 App 詳情頁主要支援巴士)
+      const row = {
+        route: r.route,
+        dest: r.dest_tc,
+        companyType: r._co,
+        stopId: r._id || null,
+        etasWithType: [],
+        _type: r._type
+      };
+      openDrawer(`${r.route} 詳情`, 'bus-detail', row);
+    }
   };
 
   return (
