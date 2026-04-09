@@ -22,6 +22,7 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
   const firstM = validEtas.length ? Math.round((validEtas[0].ts - now) / 60000) : null;
   const urgency = firstM === null ? '' : firstM <= 2 ? 'soon' : firstM <= 8 ? 'coming' : 'ok';
   const cfg = CO_CFG[companyType] || CO_CFG.kmb;
+  const operatorColor = companyType === 'joint' ? 'linear-gradient(135deg, #D85A30 50%, #0F6E56 50%)' : cfg.color;
   const routeFontSize = route.length <= 3 ? '24px' : route.length === 4 ? '19px' : '15px';
   const distStr = dist ? `${dist}m` : '';
   const fareStr = fare != null ? ` ($${fare})` : '';
@@ -32,15 +33,33 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
   return (
     <div
       className={`bus-card-v2 ${urgency}`}
-      style={{ animationDelay: `${idx * 0.04}s` }}
+      style={{ 
+        animationDelay: `${idx * 0.04}s`,
+        borderLeftColor: companyType === 'ctb' ? '#0F6E56' : companyType === 'lwb' ? '#ff9f43' : companyType === 'joint' ? '#7ba8ff' : '#D85A30'
+      }}
       onClick={onClick}
     >
       {onDragStart && (
         <div className="bcv2-drag-hdl" onTouchStart={e => onDragStart(e, idx)}>⠿</div>
       )}
-      <div className="bcv2-badge" style={{ background: cfg.bg, borderColor: cfg.bdr }}>
-        <div className="bcv2-route-no" style={{ color: cfg.color, fontSize: routeFontSize }}>{route}</div>
-        <div className="bcv2-co-name" style={{ color: cfg.color, opacity: 0.9 }}>{cfg.label}</div>
+      <div className="bcv2-badge" style={{ 
+        background: companyType === 'joint' ? 'linear-gradient(135deg, #D85A30 0%, #D85A30 50%, #0F6E56 50%, #0F6E56 100%)' : (companyType === 'ctb' ? '#0F6E56' : companyType === 'lwb' ? '#ff9f43' : '#D85A30'), 
+        borderColor: 'rgba(255,255,255,0.1)',
+        minWidth: '78px',
+        maxWidth: '78px'
+      }}>
+        <div className="bcv2-route-no" style={{ 
+          color: '#fff', 
+          fontSize: routeFontSize,
+          textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          letterSpacing: '-0.5px'
+        }}>{route}</div>
+        <div className="bcv2-co-name" style={{ 
+          color: '#fff', 
+          opacity: 0.95,
+          fontWeight: 700,
+          fontSize: '10px'
+        }}>{cfg.label}</div>
       </div>
       <div className="bcv2-mid">
         <div className="bcv2-meta-row">

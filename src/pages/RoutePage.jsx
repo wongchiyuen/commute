@@ -364,21 +364,24 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: 13, fontWeight: 500, color: 'var(--txt)',
+              fontSize: 15, fontWeight: 700, color: 'var(--bright)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              marginBottom: 4
             }}>
               {orig ? `${orig} → ${destText}` : `往 ${destText}`}
             </div>
-            <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               <span style={{
                 fontSize: 11, padding: '2px 7px', borderRadius: 10,
-                background: 'var(--bg3)', border: '1px solid var(--bdr)', color: 'var(--mid)',
-              }}>加入至：{previewTargetName}</span>
+                background: co.bg, border: `1px solid ${co.bdr}`, color: co.col,
+                fontWeight: 600
+              }}>{co.lbl}</span>
               {fare != null && (
                 <span style={{
                   fontSize: 11, padding: '2px 7px', borderRadius: 10,
-                  background: 'var(--bg3)', border: '1px solid var(--bdr)', color: 'var(--mid)',
-                }}>${fare}</span>
+                  background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', color: 'var(--amb2)',
+                  fontWeight: 600
+                }}>全程車費：${fare}</span>
               )}
               {stops.length > 0 && (
                 <span style={{
@@ -389,31 +392,36 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button 
-              onClick={() => setMapView(!mapView)}
-              style={{
-                padding: '7px 10px', fontSize: 12, borderRadius: 8,
-                border: '1px solid var(--bdr2)', background: 'var(--bg2)',
-                color: 'var(--mid)', cursor: 'pointer'
-              }}
-            >
-              {mapView ? '📋 列表' : '🗺 地圖'}
-            </button>
-
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <div style={{
-              display: 'flex', borderRadius: 8, overflow: 'hidden',
+              display: 'flex', borderRadius: 10, overflow: 'hidden',
               border: '1px solid var(--bdr2)', flexShrink: 0,
+              background: 'var(--bg2)'
             }}>
-              {[['O', '往程'], ['I', '回程']].map(([d, lbl]) => (
+              {[['O', '往'], ['I', '返']].map(([d, lbl]) => (
                 <button key={d} onClick={() => setDir(d)} style={{
-                  padding: '7px 11px', fontSize: 12, border: 'none',
+                  padding: '9px 15px', fontSize: 13, border: 'none',
                   cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'all .15s',
-                  background: dir === d ? co.col : 'var(--bg2)',
+                  fontWeight: 700,
+                  background: dir === d ? co.col : 'transparent',
                   color:      dir === d ? '#fff' : 'var(--mid)',
                 }}>{lbl}</button>
               ))}
             </div>
+
+            <button 
+              onClick={() => setMapView(!mapView)}
+              style={{
+                width: 42, height: 42, borderRadius: 10,
+                border: '1px solid var(--bdr2)', background: 'var(--bg2)',
+                color: 'var(--mid)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18
+              }}
+              title={mapView ? '列表' : '地圖'}
+            >
+              {mapView ? '📋' : '🗺'}
+            </button>
           </div>
         </div>
         <div style={{ height: '0.5px', background: 'var(--bdr)' }} />

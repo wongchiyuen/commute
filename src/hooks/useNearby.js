@@ -237,17 +237,17 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
       });
       ex.etasWithType.sort((a, b) => a.ts - b.ts);
     } else {
-      // 聯營線規則：
-      // 1xx, 3xx, 6xx, 9xx, N1xx, N3xx, N6xx, N9xx 是過海聯營線的主力
-      // 還有一些特定的路線如 101-118, 170, 171, 182, 307, 601, 681 等
-      const isJointRoute = isJointRouteNumber;
+      // 聯營線規則修正：必須是 3 位數字且開頭為 1, 6, 9，或者以 N1, N6, N9 開頭
+      // 或者在特定的聯營清單中
+      const isJointRouteNumber = /^(1|6|9)\d{2}|^(N1|N6|N9)\d{2}/.test(r.route) || 
+                          ['101','102','103','104','106','107','111','112','113','115','116','117','118','170','171','182','301','307','373','601','603','606','613','619','621','641','671','673','678','680','681','690','694','904','905','914','930','934','935','936','948','960','961','962','967','968','969','970','971','973','978','980','981','982','985'].includes(r.route);
       
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
         routeMap.set(k, { 
           ...r, 
           serviceType: '1', 
-          companyType: isJointRoute ? 'joint' : 'ctb', 
+          companyType: isJointRouteNumber ? 'joint' : 'ctb', 
           fare: null 
         });
       }

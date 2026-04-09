@@ -79,7 +79,10 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // 距離變化時重新載入
   useEffect(() => {
-    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
+    if (isNearby && gpsCoords) {
+      nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
+      showToast(`🔍 已將搜尋範圍改為 ${distLabel(nearbyDist)}`);
+    }
   // eslint-disable-next-line
   }, [nearbyDist]);
 
@@ -185,8 +188,15 @@ export default function HomePage({ openDrawer, showToast }) {
         }
       });
 
-      if (points.length > 1) map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
-      else if (points.length === 1) map.setView(points[0], 15);
+      if (points.length > 1) {
+        map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
+      } else if (points.length === 1) {
+        map.setView(points[0], 15);
+      } else if (gpsCoords) {
+        // 如果沒有點，但有 GPS，則以 GPS 為中心並根據距離縮放
+        const zoom = nearbyDist <= 300 ? 17 : nearbyDist <= 1000 ? 15 : 14;
+        map.setView([gpsCoords.lat, gpsCoords.lng], zoom);
+      }
     } catch (e) {
       console.error('Home map error:', e);
     }
