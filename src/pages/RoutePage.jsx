@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
 import { fetchAllKMBStops } from '../hooks/useNearby.js';
 import { fetchKMBFare } from '../utils/fare.js';
+import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
 
 // ── 本地 CTB stops cache（不依賴 useNearby.js）────────────
 let _ctbCache = null;
@@ -103,7 +104,8 @@ function ETAPills({ etas }) {
 }
 
 // ── 主組件 ────────────────────────────────────────────────
-export default function RoutePage({ row }) {
+export default function RoutePage({ row, closeDrawer, showToast }) {
+  const { activePid, profiles } = useApp();
   const initDir = row?.dir || 'O';
   const [dir, setDir]             = useState(initDir);
   const [routeInfo, setRouteInfo] = useState(null);
@@ -212,6 +214,36 @@ export default function RoutePage({ row }) {
   }
 
   const rfs = route.length <= 3 ? '22px' : route.length <= 4 ? '17px' : '13px';
+  const addToFavs = useCallback((stop) => {
+    const targetPid = activePid === NEARBY_PID ? (profiles[0]?.id || null) : activePid;
+    if (!targetPid) {
+      showToast?.('請先新增版面');
+      return;
+    }
+    const favType = companyType === 'joint' ? 'joint' : companyType;
+    const list = loadFavs(targetPid);
+    const exists = list.some(f =>
+      f.route === route &&
+      String(f.serviceType || '1') === String(svcType || '1') &&
+      f.stopId === stop.stopId &&
+      (f.type || 'kmb') === favType
+    );
+    if (exists) {
+      showToast?.('此站已在版面中');
+      return;
+    }
+    list.push({
+      route,
+      stopId: stop.stopId,
+      stopName: stop.name,
+      dest: destText,
+      serviceType: svcType || '1',
+      type: favType,
+    });
+    saveFavs(targetPid, list);
+    showToast?.(activePid === NEARBY_PID ? `已加入「${profiles[0]?.name || '版面'}」` : '已加入目前版面');
+    closeDrawer?.();
+  }, [activePid, profiles, companyType, route, svcType, destText, closeDrawer, showToast]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
@@ -337,9 +369,17 @@ export default function RoutePage({ row }) {
               <div style={{
                 paddingTop: 11, paddingRight: 6,
                 fontSize: 10, color: 'var(--dim)',
-                width: 22, textAlign: 'right', flexShrink: 0,
+                minWidth: 58, textAlign: 'right', flexShrink: 0,
               }}>
-                {s.seq}
+                <div>{s.seq}</div>
+                <button
+                  onClick={() => addToFavs(s)}
+                  style={{
+                    marginTop: 6, padding: '2px 6px', borderRadius: 8, border: `1px solid ${co.bdr}`,
+                    background: co.bg, color: co.col, fontSize: 10, cursor: 'pointer',
+                  }}>
+                  ＋加入
+                </button>
               </div>
             </div>
           );

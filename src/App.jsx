@@ -86,7 +86,7 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
 
   // ── 路線詳情（站序時間線）────────────────────────────
   if (drawerKey === 'bus-detail') {
-    return <RoutePage row={drawerData} />;
+    return <RoutePage row={drawerData} closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
   // ── 交通服務設定 ──────────────────────────────────────

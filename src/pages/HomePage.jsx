@@ -18,6 +18,7 @@ function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
 export default function HomePage({ openDrawer, showToast }) {
   const {
+    setActivePage,
     activePid, setActivePid, profiles,
     nearbyDist, setNearbyDist,
     gpsCoords, saveGps,
@@ -287,7 +288,7 @@ export default function HomePage({ openDrawer, showToast }) {
             </button>
           )}
           {!isNearby && (
-            <button className="add-btn" onClick={() => openDrawer('搜尋路線', 'search')}>＋ 加路線</button>
+            <button className="add-btn" onClick={() => setActivePage('search')}>＋ 加路線</button>
           )}
         </div>
 
