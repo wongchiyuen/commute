@@ -198,6 +198,79 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);display:flex;
 .sec-lbl{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-family:var(--mono);margin-bottom:8px}
 .result-item{display:flex;align-items:center;gap:10px;padding:11px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
 .result-item:active{border-color:var(--amb)}
+
+/* ── CUSTOM MAP STYLES ── */
+#nearby-map {
+  background: var(--bg) !important;
+}
+.leaflet-container {
+  background: var(--bg) !important;
+  font-family: var(--sans) !important;
+}
+.custom-stop-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stop-marker-inner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.stop-marker-inner.near {
+  box-shadow: 0 0 12px var(--amb);
+  color: #000;
+  font-weight: 800;
+}
+.leaflet-popup-content-wrapper {
+  background: var(--bg2) !important;
+  color: var(--txt) !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--bdr2) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+}
+.leaflet-popup-tip {
+  background: var(--bg2) !important;
+}
+.map-popup {
+  padding: 4px 2px;
+}
+.map-popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--amb2);
+}
+.map-popup-routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.map-popup-routes b {
+  background: var(--bg3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--mono);
+  border: 1px solid var(--bdr);
+}
+.map-popup-eta {
+  font-size: 12px;
+  color: var(--mid);
+}
 .rn{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--amb2);min-width:42px}
 .ri{flex:1}.ri-dest{font-size:14px;font-weight:500}.ri-orig{font-size:11px;color:var(--mid);margin-top:2px}
 .chev{color:var(--dim);font-size:17px}

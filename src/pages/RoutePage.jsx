@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
-import { fetchAllKMBStops } from '../hooks/useNearby.js';
+import { fetchAllKMBStops, ensureStops } from '../hooks/useNearby.js';
 import { fetchKMBFare } from '../utils/fare.js';
 import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
 
@@ -113,8 +113,11 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
   const [etaMap, setEtaMap]       = useState({});
   const [loading, setLoading]     = useState(true);
   const [fare, setFare]           = useState(row?.fare ?? null);
+  const [mapView, setMapView]     = useState(false);
   const nearRef = useRef(null);
   const genRef  = useRef(0);
+  const mapElRef = useRef(null);
+  const leafletMapRef = useRef(null);
 
   const route       = row?.route       || '';
   const companyType = row?.companyType || 'kmb';
@@ -146,14 +149,20 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
         : await getKMBStopIds(route, d, svcType);
       if (gen !== genRef.current) return;
 
-      // 3. 站名
-      const nameMap = isCtb
-        ? await getCtbStopNames()
-        : new Map((await fetchAllKMBStops()).map(s => [s.stop, s.name_tc || s.name_en || s.stop]));
+      // 3. 全港站點座標（用於地圖）
+      const allStops = await ensureStops();
+      const stopDataMap = new Map(allStops.map(s => [s.id, s]));
 
-      const stopsArr = ids.map((sid, i) => ({
-        stopId: sid, seq: i + 1, name: nameMap.get(sid) || sid,
-      }));
+      const stopsArr = ids.map((sid, i) => {
+        const sd = stopDataMap.get(sid);
+        return {
+          stopId: sid, 
+          seq: i + 1, 
+          name: sd?.n || sid,
+          lat: sd?.lat,
+          lng: sd?.lng,
+        };
+      });
 
       if (gen !== genRef.current) return;
       setStops(stopsArr);
@@ -189,6 +198,63 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
   }, [route, isCtb, isKmbLike, svcType, fare]);
 
   useEffect(() => { loadAll(dir); }, [dir]);
+
+  // ── 路線地圖 ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapView || !mapElRef.current || !stops.length) return;
+    const L = window.L;
+    if (!L) return;
+
+    if (!leafletMapRef.current) {
+      const map = L.map(mapElRef.current, { 
+        zoomControl: false, 
+        attributionControl: false 
+      }).setView([22.3193, 114.1694], 13);
+      
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+      }).addTo(map);
+      
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      leafletMapRef.current = map;
+    }
+
+    const map = leafletMapRef.current;
+    // 清除現有標記
+    map.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
+
+    const points = [];
+    stops.forEach((s, i) => {
+      if (!s.lat || !s.lng) return;
+      const pos = [Number(s.lat), Number(s.lng)];
+      points.push(pos);
+
+      const isFirst = i === 0;
+      const isLast = i === stops.length - 1;
+      const isNear = s.stopId === nearStopId;
+
+      const icon = L.divIcon({
+        className: 'custom-stop-icon',
+        html: `<div class="stop-marker-inner ${isNear ? 'near' : ''}" style="background: ${isNear ? 'var(--amb)' : co.col}; width: ${isFirst || isLast || isNear ? '24px' : '12px'}; height: ${isFirst || isLast || isNear ? '24px' : '12px'}; border-width: ${isNear ? '3px' : '2px'}">
+                ${isFirst ? '起' : isLast ? '終' : ''}
+               </div>`,
+        iconSize: isFirst || isLast || isNear ? [24, 24] : [12, 12],
+        iconAnchor: isFirst || isLast || isNear ? [12, 12] : [6, 6],
+      });
+
+      const etas = etaMap[s.stopId];
+      const etaTxt = etas?.length ? Math.round((etas[0] - Date.now()) / 60000) + ' 分' : '…';
+
+      L.marker(pos, { icon }).bindPopup(`<b>${s.seq}. ${s.name}</b><br/>下一班：${etaTxt}`).addTo(map);
+    });
+
+    if (points.length > 1) {
+      L.polyline(points, { color: co.col, weight: 4, opacity: 0.8, lineJoin: 'round' }).addTo(map);
+      map.fitBounds(points, { padding: [40, 40] });
+    }
+
+    setTimeout(() => map.invalidateSize(), 100);
+  }, [mapView, stops, etaMap, co.col, nearStopId]);
 
   if (!row) return <div style={{ padding: 20, color: 'var(--dim)', fontSize: 13 }}>路線資料缺失</div>;
   if (companyType === 'mtr' || companyType === 'lrt') {
@@ -297,34 +363,59 @@ export default function RoutePage({ row, closeDrawer, showToast }) {
             </div>
           </div>
 
-          <div style={{
-            display: 'flex', borderRadius: 8, overflow: 'hidden',
-            border: '1px solid var(--bdr2)', flexShrink: 0,
-          }}>
-            {[['O', '往程'], ['I', '回程']].map(([d, lbl]) => (
-              <button key={d} onClick={() => setDir(d)} style={{
-                padding: '7px 11px', fontSize: 12, border: 'none',
-                cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'all .15s',
-                background: dir === d ? co.col : 'var(--bg2)',
-                color:      dir === d ? '#fff' : 'var(--mid)',
-              }}>{lbl}</button>
-            ))}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button 
+              onClick={() => setMapView(!mapView)}
+              style={{
+                padding: '7px 10px', fontSize: 12, borderRadius: 8,
+                border: '1px solid var(--bdr2)', background: 'var(--bg2)',
+                color: 'var(--mid)', cursor: 'pointer'
+              }}
+            >
+              {mapView ? '📋 列表' : '🗺 地圖'}
+            </button>
+
+            <div style={{
+              display: 'flex', borderRadius: 8, overflow: 'hidden',
+              border: '1px solid var(--bdr2)', flexShrink: 0,
+            }}>
+              {[['O', '往程'], ['I', '回程']].map(([d, lbl]) => (
+                <button key={d} onClick={() => setDir(d)} style={{
+                  padding: '7px 11px', fontSize: 12, border: 'none',
+                  cursor: 'pointer', fontFamily: 'var(--sans)', transition: 'all .15s',
+                  background: dir === d ? co.col : 'var(--bg2)',
+                  color:      dir === d ? '#fff' : 'var(--mid)',
+                }}>{lbl}</button>
+              ))}
+            </div>
           </div>
         </div>
         <div style={{ height: '0.5px', background: 'var(--bdr)' }} />
       </div>
 
-      {/* ── 站序時間線 ── */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
-        {loading && stops.length === 0 ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
-            載入站序中…
-          </div>
-        ) : stops.length === 0 ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
-            找不到此方向的站序資料
-          </div>
-        ) : stops.map((s, i) => {
+      {/* ── 內容區域 ── */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* 地圖視圖 */}
+        <div ref={mapElRef} style={{ 
+          position: 'absolute', inset: 0, 
+          display: mapView ? 'block' : 'none',
+          zIndex: 5
+        }} />
+
+        {/* 站序時間線 */}
+        <div style={{ 
+          height: '100%', overflowY: 'auto', paddingBottom: 24,
+          display: mapView ? 'none' : 'block'
+        }}>
+          {loading && stops.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
+              載入站序中…
+            </div>
+          ) : stops.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
+              找不到此方向的站序資料
+            </div>
+          ) : stops.map((s, i) => {
           const isFirst = i === 0;
           const isLast  = i === stops.length - 1;
           const isNear  = s.stopId === nearStopId;

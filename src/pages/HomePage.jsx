@@ -93,11 +93,17 @@ export default function HomePage({ openDrawer, showToast }) {
     // 首次建立地圖
     if (!leafletMapRef.current) {
       const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
-      const map = L.map(mapElRef.current, { zoomControl: true }).setView(center, gpsCoords ? 15 : 11);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      const map = L.map(mapElRef.current, { 
+        zoomControl: false, 
+        attributionControl: false 
+      }).setView(center, gpsCoords ? 15 : 11);
+      
+      // 使用更現代、更暗色調的雲地圖
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
       }).addTo(map);
+      
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
       leafletMapRef.current = map;
       markerLayerRef.current = L.layerGroup().addTo(map);
     }
@@ -115,27 +121,55 @@ export default function HomePage({ openDrawer, showToast }) {
     const points = [];
     if (gpsCoords) {
       points.push([gpsCoords.lat, gpsCoords.lng]);
+      // 更好看的人位置標記
       L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
-        radius: 7, color: '#4da3ff', weight: 2, fillColor: '#4da3ff', fillOpacity: 0.35,
-      }).bindPopup('你的位置').addTo(layer);
+        radius: 8, color: '#fff', weight: 2, fillColor: '#007bff', fillOpacity: 0.9,
+      }).addTo(layer);
+      L.circle([gpsCoords.lat, gpsCoords.lng], {
+        radius: nearbyDist, color: '#007bff', weight: 1, fillColor: '#007bff', fillOpacity: 0.05, dashArray: '5, 5'
+      }).addTo(layer);
     }
 
     // 取每個 stop 第一筆路線作 marker，避免重覆太多點
     const stopMap = new Map();
     (nearbyHook.rows || []).forEach(r => {
       if (!r?.stopLat || !r?.stopLng || !r?.stopId) return;
-      if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, r);
+      if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
+      stopMap.get(r.stopId).push(r);
     });
-    stopMap.forEach((r) => {
+
+    stopMap.forEach((routes, stopId) => {
+      const r = routes[0];
       const lat = Number(r.stopLat);
       const lng = Number(r.stopLng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       points.push([lat, lng]);
+
+      // 製作包含路線編號的自訂標記
+      const routeLabels = routes.slice(0, 3).map(x => x.route).join(', ');
+      const moreCount = routes.length > 3 ? ` +${routes.length - 3}` : '';
+      
+      const icon = L.divIcon({
+        className: 'custom-stop-icon',
+        html: `<div class="stop-marker-inner" style="background: ${r.companyType === 'ctb' ? '#0F6E56' : '#D85A30'}">
+                ${r.route}
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+
       const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
       const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta} 分`;
-      L.circleMarker([lat, lng], {
-        radius: 6, color: '#f0a500', weight: 1.5, fillColor: '#f0a500', fillOpacity: 0.55,
-      }).bindPopup(`<b>${r.route}</b> 往 ${r.dest || ''}<br/>${r.stopName || ''}<br/>${etaTxt}`).addTo(layer);
+      
+      const popupContent = `
+        <div class="map-popup">
+          <div class="map-popup-title">${r.stopName}</div>
+          <div class="map-popup-routes">${routes.map(x => `<b>${x.route}</b>`).join(' ')}</div>
+          <div class="map-popup-eta">下一班：${etaTxt}</div>
+        </div>
+      `;
+
+      L.marker([lat, lng], { icon }).bindPopup(popupContent).addTo(layer);
     });
 
     // 自動框住目前可用點位
