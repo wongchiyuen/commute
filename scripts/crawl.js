@@ -210,10 +210,18 @@ async function crawlKMB() {
 
   console.log('\n📋 KMB/LWB 路線...');
   const routeData = await fetchJSON(`${KMB}/route`);
+  // ✅ KMB /route API 不回傳 r.co，改用靜態名單識別龍運路線
+  const LWB_ROUTES = new Set([
+    'E21','E21A','E21P','E22','E22A','E22B','E22P','E22S','E23','E23P','E24','E24P',
+    'E31','E32','E33','E34','E35',
+    'A31','A32','A33','A35','A36','A37','A40','A41','A43','A44','A45','A47',
+    'A60','A65','A70','A73','A74',
+    'NR31','NR32','NR33','NR34','NR35','NR36','NR737','NR831',
+    'R8','R33','R42',
+  ]);
   const routes = (routeData.data || []).map(r => ({
     route: r.route,
-    // ✅ 修正：使用 API 返回的 r.co 欄位區分 KMB / LWB（龍運）
-    co: (r.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb',
+    co: LWB_ROUTES.has(r.route) ? 'lwb' : 'kmb',
     orig_tc: r.orig_tc || '', dest_tc: r.dest_tc || '',
     bound: r.bound || 'O', service_type: r.service_type || '1',
   }));
@@ -308,13 +316,75 @@ function buildLRT() {
   return { stops, routes };
 }
 
+// ── NLB 大嶼山巴士 ───────────────────────────────────────
+const NLB = 'https://rt.data.gov.hk/v2/transport/nlb';
+
+async function crawlNLB() {
+  console.log('\n📌 NLB 大嶼山巴士路線...');
+  const routeData = await fetchJSON(`${NLB}/route.php?action=list`);
+  const allRoutes = routeData.routes || [];
+  console.log(`  ✅ ${allRoutes.length} 條路線`);
+
+  // 每條路線獲取站點（包含 routeId 供 ETA 使用）
+  console.log('\n📌 NLB 站點...');
+  const stopMap = new Map(); // stopId → stop object
+  const routeList = [];
+
+  // 批次拉取（NLB 路線較少，約 40 條）
+  const stopResults = await batchFetch(
+    allRoutes.map(r => `${NLB}/stop.php?action=list&routeId=${r.routeId}`),
+    10, 300
+  );
+
+  stopResults.forEach((res, idx) => {
+    const r = allRoutes[idx];
+    if (!res?.stops) return;
+
+    // 路線記錄（outbound）
+    routeList.push({
+      route: r.routeNo, co: 'nlb', routeId: r.routeId,
+      orig_tc: r.oragin_c || r.routeName_c || '',  // NLB API typo: oragin
+      dest_tc: r.destination_c || '',
+      bound: 'O', service_type: '1',
+    });
+
+    res.stops.forEach(s => {
+      if (!s.stopId) return;
+      const lat = parseFloat(s.latitude ?? s.lat ?? 0);
+      const lng = parseFloat(s.longitude ?? s.lng ?? s.long ?? 0);
+      if (!lat || !lng || isNaN(lat)) return;
+
+      if (!stopMap.has(s.stopId)) {
+        stopMap.set(s.stopId, {
+          id: String(s.stopId), co: 'nlb',
+          n: s.stopName_c || s.stopName_e || String(s.stopId),
+          lat, lng,
+          routes: [],  // [{routeId, routeNo}]
+        });
+      }
+      const existing = stopMap.get(s.stopId);
+      if (!existing.routes.find(x => x.routeId === r.routeId)) {
+        existing.routes.push({ routeId: r.routeId, routeNo: r.routeNo });
+      }
+    });
+  });
+
+  const stops = [...stopMap.values()].map(s => ({
+    ...s,
+    routes: s.routes.slice(0, 20), // 最多保留 20 條路線
+  }));
+
+  console.log(`  ✅ ${stops.length} 個站點，${routeList.length} 條路線記錄`);
+  return { stops, routes: routeList };
+}
+
 // ── 主程式 ────────────────────────────────────────────────
 async function main() {
   console.log('🚌 生活日常 Bus Data Crawler');
   console.log('🕐', new Date().toISOString());
 
   const generated = new Date().toISOString();
-  const [kmb, ctb] = await Promise.all([crawlKMB(), crawlCTB()]);
+  const [kmb, ctb, nlb] = await Promise.all([crawlKMB(), crawlCTB(), crawlNLB()]);
   const mtr = buildMTR();
   const lrt = buildLRT();
 
@@ -330,8 +400,8 @@ async function main() {
   });
   console.log(`\n🔗 KMB 路線標記為聯營：${kmbJointUpdated} 條`);
 
-  const allStops = [...kmb.stops, ...ctb.stops, ...mtr.stops, ...lrt.stops];
-  const allRoutes = [...kmb.routes, ...ctb.routes, ...mtr.routes, ...lrt.routes];
+  const allStops = [...kmb.stops, ...ctb.stops, ...nlb.stops, ...mtr.stops, ...lrt.stops];
+  const allRoutes = [...kmb.routes, ...ctb.routes, ...nlb.routes, ...mtr.routes, ...lrt.routes];
 
   mkdirSync(OUT, { recursive: true });
   const stopsJSON = JSON.stringify({ v: 1, generated, stops: allStops });
@@ -345,9 +415,9 @@ async function main() {
 
   console.log('\n✅ 完成！');
   console.log(`  stops.json  : ${allStops.length} 個站點 (${Math.round(Buffer.byteLength(stopsJSON)/1024)}KB)`);
-  console.log(`    KMB:${kmb.stops.length}  CTB:${ctb.stops.length}  MTR:${mtr.stops.length}  LRT:${lrt.stops.length}`);
+  console.log(`    KMB:${kmb.stops.length}  CTB:${ctb.stops.length}  NLB:${nlb.stops.length}  MTR:${mtr.stops.length}  LRT:${lrt.stops.length}`);
   console.log(`  routes.json : ${allRoutes.length} 條路線 (${Math.round(Buffer.byteLength(routesJSON)/1024)}KB)`);
-  console.log(`    KMB純九巴:${kmbOnlyRoutes}  LWB龍運:${lwbRoutes}  聯營:${kmbJointRoutes}  CTB純城巴:${ctb.routes.filter(r=>r.co==='ctb').length}  MTR:${mtr.routes.length}  LRT:${lrt.routes.length}`);
+  console.log(`    KMB純九巴:${kmbOnlyRoutes}  LWB龍運:${lwbRoutes}  聯營:${kmbJointRoutes}  CTB純城巴:${ctb.routes.filter(r=>r.co==='ctb').length}  NLB:${nlb.routes.length}  MTR:${mtr.routes.length}  LRT:${lrt.routes.length}`);
   console.log('🕐', new Date().toISOString());
 }
 

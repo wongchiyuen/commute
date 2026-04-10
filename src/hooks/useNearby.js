@@ -238,6 +238,49 @@ async function fetchLRTEtas(nearby) {
   return results;
 }
 
+// ── NLB ETA ───────────────────────────────────────────────
+const NLB_API = 'https://rt.data.gov.hk/v2/transport/nlb';
+
+async function fetchNLBEtas(nearby, now) {
+  const stops = nearby.filter(s => s.co === 'nlb').slice(0, 15);
+  if (!stops.length) return [];
+  const results = [];
+  const seen = new Map(); // key → row
+
+  await Promise.all(stops.map(async stop => {
+    const routeList = stop.routes || [];
+    await Promise.all(routeList.map(async ({ routeId, routeNo }) => {
+      try {
+        const url = `${NLB_API}/stop.php?action=estimatedArrivals&routeId=${routeId}&stopId=${stop.id}&serviceType=1`;
+        const d = await fetch(url, { signal: AbortSignal.timeout(8000) }).then(r => r.json());
+        (d.estimatedArrivals || []).forEach(e => {
+          if (!e.estimatedArrivalTime) return;
+          const ts = new Date(e.estimatedArrivalTime.replace(' ', 'T') + '+08:00').getTime();
+          if (ts < now - 30000) return;
+          const key = `${routeNo}_${stop.id}`;
+          if (!seen.has(key)) {
+            seen.set(key, {
+              route: routeNo, dest: '',
+              stopName: stop.n, stopId: stop.id,
+              stopLat: stop.lat, stopLng: stop.lng,
+              dist: Math.round(stop.dist), dir: 'O',
+              serviceType: '1', companyType: 'nlb',
+              etasWithType: [{ ts, type: 'nlb' }], fare: null,
+            });
+          } else {
+            const ex = seen.get(key);
+            if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === ts))
+              ex.etasWithType.push({ ts, type: 'nlb' });
+          }
+        });
+      } catch {}
+    }));
+  }));
+
+  seen.forEach(r => results.push(r));
+  return results;
+}
+
 // ── 聯營路線名單 ──────────────────────────────────────────
 const JOINT_ROUTES = new Set([
   '101','101P','101R','101X','102','102P','102R','103','104',
@@ -259,7 +302,7 @@ function isJointRoute(route) {
 }
 
 // ── 合併、排序、車費 ──────────────────────────────────────
-async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
+async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows, nlbRows = []) {
   const routeMap = new Map(kmbMap);
 
   ctbRows.forEach(r => {
@@ -294,6 +337,7 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
 
   mtrRows.forEach((r, i) => routeMap.set(`MTR_${r.route}_${r.dest}_${i}`, r));
   lrtRows.forEach((r, i) => routeMap.set(`LRT_${r.route}_${r.stopId}_${i}`, r));
+  nlbRows.forEach((r, i) => routeMap.set(`NLB_${r.route}_${r.stopId}_${i}`, r));
 
   let allRows = [...routeMap.values()].filter(r => r.etasWithType?.length > 0);
   const pairIndex = new Map();
@@ -374,20 +418,20 @@ export function useNearby(transportSettings) {
       setRows(phase1);
       setStatus('ready');
 
-      // Phase 2: CTB 永遠抓取（主頁不受 transportSettings 限制）
-      //          MTR/LRT 仍按設定
-      const [ctbRows, mtrRows, lrtRows] = await Promise.all([
+      // Phase 2: CTB + NLB 永遠抓取；MTR/LRT 按設定
+      const [ctbRows, nlbRows, mtrRows, lrtRows] = await Promise.all([
         fetchCTBEtas(nearby, now),
+        fetchNLBEtas(nearby, now),
         (transportSettings?.mtr === true) ? fetchMTREtas(nearby) : Promise.resolve([]),
         (transportSettings?.lrt === true) ? fetchLRTEtas(nearby) : Promise.resolve([]),
       ]);
       if (myId !== loadId.current) return;
-      if (ctbRows.length || mtrRows.length || lrtRows.length) {
-        const final = await buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows);
+      if (ctbRows.length || nlbRows.length || mtrRows.length || lrtRows.length) {
+        const final = await buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows, nlbRows);
         if (myId !== loadId.current) return;
         setRows(final);
       } else {
-        console.log('[nearby] Phase 2 empty: ctb=0 mtr=0 lrt=0');
+        console.log('[nearby] Phase 2 empty: ctb=0 nlb=0 mtr=0 lrt=0');
       }
     } catch (e) {
       console.warn('[nearby]', e);

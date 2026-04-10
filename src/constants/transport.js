@@ -5,12 +5,12 @@ export const MTR_API = 'https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php'
 export const NEARBY_PID = '__nearby__';
 
 // ── 巴士公司顯示資訊 ──────────────────────────────────────
-// KMB API 同時涵蓋九巴(KMB)及龍運(LWB)，stop-eta 回應 co 欄位區分
 export const CO_INFO = {
   kmb:   { label: '九巴',      short: 'KMB', color: '#ffc03a', bg: 'rgba(240,165,0,.13)',  bdr: 'rgba(240,165,0,.35)'  },
   lwb:   { label: '龍運',      short: 'LWB', color: '#ff9f43', bg: 'rgba(255,159,67,.13)', bdr: 'rgba(255,159,67,.35)' },
   ctb:   { label: '城巴',      short: 'CTB', color: '#2ed573', bg: 'rgba(46,213,115,.1)',  bdr: 'rgba(46,213,115,.3)'  },
   joint: { label: 'KMB+CTB',   short: '聯營', color: '#7ba8ff', bg: 'rgba(91,143,255,.1)',  bdr: 'rgba(91,143,255,.3)'  },
+  nlb:   { label: '嶼巴',      short: 'NLB', color: '#fd79a8', bg: 'rgba(253,121,168,.1)', bdr: 'rgba(253,121,168,.3)' },
   mtr:   { label: '港鐵',      short: 'MTR', color: '#e74c3c', bg: 'rgba(231,76,60,.12)',  bdr: 'rgba(231,76,60,.3)'   },
   lrt:   { label: '輕鐵',      short: 'LRT', color: '#a29bfe', bg: 'rgba(162,155,254,.12)', bdr: 'rgba(162,155,254,.3)' },
 };
