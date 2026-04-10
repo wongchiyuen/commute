@@ -245,20 +245,28 @@ async function crawlCTB() {
   const jointCount = routes.filter(r => r.co === 'joint').length;
   console.log(`  ✅ ${routes.length} 條路線（聯營：${jointCount} 條，${allEntries.length} 個方向記錄）`);
 
-  console.log('\n📌 CTB 站點 ID（雙向）...');
+  console.log('\n📌 CTB 站點 ID 及路線對應（雙向）...');
   const BOUND_MAP = { O: 'outbound', I: 'inbound' };
   const tasks = allEntries.map(r => ({ route: r.route, dir: BOUND_MAP[r.bound] || 'outbound' }));
   const routeStopResults = await batchFetch(
     tasks.map(t => `${CTB}/route-stop/CTB/${t.route}/${t.dir}`), 25, 150
   );
 
-  const stopIds = new Set();
-  routeStopResults.forEach(res => (res?.data || []).forEach(s => { if (s.stop) stopIds.add(s.stop); }));
-  console.log(`  ✅ ${stopIds.size} 個唯一站點 ID`);
+  // ✅ 修正：記錄每個站點服務哪些路線（v2 API 不支援 /eta/CTB/{stop}/all）
+  const stopRouteMap = new Map(); // stopId → Set<routeNo>
+  routeStopResults.forEach((res, idx) => {
+    const routeNo = tasks[idx].route;
+    (res?.data || []).forEach(s => {
+      if (!s.stop) return;
+      if (!stopRouteMap.has(s.stop)) stopRouteMap.set(s.stop, new Set());
+      stopRouteMap.get(s.stop).add(routeNo);
+    });
+  });
+  console.log(`  ✅ ${stopRouteMap.size} 個唯一站點 ID`);
 
   console.log('\n📌 CTB 站點座標...');
   const stopResults = await batchFetch(
-    [...stopIds].map(id => `${CTB}/stop/${id}`), 20, 200
+    [...stopRouteMap.keys()].map(id => `${CTB}/stop/${id}`), 20, 200
   );
 
   const stops = [];
@@ -268,7 +276,9 @@ async function crawlCTB() {
     const lat = parseFloat(s.lat ?? s.latitude ?? 0);
     const lng = parseFloat(s.long ?? s.longitude ?? 0);
     if (!lat || !lng || isNaN(lat)) return;
-    stops.push({ id: s.stop, co: 'ctb', n: s.name_tc || s.name_en || s.stop, lat, lng });
+    // 把路線列表存入站點，最多保留 20 條（ETA 查詢用）
+    const routeList = [...(stopRouteMap.get(s.stop) || [])].slice(0, 20);
+    stops.push({ id: s.stop, co: 'ctb', n: s.name_tc || s.name_en || s.stop, lat, lng, routes: routeList });
   });
   console.log(`  ✅ ${stops.length} 個站點`);
   return { stops, routes };
