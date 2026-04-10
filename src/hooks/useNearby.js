@@ -70,9 +70,7 @@ export async function fetchAllKMBStops() {
 }
 
 // ── KMB + LWB ETA ─────────────────────────────────────────
-// 同一 API (data.etabus.gov.hk)，e.co 欄位區分九巴/龍運
 async function fetchKMBLWBEtas(nearby, now) {
-  // 修正：同時接收 kmb 同 lwb 嘅站點
   const stops = nearby.filter(s => s.co === 'kmb' || s.co === 'lwb').slice(0, 20);
   if (!stops.length) return new Map();
   const results = await Promise.all(
@@ -111,9 +109,7 @@ async function fetchKMBLWBEtas(nearby, now) {
 }
 
 // ── CTB ETA ───────────────────────────────────────────────
-// stops.json 已有 CTB 座標，直接取 ETA
 async function fetchCTBEtas(nearby, now) {
-  // 修正：增加掃描站點數量由 15 個到 30 個，確保涵蓋更多路線
   const stops = nearby.filter(s => s.co === 'ctb').slice(0, 30);
   if (!stops.length) return [];
   const results = [];
@@ -210,24 +206,59 @@ async function fetchLRTEtas(nearby) {
   return results;
 }
 
-// ── 聯營路線名單（排除已非聯營的 968, 978, 108 等） ───────────────
+// ── 聯營路線名單（由 routes.json 實際數據驅動，去除啟發式規則）────────
+// 只收錄確認由 KMB+CTB 聯合營辦的過海及跨區路線
 const JOINT_ROUTES = new Set([
-  '101','102','103','104','106','107','109','110','111','112','113','115','116','117','118','170','171','182',
-  '301','307','373','601','606','608','619','621','641','671','678','680','681','690','694',
-  '904','905','914','930','948','962','967','969','970','971','973','980','981','982','985',
-  'N118','N121','N122','N170','N171','N182','N307','N368','N373','N619','N680','N691','N930','N952','N960','N962','N969'
+  // 過海隧道路線（1xx）
+  '101','101P','101R','101X',
+  '102','102P','102R',
+  '103','104',
+  '106','106A','106P',
+  '107','107P',
+  '109','110',
+  '111','111P',
+  '112','113',
+  '115','115P',
+  '116','117',
+  '118','118P','118R',
+  // 東區走廊 / 紅隧路線（1xx 其他）
+  '170','171','171A','171P',
+  '182','182X',
+  // 3xx 系列
+  '302','302A',
+  '307','307A','307P',
+  // 6xx 過海路線
+  '601','601P',
+  '606','606A','606X',
+  '619','619P','619X',
+  '621','641',
+  '671','671X',
+  '678',
+  '680','680B','680P','680X',
+  '681','681P',
+  '690','690P','690S',
+  '694',
+  // 9xx 過海路線
+  '904','905','905A','905P',
+  '907C','907D',
+  '914','914P','914X',
+  '948','948A','948B','948E','948P','948X',
+  '980','980A','980X',
+  '981','981P',
+  '982','982X',
+  '985','985A','985B',
+  // 夜間聯營路線（N 系列）
+  'N116','N118','N121','N122',
+  'N170','N171','N182',
+  'N307',
+  'N619','N680','N691',
+  // 特別路線
+  'R8','S1','X1','SP10','SP12',
 ]);
 
+// ✅ 修正：移除錯誤的啟發式 regex 規則，只用明確名單
 function isJointRoute(route) {
-  if (JOINT_ROUTES.has(route)) return true;
-  // 過海聯營線主力：1xx, 6xx, 9xx (排除已知純九巴或純城巴路線)
-  if (/^(1|6|9)\d{2}/.test(route)) {
-    const kmbOnly = ['108', '603', '613', '673', '681', '934', '935', '936', '960', '961', '968', '978'];
-    const ctbOnly = ['608', '629', '952', '962', '967', '969', '976', '979', '986', '987', '988', '989'];
-    if (kmbOnly.includes(route) || ctbOnly.includes(route)) return false;
-    return true;
-  }
-  return false;
+  return JOINT_ROUTES.has(route);
 }
 
 // ── 合併、排序、車費 ──────────────────────────────────────
@@ -237,16 +268,14 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   // CTB 合併與處理
   ctbRows.forEach(r => {
     const isJoint = isJointRoute(r.route);
-    // 聯營路線檢測邏輯
-    // 1. 先搵有無現成嘅九巴/龍運 key
     const matchKey =
       routeMap.has(`${r.route}_O_kmb`) ? `${r.route}_O_kmb` :
       routeMap.has(`${r.route}_I_kmb`) ? `${r.route}_I_kmb` :
-      routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` : 
+      routeMap.has(`${r.route}_O_lwb`) ? `${r.route}_O_lwb` :
       routeMap.has(`${r.route}_I_lwb`) ? `${r.route}_I_lwb` : null;
 
     if (matchKey) {
-      // 如果已經有九巴，就合併變做 joint
+      // 有九巴/龍運記錄，合併為聯營
       const ex = routeMap.get(matchKey);
       ex.companyType = 'joint';
       r.etasWithType.forEach(e => {
@@ -257,22 +286,20 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
     } else {
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
-        routeMap.set(k, { 
-          ...r, 
-          serviceType: '1', 
-          companyType: isJoint ? 'joint' : 'ctb', 
-          fare: null 
+        routeMap.set(k, {
+          ...r,
+          serviceType: '1',
+          companyType: isJoint ? 'joint' : 'ctb',
+          fare: null,
         });
       }
     }
   });
 
-  // 若屬聯營路線，但附近只有九巴站，仍以「聯營」顯示，ETA 保留九巴時間
-  routeMap.forEach((v, k) => {
-    if (v.companyType === 'kmb') {
-      if (isJointRoute(v.route)) {
-        v.companyType = 'joint';
-      }
+  // 若屬聯營路線，但附近只有九巴/龍運站，仍以「聯營」顯示
+  routeMap.forEach((v) => {
+    if ((v.companyType === 'kmb' || v.companyType === 'lwb') && isJointRoute(v.route)) {
+      v.companyType = 'joint';
     }
   });
 
@@ -346,7 +373,7 @@ export function useNearby(transportSettings) {
         setRows([]); setStatus('ready'); return;
       }
 
-      // Phase 1: KMB + LWB
+      // Phase 1: KMB + LWB（快速顯示）
       const kmbMap = await fetchKMBLWBEtas(nearby, now);
       const phase1 = await buildFinalRows(new Map(kmbMap), [], [], []);
       if (myId !== loadId.current) return;
@@ -354,10 +381,11 @@ export function useNearby(transportSettings) {
       setStatus('ready');
 
       // Phase 2: CTB + MTR + LRT 並行背景更新
+      // ✅ 修正：CTB 預設開啟（!== false），只有用戶明確關閉才跳過
       const [ctbRows, mtrRows, lrtRows] = await Promise.all([
-        transportSettings.ctb ? fetchCTBEtas(nearby, now) : Promise.resolve([]),
-        transportSettings.mtr ? fetchMTREtas(nearby) : Promise.resolve([]),
-        transportSettings.lrt ? fetchLRTEtas(nearby) : Promise.resolve([]),
+        (transportSettings?.ctb !== false) ? fetchCTBEtas(nearby, now) : Promise.resolve([]),
+        (transportSettings?.mtr === true)  ? fetchMTREtas(nearby)      : Promise.resolve([]),
+        (transportSettings?.lrt === true)  ? fetchLRTEtas(nearby)      : Promise.resolve([]),
       ]);
       if (myId !== loadId.current) return;
       if (ctbRows.length || mtrRows.length || lrtRows.length) {

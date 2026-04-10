@@ -202,7 +202,7 @@ async function crawlKMB() {
   console.log('\n📌 KMB/LWB 站點...');
   const stopData = await fetchJSON(`${KMB}/stop`);
   const stops = (stopData.data || []).map(s => ({
-    id: s.stop, co: 'kmb',
+    id: s.stop, co: 'kmb',   // 站點層面 KMB/LWB 共用同一站點庫，以 kmb 統一
     n: s.name_tc || s.name_en || s.stop,
     lat: parseFloat(s.lat), lng: parseFloat(s.long),
   })).filter(s => s.lat && s.lng && !isNaN(s.lat));
@@ -211,11 +211,14 @@ async function crawlKMB() {
   console.log('\n📋 KMB/LWB 路線...');
   const routeData = await fetchJSON(`${KMB}/route`);
   const routes = (routeData.data || []).map(r => ({
-    route: r.route, co: 'kmb',
+    route: r.route,
+    // ✅ 修正：使用 API 返回的 r.co 欄位區分 KMB / LWB（龍運）
+    co: (r.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb',
     orig_tc: r.orig_tc || '', dest_tc: r.dest_tc || '',
     bound: r.bound || 'O', service_type: r.service_type || '1',
   }));
-  console.log(`  ✅ ${routes.length} 條路線`);
+  const lwbCount = routes.filter(r => r.co === 'lwb').length;
+  console.log(`  ✅ ${routes.length} 條路線（其中 LWB 龍運：${lwbCount} 條）`);
   return { stops, routes };
 }
 
@@ -228,15 +231,19 @@ async function crawlCTB() {
   const routeMap = new Map();
   allEntries.forEach(r => {
     if (!routeMap.has(r.route)) {
+      // ✅ 修正：檢查 API 的 r.co 欄位，聯營路線會返回含 'KMB' 的值（如 'CTB+KMB'）
+      const coVal = (r.co || 'CTB').toUpperCase();
+      const co = coVal.includes('KMB') ? 'joint' : 'ctb';
       routeMap.set(r.route, {
-        route: r.route, co: 'ctb',
+        route: r.route, co,
         orig_tc: r.orig_tc || '', dest_tc: r.dest_tc || '',
         bound: r.bound || 'O', service_type: '1',
       });
     }
   });
   const routes = [...routeMap.values()];
-  console.log(`  ✅ ${routes.length} 條路線（${allEntries.length} 個方向記錄）`);
+  const jointCount = routes.filter(r => r.co === 'joint').length;
+  console.log(`  ✅ ${routes.length} 條路線（聯營：${jointCount} 條，${allEntries.length} 個方向記錄）`);
 
   console.log('\n📌 CTB 站點 ID（雙向）...');
   const BOUND_MAP = { O: 'outbound', I: 'inbound' };
@@ -301,6 +308,18 @@ async function main() {
   const mtr = buildMTR();
   const lrt = buildLRT();
 
+  // ✅ 修正：將 CTB 已識別為聯營的路線號碼，回寫到 KMB 路線記錄
+  // 確保 SearchPage 的九巴/聯營標籤一致
+  const jointRouteNums = new Set(ctb.routes.filter(r => r.co === 'joint').map(r => r.route));
+  let kmbJointUpdated = 0;
+  kmb.routes.forEach(r => {
+    if (r.co === 'kmb' && jointRouteNums.has(r.route)) {
+      r.co = 'joint';
+      kmbJointUpdated++;
+    }
+  });
+  console.log(`\n🔗 KMB 路線標記為聯營：${kmbJointUpdated} 條`);
+
   const allStops = [...kmb.stops, ...ctb.stops, ...mtr.stops, ...lrt.stops];
   const allRoutes = [...kmb.routes, ...ctb.routes, ...mtr.routes, ...lrt.routes];
 
@@ -310,11 +329,15 @@ async function main() {
   writeFileSync(join(OUT, 'stops.json'), stopsJSON, 'utf8');
   writeFileSync(join(OUT, 'routes.json'), routesJSON, 'utf8');
 
+  const lwbRoutes = kmb.routes.filter(r => r.co === 'lwb').length;
+  const kmbOnlyRoutes = kmb.routes.filter(r => r.co === 'kmb').length;
+  const kmbJointRoutes = kmb.routes.filter(r => r.co === 'joint').length;
+
   console.log('\n✅ 完成！');
   console.log(`  stops.json  : ${allStops.length} 個站點 (${Math.round(Buffer.byteLength(stopsJSON)/1024)}KB)`);
-  console.log(`    KMB/LWB:${kmb.stops.length}  CTB:${ctb.stops.length}  MTR:${mtr.stops.length}  LRT:${lrt.stops.length}`);
+  console.log(`    KMB:${kmb.stops.length}  CTB:${ctb.stops.length}  MTR:${mtr.stops.length}  LRT:${lrt.stops.length}`);
   console.log(`  routes.json : ${allRoutes.length} 條路線 (${Math.round(Buffer.byteLength(routesJSON)/1024)}KB)`);
-  console.log(`    KMB/LWB:${kmb.routes.length}  CTB:${ctb.routes.length}  MTR:${mtr.routes.length}  LRT:${lrt.routes.length}`);
+  console.log(`    KMB純九巴:${kmbOnlyRoutes}  LWB龍運:${lwbRoutes}  聯營:${kmbJointRoutes}  CTB純城巴:${ctb.routes.filter(r=>r.co==='ctb').length}  MTR:${mtr.routes.length}  LRT:${lrt.routes.length}`);
   console.log('🕐', new Date().toISOString());
 }
 
