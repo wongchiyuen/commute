@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { KMB, CTB, MTR_API } from '../constants/transport.js';
+import { KMB, MTR_API } from '../constants/transport.js';
 import { LRT_API } from '../constants/lrt.js';
 import { haverDist } from '../utils/geo.js';
 import { fetchKMBFare } from '../utils/fare.js';
@@ -8,6 +8,9 @@ import _idb from '../utils/idb.js';
 // gh-pages 每日自動爬取的靜態站點資料庫
 const STOPS_URL = 'https://wongchiyuen.github.io/commute/data/stops.json';
 const STOPS_TTL = 7 * 24 * 60 * 60 * 1000;
+
+// ✅ 城巴 API 直接定義於此，確保用 v2 且不受 transport.js 影響
+const CTB_API = 'https://rt.data.gov.hk/v2/transport/citybus';
 
 // ── Route usage ───────────────────────────────────────────
 const USAGE_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -43,7 +46,8 @@ export async function ensureStops() {
     const data = await res.json();
     _stopsCache = data.stops || [];
     if (_stopsCache.length) _idb.set('all_stops_v1', _stopsCache, STOPS_TTL);
-    console.log('[stops] fetched:', _stopsCache.length);
+    console.log('[stops] fetched:', _stopsCache.length,
+      '| CTB:', _stopsCache.filter(s => s.co === 'ctb').length);
   } catch (e) {
     console.warn('[stops] failed:', e.message);
     _stopsCache = null;
@@ -61,7 +65,6 @@ export function clearStopsCache() {
   _idb.del('all_routes_v1');
 }
 
-// 相容舊 import（HomePage 仍有 import fetchAllKMBStops）
 export async function fetchAllKMBStops() {
   const stops = await ensureStops();
   return stops.filter(s => s.co === 'kmb').map(s => ({
@@ -85,7 +88,6 @@ async function fetchKMBLWBEtas(nearby, now) {
       if (!e.eta) return;
       const ts = new Date(e.eta).getTime();
       if (ts < now - 30000) return;
-      // e.co = 'KMB' 九巴 | 'LWB' 龍運
       const co = (e.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb';
       const key = `${e.route}_${e.dir}_${co}`;
       if (!routeMap.has(key)) {
@@ -109,22 +111,28 @@ async function fetchKMBLWBEtas(nearby, now) {
 }
 
 // ── CTB ETA ───────────────────────────────────────────────
+// ✅ 主頁永遠抓取城巴，不受 transportSettings 限制
 async function fetchCTBEtas(nearby, now) {
   const stops = nearby.filter(s => s.co === 'ctb').slice(0, 30);
+  console.log('[CTB] nearby ctb stops:', stops.length,
+    stops.slice(0, 3).map(s => `${s.n}(${Math.round(s.dist)}m)`));
   if (!stops.length) return [];
   const results = [];
+  let fetchOk = 0, fetchFail = 0, etaCount = 0;
   await Promise.all(stops.map(async stop => {
     try {
-      const sig = AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined;
-      const d = await fetch(
-        `${CTB}/eta/CTB/${stop.id}/all`,
-        sig ? { signal: sig } : {}
-      ).then(r => r.json());
+      const url = `${CTB_API}/eta/CTB/${stop.id}/all`;
+      const d = await fetch(url, { signal: AbortSignal.timeout(8000) }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      });
+      fetchOk++;
       const routeMap = new Map();
       (d.data || []).forEach(e => {
         if (!e.eta) return;
         const ts = new Date(e.eta).getTime();
         if (ts < now - 30000) return;
+        etaCount++;
         const key = `${e.route}_${e.dir || 'O'}`;
         if (!routeMap.has(key)) {
           routeMap.set(key, {
@@ -141,8 +149,12 @@ async function fetchCTBEtas(nearby, now) {
         }
       });
       routeMap.forEach(r => results.push(r));
-    } catch (e) { console.warn('[CTB eta]', stop.id, e.message); }
+    } catch (e) {
+      fetchFail++;
+      console.warn('[CTB eta]', stop.id, e.message);
+    }
   }));
+  console.log(`[CTB] done: ok=${fetchOk} fail=${fetchFail} etas=${etaCount} routes=${results.length}`);
   return results;
 }
 
@@ -206,57 +218,22 @@ async function fetchLRTEtas(nearby) {
   return results;
 }
 
-// ── 聯營路線名單（由 routes.json 實際數據驅動，去除啟發式規則）────────
-// 只收錄確認由 KMB+CTB 聯合營辦的過海及跨區路線
+// ── 聯營路線名單 ──────────────────────────────────────────
 const JOINT_ROUTES = new Set([
-  // 過海隧道路線（1xx）
-  '101','101P','101R','101X',
-  '102','102P','102R',
-  '103','104',
-  '106','106A','106P',
-  '107','107P',
-  '109','110',
-  '111','111P',
-  '112','113',
-  '115','115P',
-  '116','117',
-  '118','118P','118R',
-  // 東區走廊 / 紅隧路線（1xx 其他）
-  '170','171','171A','171P',
-  '182','182X',
-  // 3xx 系列
-  '302','302A',
-  '307','307A','307P',
-  // 6xx 過海路線
-  '601','601P',
-  '606','606A','606X',
-  '619','619P','619X',
-  '621','641',
-  '671','671X',
-  '678',
-  '680','680B','680P','680X',
-  '681','681P',
-  '690','690P','690S',
-  '694',
-  // 9xx 過海路線
-  '904','905','905A','905P',
-  '907C','907D',
-  '914','914P','914X',
+  '101','101P','101R','101X','102','102P','102R','103','104',
+  '106','106A','106P','107','107P','109','110','111','111P','112','113',
+  '115','115P','116','117','118','118P','118R',
+  '170','171','171A','171P','182','182X',
+  '302','302A','307','307A','307P',
+  '601','601P','606','606A','606X','619','619P','619X','621','641',
+  '671','671X','678','680','680B','680P','680X','681','681P','690','690P','690S','694',
+  '904','905','905A','905P','907C','907D','914','914P','914X',
   '948','948A','948B','948E','948P','948X',
-  '980','980A','980X',
-  '981','981P',
-  '982','982X',
-  '985','985A','985B',
-  // 夜間聯營路線（N 系列）
-  'N116','N118','N121','N122',
-  'N170','N171','N182',
-  'N307',
-  'N619','N680','N691',
-  // 特別路線
-  'R8','S1','X1','SP10','SP12',
+  '980','980A','980X','981','981P','982','982X','985','985A','985B',
+  'N116','N118','N121','N122','N170','N171','N182','N307',
+  'N619','N680','N691','R8','S1','X1','SP10','SP12',
 ]);
 
-// ✅ 修正：移除錯誤的啟發式 regex 規則，只用明確名單
 function isJointRoute(route) {
   return JOINT_ROUTES.has(route);
 }
@@ -265,7 +242,6 @@ function isJointRoute(route) {
 async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
   const routeMap = new Map(kmbMap);
 
-  // CTB 合併與處理
   ctbRows.forEach(r => {
     const isJoint = isJointRoute(r.route);
     const matchKey =
@@ -275,7 +251,6 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
       routeMap.has(`${r.route}_I_lwb`) ? `${r.route}_I_lwb` : null;
 
     if (matchKey) {
-      // 有九巴/龍運記錄，合併為聯營
       const ex = routeMap.get(matchKey);
       ex.companyType = 'joint';
       r.etasWithType.forEach(e => {
@@ -286,17 +261,11 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows) {
     } else {
       const k = `${r.route}_${r.dir}_ctb`;
       if (!routeMap.has(k)) {
-        routeMap.set(k, {
-          ...r,
-          serviceType: '1',
-          companyType: isJoint ? 'joint' : 'ctb',
-          fare: null,
-        });
+        routeMap.set(k, { ...r, serviceType: '1', companyType: isJoint ? 'joint' : 'ctb', fare: null });
       }
     }
   });
 
-  // 若屬聯營路線，但附近只有九巴/龍運站，仍以「聯營」顯示
   routeMap.forEach((v) => {
     if ((v.companyType === 'kmb' || v.companyType === 'lwb') && isJointRoute(v.route)) {
       v.companyType = 'joint';
@@ -368,6 +337,11 @@ export function useNearby(transportSettings) {
         .filter(s => s.dist <= dist && s.dist > 0 && !isNaN(s.dist))
         .sort((a, b) => a.dist - b.dist);
 
+      console.log('[nearby] total nearby:', nearby.length,
+        '| kmb:', nearby.filter(s=>s.co==='kmb').length,
+        '| ctb:', nearby.filter(s=>s.co==='ctb').length,
+        '| dist:', dist);
+
       if (!nearby.length) {
         if (myId !== loadId.current) return;
         setRows([]); setStatus('ready'); return;
@@ -380,18 +354,20 @@ export function useNearby(transportSettings) {
       setRows(phase1);
       setStatus('ready');
 
-      // Phase 2: CTB + MTR + LRT 並行背景更新
-      // ✅ 修正：CTB 預設開啟（!== false），只有用戶明確關閉才跳過
+      // Phase 2: CTB 永遠抓取（主頁不受 transportSettings 限制）
+      //          MTR/LRT 仍按設定
       const [ctbRows, mtrRows, lrtRows] = await Promise.all([
-        (transportSettings?.ctb !== false) ? fetchCTBEtas(nearby, now) : Promise.resolve([]),
-        (transportSettings?.mtr === true)  ? fetchMTREtas(nearby)      : Promise.resolve([]),
-        (transportSettings?.lrt === true)  ? fetchLRTEtas(nearby)      : Promise.resolve([]),
+        fetchCTBEtas(nearby, now),
+        (transportSettings?.mtr === true) ? fetchMTREtas(nearby) : Promise.resolve([]),
+        (transportSettings?.lrt === true) ? fetchLRTEtas(nearby) : Promise.resolve([]),
       ]);
       if (myId !== loadId.current) return;
       if (ctbRows.length || mtrRows.length || lrtRows.length) {
         const final = await buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows);
         if (myId !== loadId.current) return;
         setRows(final);
+      } else {
+        console.log('[nearby] Phase 2 empty: ctb=0 mtr=0 lrt=0');
       }
     } catch (e) {
       console.warn('[nearby]', e);
