@@ -112,36 +112,47 @@ async function fetchKMBLWBEtas(nearby, now) {
 
 // ── CTB ETA ───────────────────────────────────────────────
 // ✅ 主頁永遠抓取城巴，不受 transportSettings 限制
+// ✅ v2 API 不支援 /all，改為用 stops.json 裡的 routes 欄位逐條路線查詢
 async function fetchCTBEtas(nearby, now) {
-  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 30);
+  const stops = nearby.filter(s => s.co === 'ctb').slice(0, 20);
   console.log('[CTB] nearby ctb stops:', stops.length,
-    stops.slice(0, 3).map(s => `${s.n}(${Math.round(s.dist)}m)`));
+    stops.slice(0, 3).map(s => `${s.n}(${Math.round(s.dist)}m) routes:${(s.routes||[]).length}`));
   if (!stops.length) return [];
+
+  // 建立 stop+route 查詢任務（每個站點逐條路線查詢）
+  const tasks = [];
+  stops.forEach(stop => {
+    const routeList = stop.routes || [];
+    if (!routeList.length) {
+      // 舊版 stops.json 無 routes 欄位時的降級方案
+      console.warn('[CTB] stop has no routes field:', stop.id, '— 請重新執行爬蟲');
+    }
+    routeList.forEach(route => tasks.push({ stop, route }));
+  });
+
+  if (!tasks.length) {
+    console.warn('[CTB] no tasks — stops.json 可能未含 routes 欄位，請重新執行爬蟲更新 stops.json');
+    return [];
+  }
+
   const results = [];
+  const routeMap = new Map();
   let fetchOk = 0, fetchFail = 0, etaCount = 0;
-  let _firstLog = true;
-  await Promise.all(stops.map(async stop => {
+
+  await Promise.all(tasks.map(async ({ stop, route }) => {
     try {
-      const url = `${CTB_API}/eta/CTB/${stop.id}/all`;
+      const url = `${CTB_API}/eta/CTB/${stop.id}/${route}`;
       const d = await fetch(url, { signal: AbortSignal.timeout(8000) }).then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       });
       fetchOk++;
-      // 首個站點：印出原始回應供診斷
-      if (_firstLog) {
-        _firstLog = false;
-        console.log('[CTB raw]', stop.id, stop.n,
-          'data len:', d.data?.length,
-          'sample:', JSON.stringify(d.data?.slice(0, 2)));
-      }
-      const routeMap = new Map();
       (d.data || []).forEach(e => {
         if (!e.eta) return;
         const ts = new Date(e.eta).getTime();
         if (ts < now - 30000) return;
         etaCount++;
-        const key = `${e.route}_${e.dir || 'O'}`;
+        const key = `${e.route}_${e.dir || 'O'}_${stop.id}`;
         if (!routeMap.has(key)) {
           routeMap.set(key, {
             route: e.route, dest: e.dest_tc || '',
@@ -156,12 +167,13 @@ async function fetchCTBEtas(nearby, now) {
             ex.etasWithType.push({ ts, type: 'ctb' });
         }
       });
-      routeMap.forEach(r => results.push(r));
     } catch (e) {
       fetchFail++;
-      console.warn('[CTB eta]', stop.id, e.message);
+      console.warn('[CTB eta]', stop.id, route, e.message);
     }
   }));
+
+  routeMap.forEach(r => results.push(r));
   console.log(`[CTB] done: ok=${fetchOk} fail=${fetchFail} etas=${etaCount} routes=${results.length}`);
   return results;
 }
