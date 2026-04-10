@@ -119,6 +119,7 @@ async function fetchCTBEtas(nearby, now) {
   if (!stops.length) return [];
   const results = [];
   let fetchOk = 0, fetchFail = 0, etaCount = 0;
+  let _firstLog = true;
   await Promise.all(stops.map(async stop => {
     try {
       const url = `${CTB_API}/eta/CTB/${stop.id}/all`;
@@ -127,6 +128,13 @@ async function fetchCTBEtas(nearby, now) {
         return r.json();
       });
       fetchOk++;
+      // 首個站點：印出原始回應供診斷
+      if (_firstLog) {
+        _firstLog = false;
+        console.log('[CTB raw]', stop.id, stop.n,
+          'data len:', d.data?.length,
+          'sample:', JSON.stringify(d.data?.slice(0, 2)));
+      }
       const routeMap = new Map();
       (d.data || []).forEach(e => {
         if (!e.eta) return;
