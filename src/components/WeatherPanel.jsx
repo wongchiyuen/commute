@@ -19,9 +19,10 @@ export default function WeatherPanel({ weatherData, selectedStn, refreshing, onR
   const clockStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}（${DAY[now.getDay()]}）`;
 
-  // Filter hourly to only future hours
+  // 只顯示當前小時起的未來時段
   const nowHourInt = parseInt(
-    `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`
+    `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}` +
+    `${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`
   );
   const upcomingHourly = hourlyForecast
     .filter(h => parseInt(String(h.forecastHour)) >= nowHourInt)
@@ -74,16 +75,17 @@ export default function WeatherPanel({ weatherData, selectedStn, refreshing, onR
 
       {forecast.length > 0 && (
         <>
-          {/* 模式標籤列 */}
+          {/* 模式標籤列 — 點擊切換 */}
           <div
+            onClick={() => canToggle && setShowHourly(v => !v)}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '4px 6px 2px', cursor: canToggle ? 'pointer' : 'default',
+              padding: '4px 6px 2px',
+              cursor: canToggle ? 'pointer' : 'default',
               userSelect: 'none',
             }}
-            onClick={() => canToggle && setShowHourly(v => !v)}
           >
-            <span style={{ fontSize: 10, color: 'var(--mid)', opacity: 0.65, letterSpacing: '0.03em' }}>
+            <span style={{ fontSize: 10, color: 'var(--mid)', opacity: 0.65 }}>
               {showHourly ? '每小時預報' : '每日預報'}
             </span>
             {canToggle && (
@@ -93,7 +95,7 @@ export default function WeatherPanel({ weatherData, selectedStn, refreshing, onR
             )}
           </div>
 
-          {/* 預報橫列 */}
+          {/* 預報橫列 — 整行亦可點擊切換 */}
           <div
             className="w-fore"
             onClick={() => canToggle && setShowHourly(v => !v)}
@@ -102,13 +104,12 @@ export default function WeatherPanel({ weatherData, selectedStn, refreshing, onR
             {showHourly ? (
               upcomingHourly.map((h, i) => {
                 const hrStr = String(h.forecastHour || '').slice(-2);
-                const iconCode = h.forecastWeatherIcon;
-                const isNowSlot = i === 0;
+                const isNow = i === 0;
                 return (
-                  <div key={i} className={`fc${isNowSlot ? ' hl' : ''}`}>
-                    <div className={`fc-date${isNowSlot ? ' named' : ''}`}>{hrStr}時</div>
+                  <div key={i} className={`fc${isNow ? ' hl' : ''}`}>
+                    <div className={`fc-date${isNow ? ' named' : ''}`}>{hrStr}時</div>
                     <div className="fc-day" style={{ minHeight: '1em' }} />
-                    <div className="fc-ico">{W_ICONS[iconCode] ?? '🌡'}</div>
+                    <div className="fc-ico">{h.icon ?? '🌡'}</div>
                     <div className="fc-tt">
                       <span className="fc-hi">{h.forecastTemperature ?? '--'}°</span>
                     </div>
