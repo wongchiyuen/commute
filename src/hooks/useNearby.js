@@ -56,6 +56,9 @@ let _ctbStopsCache = null;
 let _ctbStopsLoading = false;
 let _ctbStopsCallbacks = [];
 
+// alias for RoutePage.jsx compatibility
+export const ensureStops = (...args) => ensureCTBStops(...args);
+
 export async function ensureCTBStops() {
   if (_ctbStopsCache?.length) return _ctbStopsCache;
 
