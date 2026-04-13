@@ -73,6 +73,16 @@ export async function fetchAllKMBStops() {
 }
 
 // ── KMB + LWB ETA ─────────────────────────────────────────
+// ── LWB 龍運路線靜態名單（KMB stop-eta API 的 e.co 永遠回傳 'KMB'，不區分龍運）
+const LWB_ROUTES = new Set([
+  'E21','E21A','E21P','E22','E22A','E22B','E22P','E22S','E23','E23P','E24','E24P',
+  'E31','E32','E33','E34','E35',
+  'A31','A32','A33','A35','A36','A37','A40','A41','A43','A44','A45','A47',
+  'A60','A65','A70','A73','A74',
+  'NR31','NR32','NR33','NR34','NR35','NR36','NR737','NR831',
+  'R8','R33','R42',
+]);
+
 async function fetchKMBLWBEtas(nearby, now) {
   const stops = nearby.filter(s => s.co === 'kmb' || s.co === 'lwb').slice(0, 20);
   if (!stops.length) return new Map();
@@ -82,16 +92,14 @@ async function fetchKMBLWBEtas(nearby, now) {
     )
   );
   const routeMap = new Map();
-  // LWB debug: 收集所有唯一 e.co 值
-  const coValues = new Set();
   results.forEach((res, i) => {
     const stop = stops[i];
     (res.data || []).forEach(e => {
-      if (e.co) coValues.add(e.co);
       if (!e.eta) return;
       const ts = new Date(e.eta).getTime();
       if (ts < now - 30000) return;
-      const co = (e.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb';
+      // ✅ e.co 欄位不可信（永遠回傳 KMB），改用路線號碼靜態名單識別龍運
+      const co = LWB_ROUTES.has(e.route) ? 'lwb' : 'kmb';
       const key = `${e.route}_${e.dir}_${co}`;
       if (!routeMap.has(key)) {
         routeMap.set(key, {
@@ -110,9 +118,6 @@ async function fetchKMBLWBEtas(nearby, now) {
       }
     });
   });
-  const lwbRoutes = [...routeMap.values()].filter(r => r.companyType === 'lwb').map(r => r.route);
-  console.log('[KMB/LWB] e.co values seen:', [...coValues]);
-  console.log('[KMB/LWB] LWB routes found:', lwbRoutes);
   return routeMap;
 }
 
