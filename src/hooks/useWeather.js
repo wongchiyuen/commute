@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { HKO, HKO_C, W_ICONS, WARN_MAP, AMB_WARNS, RHRREAD_STNS, TIDE_STNS, CLIMATE_STNS } from '../constants/weather.js';
+import { useState, useCallback, useRef } from 'react';
+import { HKO, HKO_C, HKO_T, W_ICONS, WARN_MAP, AMB_WARNS, RHRREAD_STNS, TIDE_STNS, CLIMATE_STNS } from '../constants/weather.js';
 import { nearestOf } from '../utils/geo.js';
 import { num, hkoFind } from '../utils/format.js';
 
@@ -7,23 +7,10 @@ const _WARN_STORE_KEY = 'swd_last_warns';
 function getStoredWarns() { try { return JSON.parse(localStorage.getItem(_WARN_STORE_KEY) || '[]'); } catch { return []; } }
 function setStoredWarns(arr) { try { localStorage.setItem(_WARN_STORE_KEY, JSON.stringify(arr)); } catch {} }
 
-// WMO weather code → emoji（Open-Meteo 使用 WMO 標準）
-const WMO_ICONS = {
-  0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️',
-  45: '🌫', 48: '🌫',
-  51: '🌦', 53: '🌦', 55: '🌧',
-  61: '🌧', 63: '🌧', 65: '🌧',
-  71: '🌨', 73: '🌨', 75: '❄️', 77: '🌨',
-  80: '🌦', 81: '🌧', 82: '⛈',
-  85: '🌨', 86: '❄️',
-  95: '⛈', 96: '⛈', 99: '⛈',
-};
-
 export function useWeather(selectedStn, gpsCoords) {
   const [weatherData, setWeatherData] = useState({
     temp: null, icon: '🌡', humidity: null, humidityStn: '',
     warns: [], desc: '', forecast: [],
-    hourlyForecast: [],
     todayMaxT: null, todayMinT: null,
     tide: [], tideLoaded: false, tideStn: '',
     sunrise: null, sunset: null,
@@ -33,23 +20,11 @@ export function useWeather(selectedStn, gpsCoords) {
 
   const loadWeather = useCallback(async (onNewWarn) => {
     try {
-      // 決定座標（GPS > 選定站點 > 香港天文台預設）
-      const stnCoords = RHRREAD_STNS.find(s => s.n === selectedStn);
-      const hLat = gpsCoords?.lat ?? stnCoords?.lat ?? 22.3193;
-      const hLng = gpsCoords?.lng ?? stnCoords?.lng ?? 114.1694;
-
-      const [rhr, flw, fnd, warn, hourlyRes] = await Promise.all([
+      const [rhr, flw, fnd, warn] = await Promise.all([
         fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=flw&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=fnd&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r => r.json()),
-        // Open-Meteo 每小時預報（免費，無需 API key）
-        fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${hLat}&longitude=${hLng}` +
-          `&hourly=temperature_2m,relativehumidity_2m,weathercode` +
-          `&timezone=Asia%2FHong_Kong&forecast_days=2`,
-          { signal: AbortSignal.timeout(8000) }
-        ).then(r => r.json()).catch(() => null),
       ]);
 
       const te = hkoFind(rhr.temperature?.data, selectedStn);
@@ -60,26 +35,13 @@ export function useWeather(selectedStn, gpsCoords) {
         .filter(([, v]) => v?.actionCode && v.actionCode !== 'CANCEL')
         .map(([k]) => k);
 
-      // 警告通知
+      // Local notification check
       const last = getStoredWarns();
       const newWarns = aw.filter(k => !last.includes(k));
       const lifted = last.filter(k => !aw.includes(k));
       setStoredWarns(aw);
       if ((newWarns.length || lifted.length) && onNewWarn) {
         onNewWarn(newWarns, lifted, warn);
-      }
-
-      // 解析 Open-Meteo 每小時資料
-      let hourlyForecast = [];
-      if (hourlyRes?.hourly) {
-        const { time, temperature_2m, relativehumidity_2m, weathercode } = hourlyRes.hourly;
-        hourlyForecast = time.map((t, i) => ({
-          // "2026-04-13T09:00" → "2026041309"
-          forecastHour: t.replace(/[-:T]/g, '').slice(0, 10),
-          forecastTemperature: Math.round(temperature_2m[i]),
-          forecastRelativeHumidity: relativehumidity_2m[i],
-          icon: WMO_ICONS[weathercode[i]] ?? '🌡',
-        }));
       }
 
       setWeatherData(prev => ({
@@ -91,12 +53,11 @@ export function useWeather(selectedStn, gpsCoords) {
         warns: aw,
         desc: flw.forecastDesc || flw.outlook || '',
         forecast: fcs,
-        hourlyForecast,
         todayMaxT: num(fcs[0]?.forecastMaxtemp),
         todayMinT: num(fcs[0]?.forecastMintemp),
       }));
 
-      // 背景載入額外資料
+      // Load extra weather in background
       _loadExtra(selectedStn, gpsCoords, setWeatherData);
     } catch (e) { console.warn('[weather]', e); }
   }, [selectedStn, gpsCoords]);
