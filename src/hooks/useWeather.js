@@ -11,6 +11,7 @@ export function useWeather(selectedStn, gpsCoords) {
   const [weatherData, setWeatherData] = useState({
     temp: null, icon: '🌡', humidity: null, humidityStn: '',
     warns: [], desc: '', forecast: [],
+    hourlyForecast: [],
     todayMaxT: null, todayMinT: null,
     tide: [], tideLoaded: false, tideStn: '',
     sunrise: null, sunset: null,
@@ -20,11 +21,12 @@ export function useWeather(selectedStn, gpsCoords) {
 
   const loadWeather = useCallback(async (onNewWarn) => {
     try {
-      const [rhr, flw, fnd, warn] = await Promise.all([
+      const [rhr, flw, fnd, warn, fhfd] = await Promise.all([
         fetch(`${HKO}?dataType=rhrread&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=flw&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=fnd&lang=tc`).then(r => r.json()),
         fetch(`${HKO}?dataType=warnsum&lang=tc`).then(r => r.json()),
+        fetch(`${HKO}?dataType=fhfd&lang=tc`).then(r => r.json()).catch(() => ({ hourlyWeatherForecast: [] })),
       ]);
 
       const te = hkoFind(rhr.temperature?.data, selectedStn);
@@ -53,6 +55,7 @@ export function useWeather(selectedStn, gpsCoords) {
         warns: aw,
         desc: flw.forecastDesc || flw.outlook || '',
         forecast: fcs,
+        hourlyForecast: fhfd.hourlyWeatherForecast || [],
         todayMaxT: num(fcs[0]?.forecastMaxtemp),
         todayMinT: num(fcs[0]?.forecastMintemp),
       }));
