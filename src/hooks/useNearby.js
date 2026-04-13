@@ -82,9 +82,12 @@ async function fetchKMBLWBEtas(nearby, now) {
     )
   );
   const routeMap = new Map();
+  // LWB debug: 收集所有唯一 e.co 值
+  const coValues = new Set();
   results.forEach((res, i) => {
     const stop = stops[i];
     (res.data || []).forEach(e => {
+      if (e.co) coValues.add(e.co);
       if (!e.eta) return;
       const ts = new Date(e.eta).getTime();
       if (ts < now - 30000) return;
@@ -107,6 +110,9 @@ async function fetchKMBLWBEtas(nearby, now) {
       }
     });
   });
+  const lwbRoutes = [...routeMap.values()].filter(r => r.companyType === 'lwb').map(r => r.route);
+  console.log('[KMB/LWB] e.co values seen:', [...coValues]);
+  console.log('[KMB/LWB] LWB routes found:', lwbRoutes);
   return routeMap;
 }
 
