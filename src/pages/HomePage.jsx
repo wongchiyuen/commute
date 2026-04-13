@@ -3,7 +3,7 @@ import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.js
 import { useWeather } from '../hooks/useWeather.js';
 import { useGeolocation } from '../hooks/useGeolocation.js';
 import { useNearby, incrementRouteUsage, fetchAllKMBStops } from '../hooks/useNearby.js';
-import { KMB, CTB } from '../constants/transport.js';
+import { KMB } from '../constants/transport.js';
 import { RHRREAD_STNS } from '../constants/weather.js';
 import { nearestOf } from '../utils/geo.js';
 import { fetchKMBFare } from '../utils/fare.js';
@@ -18,8 +18,6 @@ function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
 export default function HomePage({ openDrawer, showToast }) {
   const {
-    setActivePage,
-    setAddRouteTargetPid,
     activePid, setActivePid, profiles,
     nearbyDist, setNearbyDist,
     gpsCoords, saveGps,
@@ -34,9 +32,7 @@ export default function HomePage({ openDrawer, showToast }) {
   const [showSlider, setShowSlider] = useState(false);
   const [sliderIdx, setSliderIdx] = useState(3);
   const [mapView, setMapView] = useState(false);
-  const mapElRef = useRef(null);
-  const leafletMapRef = useRef(null);
-  const markerLayerRef = useRef(null);
+  const [editMode, setEditMode] = useState(false);
 
   const { weatherData, loadWeather } = useWeather(selectedStn, gpsCoords);
   const { getCurrentPosition, checkPermission } = useGeolocation();
@@ -79,209 +75,23 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // 距離變化時重新載入
   useEffect(() => {
-    if (isNearby && gpsCoords) {
-      nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-      showToast(`🔍 已將搜尋範圍改為 ${distLabel(nearbyDist)}`);
-    }
+    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
   // eslint-disable-next-line
   }, [nearbyDist]);
 
-  // ── Nearby map（Leaflet）──────────────────────────────────
-  useEffect(() => {
-    let mapInstance = null;
-    let timer = null;
-
-    // 只有在 isNearby && mapView 為真時才嘗試操作地圖
-    if (!isNearby || !mapView || !mapElRef.current) {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-        markerLayerRef.current = null;
-      }
-      return;
-    }
-
-    const L = window.L;
-    if (!L) return;
-
-    try {
-      if (!leafletMapRef.current) {
-        const center = gpsCoords ? [gpsCoords.lat, gpsCoords.lng] : [22.3193, 114.1694];
-        mapInstance = L.map(mapElRef.current, { 
-          zoomControl: false, 
-          attributionControl: false 
-        }).setView(center, gpsCoords ? 15 : 11);
-        
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-        }).addTo(mapInstance);
-        
-        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-        leafletMapRef.current = mapInstance;
-        markerLayerRef.current = L.layerGroup().addTo(mapInstance);
-      }
-
-      const map = leafletMapRef.current;
-      const layer = markerLayerRef.current;
-      if (!map || !layer) return;
-
-      // 重要：給予一些時間讓 React 完成 DOM 渲染
-      timer = setTimeout(() => {
-        if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
-      }, 200);
-
-      layer.clearLayers();
-      const points = [];
-      
-      if (gpsCoords) {
-        points.push([gpsCoords.lat, gpsCoords.lng]);
-        L.circleMarker([gpsCoords.lat, gpsCoords.lng], {
-          radius: 8, color: '#fff', weight: 2, fillColor: '#007bff', fillOpacity: 0.9,
-        }).addTo(layer);
-        L.circle([gpsCoords.lat, gpsCoords.lng], {
-          radius: nearbyDist, color: '#007bff', weight: 1, fillColor: '#007bff', fillOpacity: 0.05, dashArray: '5, 5'
-        }).addTo(layer);
-      }
-
-      const stopMap = new Map();
-      (nearbyHook.rows || []).forEach(r => {
-        if (r?.stopLat && r?.stopLng && r?.stopId) {
-          if (!stopMap.has(r.stopId)) stopMap.set(r.stopId, []);
-          stopMap.get(r.stopId).push(r);
-        }
-      });
-
-      stopMap.forEach((routes, stopId) => {
-        const r = routes[0];
-        const lat = Number(r.stopLat);
-        const lng = Number(r.stopLng);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          points.push([lat, lng]);
-          
-          const routeCount = routes.length;
-          const displayRoute = r.route || '';
-          const hasMore = routeCount > 1;
-          
-          // 決定標記顏色：如果是聯營或有多種營辦商，用 joint 色
-          const cos = new Set(routes.map(x => x.companyType));
-          const mainCo = cos.size > 1 ? 'joint' : r.companyType;
-
-          const icon = L.divIcon({
-            className: 'custom-stop-icon',
-            html: `<div class="stop-pill ${mainCo}">
-                    <div class="co-dot"></div>
-                    <span>${displayRoute}${hasMore ? `<small>+${routeCount-1}</small>` : ''}</span>
-                  </div>`,
-            iconSize: [hasMore ? 80 : 60, 24],
-            iconAnchor: [hasMore ? 40 : 30, 12],
-          });
-          const eta = r.etasWithType?.[0]?.ts ? Math.max(0, Math.round((r.etasWithType[0].ts - Date.now()) / 60000)) : null;
-          const etaTxt = eta == null ? '無班次' : eta <= 0 ? '即將' : `${eta}分`;
-          const popup = `
-            <div class="map-popup">
-              <div class="map-popup-title">${r.stopName || '未知站點'}</div>
-              <div class="map-popup-routes">${routes.map(x => `<b>${x.route || ''}</b>`).join(' ')}</div>
-              <div class="map-popup-eta">下一班：${etaTxt}</div>
-            </div>
-          `;
-          L.marker([lat, lng], { icon }).bindPopup(popup).addTo(layer);
-        }
-      });
-
-      if (points.length > 1) {
-        map.fitBounds(points, { padding: [24, 24], maxZoom: 16 });
-      } else if (points.length === 1) {
-        map.setView(points[0], 15);
-      } else if (gpsCoords) {
-        // 如果沒有點，但有 GPS，則以 GPS 為中心並根據距離縮放
-        const zoom = nearbyDist <= 300 ? 17 : nearbyDist <= 1000 ? 15 : 14;
-        map.setView([gpsCoords.lat, gpsCoords.lng], zoom);
-      }
-    } catch (e) {
-      console.error('Home map error:', e);
-    }
-
-    return () => { if (timer) clearTimeout(timer); };
-  }, [isNearby, mapView, gpsCoords, nearbyHook.rows, nearbyDist]);
-
-  // 移除舊有的 [isNearby] 清理 effect，因為上面已經整合咗
-  // (即係刪除原本 157-164 行嘅 useEffect)
-  
   // ── Favs ──────────────────────────────────────────────────
-  const fetchFavEtas = useCallback(async (fav, now) => {
-    const favType = (fav.type || '').toLowerCase();
-    const isKnownType = ['kmb', 'lwb', 'ctb', 'joint'].includes(favType);
-
-    const loadKmbLike = async () => {
-      const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
-      const etas = (d.data || [])
-        .filter(e => e.eta)
-        .map(e => ({
-          ts: new Date(e.eta).getTime(),
-          type: (e.co || '').toUpperCase() === 'LWB' ? 'lwb' : 'kmb',
-        }))
-        .filter(e => e.ts > now - 30000)
-        .sort((a, b) => a.ts - b.ts)
-        .slice(0, 3);
-      const hasKmb = etas.some(e => e.type === 'kmb');
-      const hasLwb = etas.some(e => e.type === 'lwb');
-      const companyType = hasKmb && hasLwb ? 'joint' : hasLwb ? 'lwb' : 'kmb';
-      return { etasWithType: etas, companyType };
-    };
-
-    const loadCtb = async () => {
-      const d = await fetch(`${CTB}/eta/CTB/${fav.stopId}/${fav.route}`).then(r => r.json());
-      const etas = (d.data || [])
-        .filter(e => e.eta)
-        .map(e => ({ ts: new Date(e.eta).getTime(), type: 'ctb' }))
-        .filter(e => e.ts > now - 30000)
-        .sort((a, b) => a.ts - b.ts)
-        .slice(0, 3);
-      return { etasWithType: etas, companyType: 'ctb' };
-    };
-
-    if (favType === 'ctb') return loadCtb();
-    if (favType === 'joint') {
-      const [kmbRes, ctbRes] = await Promise.allSettled([loadKmbLike(), loadCtb()]);
-      const kmbEtas = kmbRes.status === 'fulfilled' ? kmbRes.value.etasWithType : [];
-      const ctbEtas = ctbRes.status === 'fulfilled' ? ctbRes.value.etasWithType : [];
-      const merged = [...kmbEtas, ...ctbEtas]
-        .filter(e => e.ts > now - 30000)
-        .sort((a, b) => a.ts - b.ts)
-        .slice(0, 3);
-      const hasKmbLike = merged.some(e => e.type === 'kmb' || e.type === 'lwb');
-      const hasCtb = merged.some(e => e.type === 'ctb');
-      const companyType = hasKmbLike && hasCtb ? 'joint' : hasCtb ? 'ctb' : 'kmb';
-      return { etasWithType: merged, companyType };
-    }
-
-    // 舊資料可能沒有 type：並行探測 KMB/CTB，避免誤判導致城巴永遠空白
-    if (!isKnownType) {
-      const [kmbRes, ctbRes] = await Promise.allSettled([loadKmbLike(), loadCtb()]);
-      const kmbEtas = kmbRes.status === 'fulfilled' ? kmbRes.value.etasWithType : [];
-      const ctbEtas = ctbRes.status === 'fulfilled' ? ctbRes.value.etasWithType : [];
-      const merged = [...kmbEtas, ...ctbEtas]
-        .filter(e => e.ts > now - 30000)
-        .sort((a, b) => a.ts - b.ts)
-        .slice(0, 3);
-      if (!merged.length) return { etasWithType: [], companyType: 'kmb' };
-      const hasKmbLike = merged.some(e => e.type === 'kmb' || e.type === 'lwb');
-      const hasCtb = merged.some(e => e.type === 'ctb');
-      const companyType = hasKmbLike && hasCtb ? 'joint' : hasCtb ? 'ctb' : 'kmb';
-      return { etasWithType: merged, companyType };
-    }
-
-    return loadKmbLike();
-  }, []);
-
   const _refreshFavs = useCallback(async () => {
     const favList = loadFavs(activePid);
     if (!favList.length) { setFavRows([]); return; }
     const now = Date.now();
     const results = await Promise.all(favList.map(async fav => {
       try {
-        const { etasWithType, companyType } = await fetchFavEtas(fav, now);
-        return { ...fav, etasWithType, companyType, fare: null };
+        const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
+        const etas = (d.data || []).filter(e => e.eta)
+          .slice(0, 3)
+          .map(e => new Date(e.eta).getTime())
+          .filter(ts => ts > now - 30000);
+        return { ...fav, etasWithType: etas.map(ts => ({ ts, type: fav.type || 'kmb' })), companyType: fav.type || 'kmb', fare: null };
       } catch {
         return { ...fav, etasWithType: [], companyType: fav.type || 'kmb', fare: null };
       }
@@ -293,7 +103,7 @@ export default function HomePage({ openDrawer, showToast }) {
       const fare = await fetchKMBFare(r.route, 'O', r.serviceType).catch(() => null);
       if (fare != null) setFavRows(prev => prev.map((row, j) => j === i ? { ...row, fare } : row));
     });
-  }, [activePid, fetchFavEtas]);
+  }, [activePid]);
 
   const removeFav = useCallback((idx) => {
     const favList = loadFavs(activePid);
@@ -301,6 +111,23 @@ export default function HomePage({ openDrawer, showToast }) {
     favList.splice(idx, 1);
     saveFavs(activePid, favList);
     setFavRows(prev => prev.filter((_, i) => i !== idx));
+  }, [activePid]);
+
+  // ── 收藏排序 ──────────────────────────────────────────────
+  const moveFav = useCallback((idx, dir) => {
+    const newIdx = idx + dir;
+    setFavRows(prev => {
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+      // 同步儲存
+      const favList = loadFavs(activePid);
+      if (favList.length === next.length) {
+        [favList[idx], favList[newIdx]] = [favList[newIdx], favList[idx]];
+        saveFavs(activePid, favList);
+      }
+      return next;
+    });
   }, [activePid]);
 
   // ── Refresh ───────────────────────────────────────────────
@@ -318,6 +145,7 @@ export default function HomePage({ openDrawer, showToast }) {
 
   // ── Profile switch ────────────────────────────────────────
   const switchToNearby = () => {
+    setEditMode(false);
     setActivePid(NEARBY_PID);
     if (gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
     else {
@@ -329,16 +157,11 @@ export default function HomePage({ openDrawer, showToast }) {
   };
 
   const switchProfile = (pid) => {
+    setEditMode(false);
     setActivePid(pid);
     reloadFavs(pid);
     setTimeout(() => _refreshFavs(), 0);
   };
-
-  // ── 開啟路線詳情（附帶完整 row 資料）────────────────────
-  const openRouteDetail = useCallback((row) => {
-    incrementRouteUsage(row.route, row.companyType);
-    openDrawer(`${row.route} 路線詳情`, 'bus-detail', row);
-  }, [openDrawer]);
 
   // ── Nearby content ────────────────────────────────────────
   const renderNearbyContent = () => {
@@ -367,7 +190,10 @@ export default function HomePage({ openDrawer, showToast }) {
         );
         return nearbyHook.rows.map((row, i) => (
           <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
-            onClick={row.companyType !== 'mtr' ? () => openRouteDetail(row) : undefined}
+            onClick={row.companyType !== 'mtr' ? () => {
+              incrementRouteUsage(row.route, row.companyType);
+              openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+            } : undefined}
           />
         ));
       default: return <Spinner />;
@@ -416,9 +242,26 @@ export default function HomePage({ openDrawer, showToast }) {
             </button>
           )}
           {!isNearby && (
-            <button className="add-btn" onClick={() => { setAddRouteTargetPid(activePid); setActivePage('search'); }}>
-              ＋ 加路線
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {/* 排序編輯按鈕（有收藏才顯示）*/}
+              {favRows.length > 0 && (
+                <button
+                  onClick={() => setEditMode(v => !v)}
+                  style={{
+                    background: editMode ? 'var(--amb)' : 'var(--bg3)',
+                    color: editMode ? '#000' : 'var(--mid)',
+                    border: '1px solid var(--bdr2)',
+                    borderRadius: 8, padding: '5px 12px',
+                    fontSize: 12, fontWeight: editMode ? 700 : 400,
+                    cursor: 'pointer',
+                  }}>
+                  {editMode ? '完成' : '排序'}
+                </button>
+              )}
+              {!editMode && (
+                <button className="add-btn" onClick={() => openDrawer('搜尋路線', 'search')}>＋ 加路線</button>
+              )}
+            </div>
           )}
         </div>
 
@@ -451,16 +294,24 @@ export default function HomePage({ openDrawer, showToast }) {
                 <div className="empty-sub">點擊「加路線」搜尋巴士班次</div>
               </div>
             ) : favRows.map((row, i) => (
-              <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
-                onRemove={removeFav}
-                onClick={() => openRouteDetail(row)}
+              <BusCard
+                key={`${row.route}_${row.stopId}_${i}`}
+                row={row}
+                idx={i}
+                onRemove={editMode ? removeFav : undefined}
+                onMoveUp={editMode && i > 0 ? () => moveFav(i, -1) : undefined}
+                onMoveDown={editMode && i < favRows.length - 1 ? () => moveFav(i, 1) : undefined}
+                onClick={!editMode ? () => {
+                  incrementRouteUsage(row.route, row.companyType);
+                  openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+                } : undefined}
               />
             ))
           )}
         </div>
 
         {isNearby && mapView && (
-          <div ref={mapElRef} id="nearby-map" style={{ flex: 1, minHeight: 0, position: 'relative' }} />
+          <div id="nearby-map" style={{ flex: 1, minHeight: 0, position: 'relative' }} />
         )}
       </div>
 
