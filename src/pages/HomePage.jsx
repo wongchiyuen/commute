@@ -243,8 +243,8 @@ export default function HomePage({ openDrawer, showToast }) {
           )}
           {!isNearby && (
             <div style={{ display: 'flex', gap: 6 }}>
-              {/* 排序編輯按鈕（有收藏才顯示）*/}
-              {favRows.length > 0 && (
+              {/* 排序編輯按鈕（有收藏才顯示，直接讀 localStorage 避免等待 async）*/}
+              {loadFavs(activePid).length > 0 && (
                 <button
                   onClick={() => setEditMode(v => !v)}
                   style={{
