@@ -16,7 +16,7 @@ const STD_DISTS = [100, 300, 500, 1000, 3000, 5000];
 
 function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
-export default function HomePage({ openDrawer, showToast, isActive }) {
+export default function HomePage({ openDrawer, showToast }) {
   const {
     setActivePage,
     setAddRouteTargetPid,
@@ -70,13 +70,11 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
     doLocate();
     const weatherT = setInterval(loadWeather, 5 * 60 * 1000);
     const etaT = setInterval(() => {
-      if (!isActive) return;
       if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
       else _refreshFavs();
     }, 30000);
     return () => { clearInterval(weatherT); clearInterval(etaT); };
   // eslint-disable-next-line
-    }, [isActive]);
   }, []);
 
   // 距離變化時重新載入
