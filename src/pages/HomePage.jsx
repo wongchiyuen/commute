@@ -16,7 +16,7 @@ const STD_DISTS = [100, 300, 500, 1000, 3000, 5000];
 
 function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
-export default function HomePage({ openDrawer, showToast }) {
+export default function HomePage({ openDrawer, showToast, isActive }) {
   const {
     setActivePage,
     setAddRouteTargetPid,
@@ -85,7 +85,14 @@ export default function HomePage({ openDrawer, showToast }) {
     }
   // eslint-disable-next-line
   }, [nearbyDist]);
-
+  
+  // ★ 切換回主頁 tab 時重新整理
+  useEffect(() => {
+    if (!isActive) return;
+    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
+    else _refreshFavs();
+  // eslint-disable-next-line
+  }, [isActive]);
   // ── Nearby map（Leaflet）──────────────────────────────────
   useEffect(() => {
     let mapInstance = null;
