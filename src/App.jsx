@@ -9,6 +9,7 @@ import NewsPage from './pages/NewsPage.jsx';
 import TrafficPage from './pages/TrafficPage.jsx';
 import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import RoutePage from './pages/RoutePage.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import './styles/global.css';
 
@@ -24,12 +25,12 @@ const NAV = [
 
 function AppInner() {
   const { activePage, setActivePage, toast, showToast } = useApp();
-  const [drawer, setDrawer] = useState({ open: false, title: '', key: null });
-  const newsHook = useNews();
+  const [drawer, setDrawer] = useState({ open: false, title: '', key: null, data: null });
+  const newsHook    = useNews();
   const trafficHook = useTraffic();
 
-  const openDrawer = useCallback((title, key) =>
-    setDrawer({ open: true, title, key }), []);
+  const openDrawer = useCallback((title, key, data = null) =>
+    setDrawer({ open: true, title, key, data }), []);
   const closeDrawer = useCallback(() =>
     setDrawer(d => ({ ...d, open: false })), []);
 
@@ -43,12 +44,12 @@ function AppInner() {
     <>
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: activePage === 'home' ? 'contents' : 'none' }}>
-          {/* ★ 修正：傳入 isActive，讓 HomePage 偵測 tab 切換並重新整理資料 */}
-          <HomePage openDrawer={openDrawer} showToast={showToast} isActive={activePage === 'home'} />
+          <HomePage openDrawer={openDrawer} showToast={showToast} />
         </div>
-        <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
+        <NewsPage    newsHook={newsHook}       isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
-        <SearchPage isActive={activePage === 'search'} />
+        {/* openDrawer 傳入 SearchPage，讓搜尋結果可開路線詳情 */}
+        <SearchPage  isActive={activePage === 'search'} openDrawer={openDrawer} />
         <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
       </div>
 
@@ -63,7 +64,12 @@ function AppInner() {
       </nav>
 
       <Drawer open={drawer.open} title={drawer.title} onClose={closeDrawer}>
-        <DrawerContent drawerKey={drawer.key} closeDrawer={closeDrawer} showToast={showToast} />
+        <DrawerContent
+          drawerKey={drawer.key}
+          drawerData={drawer.data}
+          closeDrawer={closeDrawer}
+          showToast={showToast}
+        />
       </Drawer>
 
       <Toast msg={toast.msg} visible={toast.visible} />
@@ -72,12 +78,18 @@ function AppInner() {
 }
 
 // ── Drawer 內容路由 ───────────────────────────────────────
-function DrawerContent({ drawerKey, closeDrawer, showToast }) {
+function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
 
+  // ── 路線詳情（站序時間線）────────────────────────────
+  if (drawerKey === 'bus-detail') {
+    return <RoutePage row={drawerData} closeDrawer={closeDrawer} showToast={showToast} />;
+  }
+
+  // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
     const { ctb, mtr, lrt } = transportSettings;
     const Toggle = ({ checked, onChange, label, sub, disabled }) => (
@@ -105,6 +117,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
     return (
       <div>
@@ -188,9 +201,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  if (drawerKey === 'notify') {
-    return <NotifyDrawer showToast={showToast} />;
-  }
+  if (drawerKey === 'notify') return <NotifyDrawer showToast={showToast} />;
 
   if (drawerKey === 'add-profile') {
     return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
@@ -277,7 +288,6 @@ function AutoTabDrawer({ profiles, showToast }) {
     { label: '週末',   days: [true,false,false,false,false,false,true] },
     { label: '每天',   days: [true,true,true,true,true,true,true] },
   ];
-
   const TIME_PRESETS = [
     { label: '早上通勤', from: '07:30', to: '09:30' },
     { label: '下午通勤', from: '17:00', to: '19:30' },
@@ -299,7 +309,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 <span className="toggle-slider" />
               </label>
             </div>
-
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -310,67 +319,53 @@ function AutoTabDrawer({ profiles, showToast }) {
                       flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer',
                       fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600,
                       background: c.days[i] ? 'var(--amb)' : 'var(--bg3)',
-                      color: c.days[i] ? '#000' : 'var(--mid)',
-                      transition: 'all .15s',
+                      color: c.days[i] ? '#000' : 'var(--mid)', transition: 'all .15s',
                     }}>{d}</button>
                 ))}
               </div>
-
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
-                  <button key={ps.label}
-                    onClick={() => update(p.id, { days: ps.days })}
-                    style={{
-                      flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
+                  <button key={ps.label} onClick={() => update(p.id, { days: ps.days })}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
                       fontFamily: 'var(--sans)', fontSize: 11,
-                      background: 'var(--bg4)', border: '1px solid var(--bdr2)',
-                      color: 'var(--mid)',
-                    }}>{ps.label}</button>
+                      background: 'var(--bg4)', border: '1px solid var(--bdr2)', color: 'var(--mid)' }}>
+                    {ps.label}
+                  </button>
                 ))}
               </div>
-
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
                   <input type="time" value={c.from || '07:00'}
                     onChange={e => update(p.id, { from: e.target.value })}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
                       borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
-                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
-                    }} />
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
                 <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
                   <input type="time" value={c.to || '09:00'}
                     onChange={e => update(p.id, { to: e.target.value })}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
                       borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
-                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
-                    }} />
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
-                  <button key={tp.label}
-                    onClick={() => update(p.id, { from: tp.from, to: tp.to })}
-                    style={{
-                      padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                  <button key={tp.label} onClick={() => update(p.id, { from: tp.from, to: tp.to })}
+                    style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                       fontFamily: 'var(--sans)', fontSize: 11,
                       background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)',
                       border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
-                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)',
-                    }}>
+                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)' }}>
                     {tp.label}<br />
                     <span style={{ fontSize: 10, fontFamily: 'var(--mono)' }}>{tp.from}–{tp.to}</span>
                   </button>
                 ))}
               </div>
-
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
