@@ -44,7 +44,7 @@ function AppInner() {
     <>
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: activePage === 'home' ? 'contents' : 'none' }}>
-          <HomePage openDrawer={openDrawer} showToast={showToast} />
+          <HomePage openDrawer={openDrawer} showToast={showToast} isActive={activePage === 'home'} /><HomePage openDrawer={openDrawer} showToast={showToast} />
         </div>
         <NewsPage    newsHook={newsHook}       isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
