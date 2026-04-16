@@ -2,7 +2,7 @@
 /**
  * 生活日常 Bus Data Crawler
  * 資料來源：data.gov.hk (KMB/LWB) + rt.data.gov.hk (CTB)
- * MTR/LRT 站點靜態內嵌（官方座標）
+ * MTR/LRT 站點：官方 CSV（動態）+ 靜態座標對照表
  * 輸出：scripts/output/stops.json + scripts/output/routes.json
  */
 
@@ -16,7 +16,7 @@ const OUT = join(__dir, 'output');
 const KMB = 'https://data.etabus.gov.hk/v1/transport/kmb';
 const CTB = 'https://rt.data.gov.hk/v2/transport/citybus';
 
-// ── MTR 站點（靜態，極少變動）────────────────────────────
+// ── MTR 站點（靜態座標對照表，極少變動）────────────────────
 const MTR_STNS = [
   { id:'CEN',n:'中環',   lat:22.2822,lng:114.1579,lines:['TWL','ISL']},
   { id:'ADM',n:'金鐘',   lat:22.2789,lng:114.1650,lines:['TWL','ISL','SIL']},
@@ -112,7 +112,7 @@ const MTR_LINE_NAMES = {
   TKL:'將軍澳綫',TCL:'東涌綫',AEL:'機場快綫',SIL:'南港島綫',TML:'屯馬綫',
 };
 
-// ── LRT 站點（靜態，北大嶼山輕鐵）──────────────────────
+// ── LRT 站點（靜態座標對照表，極少變動）──────────────────
 const LRT_STNS = [
   // 屯門區
   { id:'1',  n:'屯門',         lat:22.3938,lng:113.9730,routes:['505','507','610','614','614P','615','615P','705','706','761P']},
@@ -195,6 +195,22 @@ async function batchFetch(urls, batchSize = 15, delayMs = 300) {
     }
   }
   return results;
+}
+
+// ── CSV 抓取工具（MTR/LRT 官方 Open Data）────────────────
+async function fetchCSV(url) {
+  try {
+    const text = await fetch(url, { signal: AbortSignal.timeout(10000) }).then(r => r.text());
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    return lines.slice(1).map(line => {
+      const vals = line.split(',');
+      return Object.fromEntries(headers.map((h, i) => [h, (vals[i] || '').trim().replace(/^"|"$/g, '')]));
+    });
+  } catch (e) {
+    console.warn('  ⚠ CSV fetch 失敗:', e.message);
+    return null;
+  }
 }
 
 // ── KMB + LWB ────────────────────────────────────────────
@@ -292,27 +308,135 @@ async function crawlCTB() {
   return { stops, routes };
 }
 
-// ── MTR ──────────────────────────────────────────────────
-function buildMTR() {
-  const stops = MTR_STNS.map(s => ({ ...s, co: 'mtr' }));
-  const lines = Object.keys(MTR_LINE_NAMES);
-  const routes = [];
-  lines.forEach(line => {
-    const stns = MTR_STNS.filter(s => s.lines.includes(line));
-    if (stns.length < 2) return;
-    routes.push({ route: line, co: 'mtr', name_tc: MTR_LINE_NAMES[line], orig_tc: stns[0].n, dest_tc: stns[stns.length-1].n, bound: 'O', service_type: '1' });
-    routes.push({ route: line, co: 'mtr', name_tc: MTR_LINE_NAMES[line], orig_tc: stns[stns.length-1].n, dest_tc: stns[0].n, bound: 'I', service_type: '1' });
+// ── MTR（官方 CSV + 靜態座標）────────────────────────────
+async function buildMTR() {
+  console.log('\n📌 MTR 港鐵（官方CSV + 靜態座標）...');
+  const COORDS = Object.fromEntries(MTR_STNS.map(s => [s.id, { lat: s.lat, lng: s.lng, n: s.n }]));
+
+  const csv = await fetchCSV('https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv');
+  let lineStns = {};
+
+  if (csv) {
+    csv.forEach(row => {
+      const line = row['Line Code'];
+      const id = row['Station Code'];
+      const name = row['Chinese Name'] || row['Station Chinese Name'];
+      const seq = parseInt(row['Station Sequence'] || row['Sequence'] || 0);
+      if (!line || !id || !name) return;
+      if (!lineStns[line]) lineStns[line] = [];
+      lineStns[line].push({ id, n: name, seq });
+    });
+    Object.values(lineStns).forEach(arr => arr.sort((a, b) => a.seq - b.seq));
+    console.log(`  ✅ CSV：${Object.keys(lineStns).length} 條路線`);
+  } else {
+    // Fallback：從靜態 MTR_STNS 重建
+    console.log('  ⚠ 使用靜態備用資料');
+    MTR_STNS.forEach(s => s.lines.forEach(line => {
+      if (!lineStns[line]) lineStns[line] = [];
+      lineStns[line].push({ id: s.id, n: s.n, seq: lineStns[line].length });
+    }));
+  }
+
+  // 建立站點記錄（以 CSV 站名為主，座標查靜態對照表）
+  const stopsMap = new Map();
+  Object.entries(lineStns).forEach(([line, stns]) => {
+    stns.forEach(s => {
+      if (!stopsMap.has(s.id)) {
+        const c = COORDS[s.id] || {};
+        stopsMap.set(s.id, { id: s.id, co: 'mtr', n: s.n, lat: c.lat, lng: c.lng, lines: [] });
+      }
+      stopsMap.get(s.id).lines.push(line);
+    });
   });
+  const stops = [...stopsMap.values()].filter(s => s.lat && s.lng);
+
+  // 建立路線記錄，加入 stops_tc 供搜尋
+  const routes = [];
+  Object.entries(lineStns).forEach(([line, stns]) => {
+    if (!MTR_LINE_NAMES[line] || stns.length < 2) return;
+    const names = stns.map(s => s.n);
+    routes.push({
+      route: line, co: 'mtr', name_tc: MTR_LINE_NAMES[line],
+      orig_tc: names[0], dest_tc: names.at(-1),
+      stops_tc: names,
+      bound: 'O', service_type: '1',
+    });
+    routes.push({
+      route: line, co: 'mtr', name_tc: MTR_LINE_NAMES[line],
+      orig_tc: names.at(-1), dest_tc: names[0],
+      stops_tc: [...names].reverse(),
+      bound: 'I', service_type: '1',
+    });
+  });
+
+  console.log(`  ✅ ${stops.length} 個站點，${routes.length} 條路線記錄`);
   return { stops, routes };
 }
 
-// ── LRT ──────────────────────────────────────────────────
-function buildLRT() {
-  const stops = LRT_STNS.map(s => ({ id: s.id, co: 'lrt', n: s.n, lat: s.lat, lng: s.lng }));
-  const routes = LRT_ROUTES.flatMap(r => [
-    { route: r.route, co: 'lrt', orig_tc: r.orig_tc, dest_tc: r.dest_tc, bound: 'O', service_type: '1' },
-    { route: r.route, co: 'lrt', orig_tc: r.dest_tc, dest_tc: r.orig_tc, bound: 'I', service_type: '1' },
-  ]);
+// ── LRT（官方 CSV + 靜態座標）────────────────────────────
+async function buildLRT() {
+  console.log('\n📌 LRT 輕鐵（官方CSV + 靜態座標）...');
+  const COORDS = Object.fromEntries(LRT_STNS.map(s => [s.id, { lat: s.lat, lng: s.lng }]));
+
+  const csv = await fetchCSV('https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv');
+  let routeStns = {};
+
+  if (csv) {
+    csv.forEach(row => {
+      // 港鐵 LRT CSV 欄位名稱（去除空格及引號後匹配）
+      const route = row['Route No'] || row['Route_No'] || row['RouteNo'];
+      const id = String(row['Stop ID'] || row['Stop_ID'] || row['StopID'] || '');
+      const name = row['Chinese Name'] || row['Chinese_Name'] || row['ChineseName'];
+      const seq = parseInt(row['Stop Seq'] || row['Stop_Seq'] || row['StopSeq'] || 0);
+      const dir = row['Direction'] || '1';
+      if (!route || !id || !name) return;
+      // 只取去程（Direction=1）避免重複
+      if (dir !== '1') return;
+      if (!routeStns[route]) routeStns[route] = [];
+      routeStns[route].push({ id, n: name, seq });
+    });
+    Object.values(routeStns).forEach(arr => arr.sort((a, b) => a.seq - b.seq));
+    console.log(`  ✅ CSV：${Object.keys(routeStns).length} 條路線`);
+  } else {
+    // Fallback：從靜態 LRT_STNS 重建
+    console.log('  ⚠ 使用靜態備用資料');
+    LRT_ROUTES.forEach(r => {
+      routeStns[r.route] = LRT_STNS
+        .filter(s => s.routes.includes(r.route))
+        .map((s, i) => ({ id: s.id, n: s.n, seq: i }));
+    });
+  }
+
+  // 建立站點記錄
+  const stopsMap = new Map();
+  Object.values(routeStns).flat().forEach(s => {
+    if (!stopsMap.has(s.id)) {
+      const c = COORDS[s.id] || {};
+      stopsMap.set(s.id, { id: s.id, co: 'lrt', n: s.n, lat: c.lat, lng: c.lng });
+    }
+  });
+  const stops = [...stopsMap.values()].filter(s => s.lat && s.lng);
+
+  // 建立路線記錄，加入 stops_tc 供搜尋
+  const routes = LRT_ROUTES.flatMap(r => {
+    const names = (routeStns[r.route] || []).map(s => s.n);
+    return [
+      {
+        route: r.route, co: 'lrt',
+        orig_tc: r.orig_tc, dest_tc: r.dest_tc,
+        stops_tc: names,
+        bound: 'O', service_type: '1',
+      },
+      {
+        route: r.route, co: 'lrt',
+        orig_tc: r.dest_tc, dest_tc: r.orig_tc,
+        stops_tc: [...names].reverse(),
+        bound: 'I', service_type: '1',
+      },
+    ];
+  });
+
+  console.log(`  ✅ ${stops.length} 個站點，${routes.length} 條路線記錄`);
   return { stops, routes };
 }
 
@@ -384,9 +508,9 @@ async function main() {
   console.log('🕐', new Date().toISOString());
 
   const generated = new Date().toISOString();
-  const [kmb, ctb, nlb] = await Promise.all([crawlKMB(), crawlCTB(), crawlNLB()]);
-  const mtr = buildMTR();
-  const lrt = buildLRT();
+  const [kmb, ctb, nlb, mtr, lrt] = await Promise.all([
+    crawlKMB(), crawlCTB(), crawlNLB(), buildMTR(), buildLRT(),
+  ]);
 
   // ✅ 修正：將 CTB 已識別為聯營的路線號碼，回寫到 KMB 路線記錄
   // 確保 SearchPage 的九巴/聯營標籤一致
