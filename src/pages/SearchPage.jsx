@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Spinner } from '../components/Overlay.jsx';
 
+const ROUTES_URL = 'https://wongchiyuen.github.io/commute/data/routes.json';
+
 export default function SearchPage({ isActive }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null); // null=idle, []|[...]
@@ -11,7 +13,7 @@ export default function SearchPage({ isActive }) {
     if (!q) return;
     setLoading(true); setResults(null);
     try {
-      const data = await fetch('/routes.json').then(r => r.json());
+      const data = await fetch(ROUTES_URL).then(r => r.json());
       const qUp = q.toUpperCase();
       const seen = new Set();
       const matches = (data.routes || []).filter(r => {
