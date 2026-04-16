@@ -3,7 +3,7 @@ import { Spinner } from '../components/Overlay.jsx';
 
 const ROUTES_URL = 'https://wongchiyuen.github.io/commute/data/routes.json';
 
-export default function SearchPage({ isActive }) {
+export default function SearchPage({ isActive, openDrawer }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null); // null=idle, []|[...]
   const [loading, setLoading] = useState(false);
@@ -61,7 +61,7 @@ export default function SearchPage({ isActive }) {
             <>
               <div className="sec-lbl">找到 {results.length} 個結果</div>
               {results.map((r, i) => (
-                <div key={i} className="result-item">
+                <div key={i} className="result-item" onClick={() => openDrawer(`${r.route} 路線詳情`, 'bus-detail')}>
                   <div className="rn">{r.route}</div>
                   <div className="ri">
                     <div className="ri-dest">往 {r.dest_tc}</div>
