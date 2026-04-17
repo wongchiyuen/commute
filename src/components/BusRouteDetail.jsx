@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp, loadFavs, saveFavs } from '../context/AppContext.jsx';
-import { KMB, CTB, MTR_LINE_STATIONS } from '../constants/transport.js';
+import { KMB, CTB, MTR_API, MTR_LINE_STATIONS } from '../constants/transport.js';
 import { Spinner } from './Overlay.jsx';
 
 function minsLabel(etaStr) {
@@ -32,11 +32,32 @@ export default function BusRouteDetail({ data, showToast }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // ── MTR：靜態站點，不顯示 ETA ────────────────────────
+      // ── MTR：靜態站點 + 官方下班車 API ──────────────────
       if (isMTR) {
         const stns = MTR_LINE_STATIONS[route] || [];
         const ordered = bound === 'I' ? [...stns].reverse() : stns;
-        setStops(ordered.map((s, i) => ({ seq: i + 1, id: s.c, name: s.n, eta: [] })));
+        // 先顯示站點，同步抓各站下班車時間
+        const mtrDir = bound === 'I' ? 'DOWN' : 'UP';
+        const schedResults = await Promise.all(
+          ordered.map(s =>
+            fetch(`${MTR_API}?line=${route}&sta=${s.c}&lang=TC`)
+              .then(r => r.json()).catch(() => null)
+          )
+        );
+        const now = Date.now();
+        setStops(ordered.map((s, i) => {
+          const key = `${route}-${s.c}`;
+          const trains = schedResults[i]?.data?.[key]?.[mtrDir] || [];
+          const eta = trains
+            .map(t => {
+              // MTR API 回傳格式："2024-01-01 12:30:00"
+              const ts = new Date(t.time?.replace(' ', 'T')).getTime();
+              return ts > now - 30000 ? t.time.slice(11, 16) : null; // "HH:MM"
+            })
+            .filter(Boolean)
+            .slice(0, 2);
+          return { seq: i + 1, id: s.c, name: s.n, eta, isMtrTime: true };
+        }));
         setLoading(false);
         return;
       }
@@ -115,7 +136,9 @@ export default function BusRouteDetail({ data, showToast }) {
     <div>
       {stops.map((stop, i) => {
         const isFav = favSet.has(`${route}|${stop.id}`);
-        const etaLabels = stop.eta.map(minsLabel).filter(Boolean);
+        const etaLabels = stop.isMtrTime
+          ? stop.eta  // MTR 直接用 "HH:MM" 字串
+          : stop.eta.map(minsLabel).filter(Boolean);
         const isFirst = etaLabels[0];
         return (
           <div key={stop.id + i} style={{
