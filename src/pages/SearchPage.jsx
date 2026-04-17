@@ -61,7 +61,7 @@ export default function SearchPage({ isActive, openDrawer }) {
             <>
               <div className="sec-lbl">找到 {results.length} 個結果</div>
               {results.map((r, i) => (
-                <div key={i} className="result-item" onClick={() => openDrawer(`${r.route} 路線詳情`, 'bus-detail')}>
+                <div key={i} className="result-item" onClick={() => openDrawer(`${r.route} 路線詳情`, 'bus-detail', { co: r.co, route: r.route, bound: r.bound, service_type: r.service_type, orig_tc: r.orig_tc, dest_tc: r.dest_tc, stops_tc: r.stops_tc })}>
                   <div className="rn">{r.route}</div>
                   <div className="ri">
                     <div className="ri-dest">往 {r.dest_tc}</div>
