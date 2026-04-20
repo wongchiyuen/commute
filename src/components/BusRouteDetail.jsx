@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp, loadFavs, saveFavs } from '../context/AppContext.jsx';
 import { KMB, CTB, MTR_API, MTR_LINE_STATIONS } from '../constants/transport.js';
 import { Spinner } from './Overlay.jsx';
+import { fetchKMBFare } from '../utils/fare.js';
+
+const CO_LABEL = {
+  kmb: '九巴', lwb: '龍運', ctb: '城巴', joint: '聯營',
+  mtr: '港鐵', lrt: '輕鐵', nlb: '嶼巴',
+};
+const CO_COLOR = {
+  kmb: '#e60012', lwb: '#b5822a', ctb: '#00a03e', joint: '#c00',
+  mtr: '#e60012', lrt: '#e60012', nlb: '#f39800',
+};
 
 function minsLabel(etaStr) {
   if (!etaStr) return null;
@@ -11,16 +21,33 @@ function minsLabel(etaStr) {
   return `${diff}分`;
 }
 
+// 去除 CTB 站名末尾的站點代碼，如 "荔灣道 (SS450)" → "荔灣道"
+function cleanName(name) {
+  return (name || '').replace(/\s*\([A-Z]{1,2}\d+\)\s*$/, '').trim();
+}
+
+// 分批發請求，避免一次性 80 個並行請求觸發瀏覽器限制
+async function fetchBatch(items, fetchFn, batchSize = 12) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const res = await Promise.all(batch.map(item => fetchFn(item).catch(() => null)));
+    results.push(...res);
+  }
+  return results;
+}
+
 export default function BusRouteDetail({ data, showToast }) {
   const { activePid } = useApp();
   const [stops, setStops] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fare, setFare] = useState(null);
   const [favSet, setFavSet] = useState(() =>
     new Set(loadFavs(activePid).map(f => `${f.route}|${f.stopId}`))
   );
 
   if (!data) return <div className="msg">路線資料缺失</div>;
-  const { co, route, bound, service_type, dest_tc, stops_tc } = data;
+  const { co, route, bound, service_type, orig_tc, dest_tc, stops_tc } = data;
 
   const isKMB = co === 'kmb' || co === 'joint' || co === 'lwb';
   const isCTB = co === 'ctb';
@@ -32,17 +59,15 @@ export default function BusRouteDetail({ data, showToast }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // ── MTR：靜態站點 + 官方下班車 API ──────────────────
+      // ── MTR：靜態站點 + 官方下班車 API（分批）───────────
       if (isMTR) {
         const stns = MTR_LINE_STATIONS[route] || [];
         const ordered = bound === 'I' ? [...stns].reverse() : stns;
-        // 先顯示站點，同步抓各站下班車時間
         const mtrDir = bound === 'I' ? 'DOWN' : 'UP';
-        const schedResults = await Promise.all(
-          ordered.map(s =>
-            fetch(`${MTR_API}?line=${route}&sta=${s.c}&lang=TC`)
-              .then(r => r.json()).catch(() => null)
-          )
+        const schedResults = await fetchBatch(
+          ordered,
+          s => fetch(`${MTR_API}?line=${route}&sta=${s.c}&lang=TC`).then(r => r.json()),
+          8
         );
         const now = Date.now();
         setStops(ordered.map((s, i) => {
@@ -50,9 +75,8 @@ export default function BusRouteDetail({ data, showToast }) {
           const trains = schedResults[i]?.data?.[key]?.[mtrDir] || [];
           const eta = trains
             .map(t => {
-              // MTR API 回傳格式："2024-01-01 12:30:00"
-              const ts = new Date(t.time?.replace(' ', 'T')).getTime();
-              return ts > now - 30000 ? t.time.slice(11, 16) : null; // "HH:MM"
+              const ts = new Date((t.time || '').replace(' ', 'T')).getTime();
+              return ts > now - 30000 ? (t.time || '').slice(11, 16) : null;
             })
             .filter(Boolean)
             .slice(0, 2);
@@ -62,15 +86,16 @@ export default function BusRouteDetail({ data, showToast }) {
         return;
       }
 
-      // ── LRT：stops_tc 列表，不顯示 ETA ───────────────────
+      // ── LRT：stops_tc 列表（LRT ETA 需要站點 ID，暫無）──
       if (isLRT) {
-        (stops_tc || []).forEach((n, i) => setStops(prev => [...prev, { seq: i + 1, id: String(i), name: n, eta: [] }]));
-        setStops((stops_tc || []).map((n, i) => ({ seq: i + 1, id: String(i), name: n, eta: [] })));
+        setStops((stops_tc || []).map((n, i) => ({
+          seq: i + 1, id: String(i), name: n, eta: [],
+        })));
         setLoading(false);
         return;
       }
 
-      // ── KMB / CTB：API 抓站點 + ETA ──────────────────────
+      // ── KMB / CTB：API 抓站點 + ETA（分批，避免限速）────
       const rsUrl = isKMB
         ? `${KMB}/route-stop/${route}/${dir}/${svcType}`
         : `${CTB}/route-stop/CTB/${route}/${dir}`;
@@ -79,30 +104,41 @@ export default function BusRouteDetail({ data, showToast }) {
       const stopList = (rsData.data || []).map(s => ({ seq: parseInt(s.seq), id: s.stop }));
       if (!stopList.length) { setStops([]); setLoading(false); return; }
 
-      // 並行抓站點資料 + ETA
-      const [detailRes, etaRes] = await Promise.all([
-        Promise.all(stopList.map(s =>
-          fetch(isKMB ? `${KMB}/stop/${s.id}` : `${CTB}/stop/${s.id}`)
-            .then(r => r.json()).catch(() => null)
-        )),
-        Promise.all(stopList.map(s =>
-          fetch(isKMB
-            ? `${KMB}/eta/${s.id}/${route}/${svcType}`
-            : `${CTB}/eta/${s.id}/CTB/${route}`)
-            .then(r => r.json()).catch(() => null)
-        )),
-      ]);
+      // 分批抓站點名稱
+      const detailRes = await fetchBatch(
+        stopList,
+        s => fetch(isKMB ? `${KMB}/stop/${s.id}` : `${CTB}/stop/${s.id}`).then(r => r.json()),
+        12
+      );
+
+      // 分批抓 ETA
+      const etaRes = await fetchBatch(
+        stopList,
+        s => fetch(isKMB
+          ? `${KMB}/eta/${s.id}/${route}/${svcType}`
+          : `${CTB}/eta/${s.id}/CTB/${route}`
+        ).then(r => r.json()),
+        12
+      );
 
       const now = Date.now();
       setStops(stopList.map((s, i) => {
         const d = detailRes[i]?.data;
-        const name = d?.name_tc || d?.name_en || s.id;
+        const rawName = d?.name_tc || d?.name_en || s.id;
+        const name = cleanName(rawName);
         const eta = (etaRes[i]?.data || [])
           .filter(e => e.eta && new Date(e.eta).getTime() > now - 30000)
           .slice(0, 2)
           .map(e => e.eta);
         return { seq: s.seq, id: s.id, name, eta };
       }));
+
+      // KMB / 聯營：背景抓車費
+      if (isKMB) {
+        fetchKMBFare(route, bound, svcType)
+          .then(f => { if (f != null) setFare(f); })
+          .catch(() => {});
+      }
     } catch (e) {
       console.warn('BusRouteDetail:', e);
       setStops([]);
@@ -134,12 +170,41 @@ export default function BusRouteDetail({ data, showToast }) {
 
   return (
     <div>
+      {/* ── 路線資訊 header ───────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
+        padding: '10px 12px', background: 'var(--bg3)',
+        border: '1px solid var(--bdr)', borderRadius: 11,
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+          background: CO_COLOR[co] || '#666', color: '#fff', flexShrink: 0,
+        }}>{CO_LABEL[co] || co.toUpperCase()}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: 'var(--bright)', fontWeight: 600 }}>
+            往 {dest_tc}
+          </div>
+          {orig_tc && (
+            <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 1 }}>
+              由 {orig_tc}
+            </div>
+          )}
+        </div>
+        {fare != null && (
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 13, color: 'var(--amb2)', fontWeight: 700 }}>${fare}</div>
+            <div style={{ fontSize: 10, color: 'var(--dim)' }}>成人票價</div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 站點列表 ─────────────────────────────────────── */}
       {stops.map((stop, i) => {
         const isFav = favSet.has(`${route}|${stop.id}`);
         const etaLabels = stop.isMtrTime
-          ? stop.eta  // MTR 直接用 "HH:MM" 字串
+          ? stop.eta
           : stop.eta.map(minsLabel).filter(Boolean);
-        const isFirst = etaLabels[0];
+        const hasEta = etaLabels.length > 0;
         return (
           <div key={stop.id + i} style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -150,15 +215,17 @@ export default function BusRouteDetail({ data, showToast }) {
             <div style={{ width: 18, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
               <div style={{
                 width: 9, height: 9, borderRadius: '50%',
-                background: isFirst ? 'var(--amb)' : 'var(--bg4)',
+                background: hasEta ? 'var(--amb)' : 'var(--bg4)',
                 border: '2px solid var(--bdr2)',
               }} />
             </div>
 
             {/* 站名 + ETA */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, color: 'var(--bright)', fontWeight: 500 }}>{stop.name}</div>
-              {etaLabels.length > 0 && (
+              <div style={{ fontSize: 14, color: 'var(--bright)', fontWeight: 500 }}>
+                {stop.name}
+              </div>
+              {hasEta && (
                 <div style={{ display: 'flex', gap: 5, marginTop: 3 }}>
                   {etaLabels.map((lbl, j) => (
                     <span key={j} style={{
@@ -177,7 +244,10 @@ export default function BusRouteDetail({ data, showToast }) {
             </div>
 
             {/* 序號 */}
-            <div style={{ fontSize: 11, color: 'var(--dim)', fontFamily: 'var(--mono)', width: 18, textAlign: 'right', flexShrink: 0 }}>
+            <div style={{
+              fontSize: 11, color: 'var(--dim)', fontFamily: 'var(--mono)',
+              width: 18, textAlign: 'right', flexShrink: 0,
+            }}>
               {stop.seq}
             </div>
 
