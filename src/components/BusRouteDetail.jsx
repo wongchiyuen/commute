@@ -26,12 +26,33 @@ function cleanName(name) {
   return (name || '').replace(/\s*\([A-Z]{1,2}\d+\)\s*$/, '').trim();
 }
 
-// 分批發請求，避免一次性 80 個並行請求觸發瀏覽器限制
-async function fetchBatch(items, fetchFn, batchSize = 12) {
+// 每站同時抓 detail + ETA，整批控制並行數量
+// 避免兩輪分開打同一域名觸發限速
+async function fetchStopData(stopList, detailUrl, etaUrl, batchSize = 8) {
   const results = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const res = await Promise.all(batch.map(item => fetchFn(item).catch(() => null)));
+  for (let i = 0; i < stopList.length; i += batchSize) {
+    const batch = stopList.slice(i, i + batchSize);
+    const res = await Promise.all(batch.map(async s => {
+      const [detail, eta] = await Promise.all([
+        fetch(detailUrl(s)).then(r => r.json()).catch(() => null),
+        fetch(etaUrl(s)).then(r => r.json()).catch(() => null),
+      ]);
+      return { detail, eta };
+    }));
+    results.push(...res);
+  }
+  return results;
+}
+
+// MTR 專用：分批抓下班車時間
+async function fetchMTRSchedules(stns, route, mtrDir, batchSize = 8) {
+  const results = [];
+  for (let i = 0; i < stns.length; i += batchSize) {
+    const batch = stns.slice(i, i + batchSize);
+    const res = await Promise.all(batch.map(s =>
+      fetch(`${MTR_API}?line=${route}&sta=${s.c}&lang=TC`)
+        .then(r => r.json()).catch(() => null)
+    ));
     results.push(...res);
   }
   return results;
@@ -59,16 +80,12 @@ export default function BusRouteDetail({ data, showToast }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // ── MTR：靜態站點 + 官方下班車 API（分批）───────────
+      // ── MTR：靜態站點 + 官方下班車 API ──────────────────
       if (isMTR) {
         const stns = MTR_LINE_STATIONS[route] || [];
         const ordered = bound === 'I' ? [...stns].reverse() : stns;
         const mtrDir = bound === 'I' ? 'DOWN' : 'UP';
-        const schedResults = await fetchBatch(
-          ordered,
-          s => fetch(`${MTR_API}?line=${route}&sta=${s.c}&lang=TC`).then(r => r.json()),
-          8
-        );
+        const schedResults = await fetchMTRSchedules(ordered, route, mtrDir);
         const now = Date.now();
         setStops(ordered.map((s, i) => {
           const key = `${route}-${s.c}`;
@@ -78,15 +95,14 @@ export default function BusRouteDetail({ data, showToast }) {
               const ts = new Date((t.time || '').replace(' ', 'T')).getTime();
               return ts > now - 30000 ? (t.time || '').slice(11, 16) : null;
             })
-            .filter(Boolean)
-            .slice(0, 2);
+            .filter(Boolean).slice(0, 2);
           return { seq: i + 1, id: s.c, name: s.n, eta, isMtrTime: true };
         }));
         setLoading(false);
         return;
       }
 
-      // ── LRT：stops_tc 列表（LRT ETA 需要站點 ID，暫無）──
+      // ── LRT：stops_tc 列表 ────────────────────────────────
       if (isLRT) {
         setStops((stops_tc || []).map((n, i) => ({
           seq: i + 1, id: String(i), name: n, eta: [],
@@ -95,7 +111,7 @@ export default function BusRouteDetail({ data, showToast }) {
         return;
       }
 
-      // ── KMB / CTB：API 抓站點 + ETA（分批，避免限速）────
+      // ── KMB / CTB：每站同時抓 detail + ETA（一輪批次）───
       const rsUrl = isKMB
         ? `${KMB}/route-stop/${route}/${dir}/${svcType}`
         : `${CTB}/route-stop/CTB/${route}/${dir}`;
@@ -104,29 +120,21 @@ export default function BusRouteDetail({ data, showToast }) {
       const stopList = (rsData.data || []).map(s => ({ seq: parseInt(s.seq), id: s.stop }));
       if (!stopList.length) { setStops([]); setLoading(false); return; }
 
-      // 分批抓站點名稱
-      const detailRes = await fetchBatch(
+      const combined = await fetchStopData(
         stopList,
-        s => fetch(isKMB ? `${KMB}/stop/${s.id}` : `${CTB}/stop/${s.id}`).then(r => r.json()),
-        12
-      );
-
-      // 分批抓 ETA
-      const etaRes = await fetchBatch(
-        stopList,
-        s => fetch(isKMB
+        s => isKMB ? `${KMB}/stop/${s.id}` : `${CTB}/stop/${s.id}`,
+        s => isKMB
           ? `${KMB}/eta/${s.id}/${route}/${svcType}`
-          : `${CTB}/eta/${s.id}/CTB/${route}`
-        ).then(r => r.json()),
-        12
+          : `${CTB}/eta/${s.id}/CTB/${route}`,
+        8  // 每批8站（同時16個請求），避免限速
       );
 
       const now = Date.now();
       setStops(stopList.map((s, i) => {
-        const d = detailRes[i]?.data;
+        const d = combined[i]?.detail?.data;
         const rawName = d?.name_tc || d?.name_en || s.id;
         const name = cleanName(rawName);
-        const eta = (etaRes[i]?.data || [])
+        const eta = (combined[i]?.eta?.data || [])
           .filter(e => e.eta && new Date(e.eta).getTime() > now - 30000)
           .slice(0, 2)
           .map(e => e.eta);
