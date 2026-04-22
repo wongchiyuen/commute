@@ -4,7 +4,6 @@ import { AppProvider, useApp, NEARBY_PID,
 import { useNews } from './hooks/useNews.js';
 import { useTraffic } from './hooks/useTraffic.js';
 import { Drawer, Toast } from './components/Overlay.jsx';
-import BusRouteDetail from './components/BusRouteDetail.jsx';
 import HomePage from './pages/HomePage.jsx';
 import NewsPage from './pages/NewsPage.jsx';
 import TrafficPage from './pages/TrafficPage.jsx';
@@ -26,14 +25,12 @@ const NAV = [
 
 function AppInner() {
   const { activePage, setActivePage, toast, showToast } = useApp();
-  // ✅ drawer state 加入 data 欄位，供 bus-detail 傳遞路線資料
-  const [drawer, setDrawer] = useState({ open: false, title: '', key: null, data: null });
+  const [drawer, setDrawer] = useState({ open: false, title: '', key: null });
   const newsHook = useNews();
   const trafficHook = useTraffic();
 
-  // ✅ openDrawer 加入可選 data 參數
-  const openDrawer = useCallback((title, key, data = null) =>
-    setDrawer({ open: true, title, key, data }), []);
+  const openDrawer = useCallback((title, key) =>
+    setDrawer({ open: true, title, key }), []);
   const closeDrawer = useCallback(() =>
     setDrawer(d => ({ ...d, open: false })), []);
 
@@ -51,8 +48,7 @@ function AppInner() {
         </div>
         <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
-        {/* ✅ SearchPage 加入 openDrawer prop */}
-        <SearchPage isActive={activePage === 'search'} openDrawer={openDrawer} />
+        <SearchPage isActive={activePage === 'search'} />
         <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
       </div>
 
@@ -67,8 +63,7 @@ function AppInner() {
       </nav>
 
       <Drawer open={drawer.open} title={drawer.title} onClose={closeDrawer}>
-        {/* ✅ 傳入 drawerData */}
-        <DrawerContent drawerKey={drawer.key} drawerData={drawer.data} closeDrawer={closeDrawer} showToast={showToast} />
+        <DrawerContent drawerKey={drawer.key} closeDrawer={closeDrawer} showToast={showToast} />
       </Drawer>
 
       <Toast msg={toast.msg} visible={toast.visible} />
@@ -77,16 +72,11 @@ function AppInner() {
 }
 
 // ── Drawer 內容路由 ───────────────────────────────────────
-function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
+function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
-
-  // ✅ 路線詳情（由 SearchPage 及 HomePage 觸發）
-  if (drawerKey === 'bus-detail') {
-    return <BusRouteDetail data={drawerData} showToast={showToast} />;
-  }
 
   // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
@@ -290,12 +280,14 @@ function AutoTabDrawer({ profiles, showToast }) {
     saveAutoTabs(next);
   };
 
+  // 快捷選擇
   const PRESETS = [
     { label: '工作日', days: [false,true,true,true,true,true,false] },
     { label: '週末',   days: [true,false,false,false,false,false,true] },
     { label: '每天',   days: [true,true,true,true,true,true,true] },
   ];
 
+  // 常用時段
   const TIME_PRESETS = [
     { label: '早上通勤', from: '07:30', to: '09:30' },
     { label: '下午通勤', from: '17:00', to: '19:30' },
@@ -309,6 +301,7 @@ function AutoTabDrawer({ profiles, showToast }) {
         const c = { ...DEF, ...(cfg[p.id] || {}) };
         return (
           <div key={p.id} className="auto-tab-card" style={{ marginBottom: 12 }}>
+            {/* 標題列 + 開關 */}
             <div className="auto-tab-hdr">
               <div className="auto-tab-name">{p.name}</div>
               <label className="toggle">
@@ -319,6 +312,8 @@ function AutoTabDrawer({ profiles, showToast }) {
             </div>
 
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
+
+              {/* 星期選擇 — 大按鈕，易點擊 */}
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 {DAY.map((d, i) => (
@@ -334,6 +329,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
+              {/* 快捷日子 */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
                   <button key={ps.label}
@@ -347,6 +343,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
+              {/* 時間選擇 */}
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -372,6 +369,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                 </div>
               </div>
 
+              {/* 常用時段快捷 */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
                   <button key={tp.label}
@@ -389,6 +387,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                 ))}
               </div>
 
+              {/* 當前設定預覽 */}
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
