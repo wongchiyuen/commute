@@ -1,328 +1,481 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
-import { useWeather } from '../hooks/useWeather.js';
-import { useGeolocation } from '../hooks/useGeolocation.js';
-import { useNearby, incrementRouteUsage, fetchAllKMBStops } from '../hooks/useNearby.js';
-import { KMB } from '../constants/transport.js';
-import { RHRREAD_STNS } from '../constants/weather.js';
-import { nearestOf } from '../utils/geo.js';
-import { fetchKMBFare } from '../utils/fare.js';
-import WeatherPanel from '../components/WeatherPanel.jsx';
-import BusCard from '../components/BusCard.jsx';
-import { Spinner } from '../components/Overlay.jsx';
+import { useState, useCallback } from 'react';
+import { AppProvider, useApp, NEARBY_PID,
+  loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
+import { useNews } from './hooks/useNews.js';
+import { useTraffic } from './hooks/useTraffic.js';
+import { Drawer, Toast } from './components/Overlay.jsx';
+import HomePage from './pages/HomePage.jsx';
+import NewsPage from './pages/NewsPage.jsx';
+import TrafficPage from './pages/TrafficPage.jsx';
+import SearchPage from './pages/SearchPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
+import { RHRREAD_STNS, DAY } from './constants/weather.js';
+import './styles/global.css';
 
-const DIST_STEPS = [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 8000, 10000];
-const STD_DISTS = [100, 300, 500, 1000, 3000, 5000];
+// 自動從 package.json 讀取版本號（Vite build 時注入）
+const APP_VERSION = __APP_VERSION__;
 
-function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
+const NAV = [
+  { id: 'home',     ico: '🌿', lbl: '主頁' },
+  { id: 'search',   ico: '🔍', lbl: '搜尋' },
+  { id: 'news',     ico: '📰', lbl: '新聞' },
+  { id: 'traffic',  ico: '🚦', lbl: '交通' },
+  { id: 'settings', ico: '⚙️', lbl: '設定' },
+];
 
-export default function HomePage({ openDrawer, showToast, isActive }) {
-  const {
-    activePid, setActivePid, profiles,
-    nearbyDist, setNearbyDist,
-    gpsCoords, saveGps,
-    selectedStn, setSelectedStn,
-    transportSettings,
-    reloadFavs,
-  } = useApp();
+function AppInner() {
+  const { activePage, setActivePage, toast, showToast } = useApp();
+  const [drawer, setDrawer] = useState({ open: false, title: '', key: null });
+  const newsHook = useNews();
+  const trafficHook = useTraffic();
 
-  const isNearby = activePid === NEARBY_PID;
-  const [refreshing, setRefreshing] = useState(false);
-  const [favRows, setFavRows] = useState([]);
-  const [showSlider, setShowSlider] = useState(false);
-  const [sliderIdx, setSliderIdx] = useState(3);
-  const [mapView, setMapView] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const openDrawer = useCallback((title, key) =>
+    setDrawer({ open: true, title, key }), []);
+  const closeDrawer = useCallback(() =>
+    setDrawer(d => ({ ...d, open: false })), []);
 
-  const { weatherData, loadWeather } = useWeather(selectedStn, gpsCoords);
-  const { getCurrentPosition, checkPermission } = useGeolocation();
-  const nearbyHook = useNearby(transportSettings);
-
-  // ── GPS ──────────────────────────────────────────────────
-  const doLocate = useCallback(() => {
-    getCurrentPosition(pos => {
-      saveGps(pos.coords.latitude, pos.coords.longitude);
-      const near = nearestOf(RHRREAD_STNS, pos.coords.latitude, pos.coords.longitude);
-      if (near.n !== selectedStn) setSelectedStn(near.n);
-      if (isNearby) nearbyHook.load(pos.coords.latitude, pos.coords.longitude, nearbyDist);
-    }, () => {
-      if (!gpsCoords && isNearby) nearbyHook.setStatus('no-permission');
-    });
-  }, [getCurrentPosition, saveGps, selectedStn, setSelectedStn, isNearby, nearbyDist, gpsCoords, nearbyHook]);
-
-  // ── Init ──────────────────────────────────────────────────
-  useEffect(() => {
-    loadWeather();
-    if (gpsCoords && isNearby) {
-      nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-    } else if (isNearby) {
-      checkPermission().then(state => {
-        if (state === 'granted') doLocate();
-        else nearbyHook.setStatus('no-permission');
-      });
-    } else {
-      _refreshFavs();
-    }
-    doLocate();
-    const weatherT = setInterval(loadWeather, 5 * 60 * 1000);
-    const etaT = setInterval(() => {
-      if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-      else _refreshFavs();
-    }, 30000);
-    return () => { clearInterval(weatherT); clearInterval(etaT); };
-  // eslint-disable-next-line
-  }, []);
-
-  // 距離變化時重新載入
-  useEffect(() => {
-    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-  // eslint-disable-next-line
-  }, [nearbyDist]);
-  // 附近站載入完成時記錄更新時間
-  useEffect(() => {
-    if (nearbyHook.status === 'ready') setLastUpdated(new Date());
-  }, [nearbyHook.status]);
-
-  // ── Favs ──────────────────────────────────────────────────
-  const _refreshFavs = useCallback(async () => {
-    const favList = loadFavs(activePid);
-    if (!favList.length) { setFavRows([]); return; }
-    const now = Date.now();
-    const results = await Promise.all(favList.map(async fav => {
-      try {
-        const d = await fetch(`${KMB}/eta/${fav.stopId}/${fav.route}/${fav.serviceType}`).then(r => r.json());
-        const etas = (d.data || []).filter(e => e.eta)
-          .slice(0, 3)
-          .map(e => new Date(e.eta).getTime())
-          .filter(ts => ts > now - 30000);
-        return { ...fav, etasWithType: etas.map(ts => ({ ts, type: fav.type || 'kmb' })), companyType: fav.type || 'kmb', fare: null };
-      } catch {
-        return { ...fav, etasWithType: [], companyType: fav.type || 'kmb', fare: null };
-      }
-    }));
-    setFavRows(results);
-    setLastUpdated(new Date());
-    const allFailed = results.length > 0 && results.every(r => r.etasWithType.length === 0);
-    if (allFailed) showToast('⚠️ 網絡異常，班次資料或未能更新');
-    // 車費背景更新
-    results.forEach(async (r, i) => {
-      if (r.companyType !== 'kmb' && r.companyType !== 'joint') return;
-      const fare = await fetchKMBFare(r.route, 'O', r.serviceType).catch(() => null);
-      if (fare != null) setFavRows(prev => prev.map((row, j) => j === i ? { ...row, fare } : row));
-    });
-  }, [activePid]);
-  // Tab 切回主頁時刷新
-  useEffect(() => {
-    if (!isActive) return;
-    loadWeather();
-    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-    else _refreshFavs();
-  // eslint-disable-next-line
-  }, [isActive]);
-
-  const removeFav = useCallback((idx) => {
-    const favList = loadFavs(activePid);
-    if (!confirm(`確定移除「${favList[idx]?.route} 往 ${favList[idx]?.dest}」？`)) return;
-    favList.splice(idx, 1);
-    saveFavs(activePid, favList);
-    setFavRows(prev => prev.filter((_, i) => i !== idx));
-  }, [activePid]);
-
-  // ── Refresh ───────────────────────────────────────────────
-  const doRefresh = async () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    await Promise.all([
-      loadWeather(),
-      isNearby && gpsCoords
-        ? nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist)
-        : _refreshFavs(),
-    ]);
-    setRefreshing(false);
+  const switchPage = (id) => {
+    setActivePage(id);
+    if (id === 'news') newsHook.ensureLoaded(newsHook.currentFeed);
+    if (id === 'traffic' && !trafficHook.v2Data.length) trafficHook.load();
   };
-
-  // ── Profile switch ────────────────────────────────────────
-  const switchToNearby = () => {
-    setActivePid(NEARBY_PID);
-    if (gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
-    else {
-      checkPermission().then(state => {
-        if (state === 'granted') doLocate();
-        else nearbyHook.setStatus('no-permission');
-      });
-    }
-  };
-
-  const switchProfile = (pid) => {
-    setActivePid(pid);
-    reloadFavs(pid);
-    setTimeout(() => _refreshFavs(), 0);
-  };
-
-  // ── openDrawer with route data ───────────────────────────
-  const openRouteDetail = useCallback((row) => {
-    incrementRouteUsage(row.route, row.companyType);
-    openDrawer(`${row.route} 路線詳情`, 'bus-detail', {
-      co: row.companyType,
-      route: row.route,
-      bound: row.bound || 'O',
-      service_type: row.serviceType || row.service_type || '1',
-      dest_tc: row.dest_tc || row.dest,
-      stops_tc: [],
-    });
-  }, [openDrawer]);
-
-  // ── Nearby content ────────────────────────────────────────
-  const renderNearbyContent = () => {
-    switch (nearbyHook.status) {
-      case 'loading': return <Spinner />;
-      case 'no-permission': return (
-        <div className="msg" style={{ padding: '30px 20px' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
-          <div style={{ fontSize: 15, color: 'var(--bright)', marginBottom: 8 }}>需要位置權限</div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>為搜尋附近班次，需要使用你的位置。</div>
-          <button
-            onClick={() => { nearbyHook.setStatus('loading'); doLocate(); }}
-            style={{ background: 'var(--blu)', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            📡 允許位置使用
-          </button>
-        </div>
-      );
-      case 'error': return <div className="msg">{nearbyHook.errorMsg}</div>;
-      case 'ready':
-        if (!nearbyHook.rows.length) return (
-          <div className="empty-state">
-            <div className="empty-icon">⏱</div>
-            <div className="empty-text">附近暫無班次</div>
-            <div className="empty-sub">{nearbyDist}米範圍內沒有找到班次</div>
-          </div>
-        );
-        return nearbyHook.rows.map((row, i) => (
-          <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
-            onClick={() => openRouteDetail(row)}
-          />
-        ));
-      default: return <Spinner />;
-    }
-  };
-
-  const isStdDist = STD_DISTS.includes(nearbyDist);
 
   return (
-    <div className="page active" id="page-home">
-      {/* 天氣面板 */}
-      <WeatherPanel
-        weatherData={weatherData}
-        selectedStn={selectedStn}
-        refreshing={refreshing}
-        onRefresh={doRefresh}
-        onOpenDetails={() => openDrawer('天氣詳情', 'weather-details')}
-      />
+    <>
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: activePage === 'home' ? 'contents' : 'none' }}>
+          <HomePage openDrawer={openDrawer} showToast={showToast} isActive={activePage === 'home'} />
+        </div>
+        <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
+        <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
+        <SearchPage isActive={activePage === 'search'} />
+        <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
+      </div>
 
-      {/* Profiles bar */}
-      <div className="profiles-bar">
-        <button
-          className={`profile-tab nearby-tab${isNearby ? ' active' : ''}`}
-          onClick={switchToNearby}>
-          📍 附近
-        </button>
-        {profiles.map(p => (
-          <button key={p.id}
-            className={`profile-tab${p.id === activePid ? ' active' : ''}`}
-            onClick={() => switchProfile(p.id)}>
-            {p.name}
+      <nav className="bottom-nav">
+        {NAV.map(n => (
+          <button key={n.id} className={`nav-btn${activePage === n.id ? ' active' : ''}`}
+            onClick={() => switchPage(n.id)}>
+            <span className="nav-ico">{n.ico}</span>
+            <span className="nav-lbl">{n.lbl}</span>
           </button>
         ))}
-        <button className="add-profile-btn" onClick={() => openDrawer('新增版面', 'add-profile')}>＋</button>
-      </div>
+      </nav>
 
-      {/* 巴士區域 */}
-      <div className="bus-sec">
-        <div className="bus-hdr">
-          <div className="bus-hdr-lbl">
-            {isNearby ? `${nearbyDist}米內到站時間` : '到站時間'}
-            {lastUpdated && (
-              <span style={{ fontSize: 11, color: 'var(--dim)', marginLeft: 6 }}>
-                更新 {lastUpdated.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
-          {isNearby && (
-            <button className={`map-toggle-btn${mapView ? ' active' : ''}`} onClick={() => setMapView(v => !v)}>
-              {mapView ? '📋 列表' : '🗺 地圖'}
-            </button>
-          )}
-          {!isNearby && (
-            <button className="add-btn" onClick={() => openDrawer('搜尋路線', 'search')}>＋ 加路線</button>
-          )}
+      <Drawer open={drawer.open} title={drawer.title} onClose={closeDrawer}>
+        <DrawerContent drawerKey={drawer.key} closeDrawer={closeDrawer} showToast={showToast} />
+      </Drawer>
+
+      <Toast msg={toast.msg} visible={toast.visible} />
+    </>
+  );
+}
+
+// ── Drawer 內容路由 ───────────────────────────────────────
+function DrawerContent({ drawerKey, closeDrawer, showToast }) {
+  const { transportSettings, saveTransport, profiles, updateProfiles,
+    setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
+
+  if (!drawerKey) return null;
+
+  // ── 交通服務設定 ──────────────────────────────────────
+  if (drawerKey === 'transport') {
+    const { ctb, mtr, lrt } = transportSettings;
+    const Toggle = ({ checked, onChange, label, sub, disabled }) => (
+      <div className="sett-row" style={{ cursor: 'default' }}>
+        <div className="sett-lbl">
+          <div className="sett-lbl-main">{label}</div>
+          <div className="sett-lbl-sub">{sub}</div>
         </div>
+        <label className="toggle">
+          <input type="checkbox" checked={!!checked} onChange={onChange} disabled={!!disabled} />
+          <span className="toggle-slider" />
+        </label>
+      </div>
+    );
+    return (
+      <div className="sett-card">
+        <Toggle label="九巴 KMB" sub="預設啟用" checked disabled />
+        <Toggle label="城巴 CTB" sub="rt.data.gov.hk" checked={ctb}
+          onChange={e => { saveTransport({ ...transportSettings, ctb: e.target.checked }); showToast('已儲存'); }} />
+        <Toggle label="港鐵 MTR" sub="附近站下班車資料" checked={mtr}
+          onChange={e => { saveTransport({ ...transportSettings, mtr: e.target.checked }); showToast('已儲存'); }} />
+        <Toggle label="輕鐵 LRT" sub="rt.data.gov.hk/mtr/lrt" checked={lrt}
+          onChange={e => { saveTransport({ ...transportSettings, lrt: e.target.checked }); showToast('已儲存'); }} />
+      </div>
+    );
+  }
 
-        {isNearby && (
-          <div className="dist-row">
-            <span className="dist-lbl">距離：</span>
-            {STD_DISTS.map(m => (
-              <button key={m} className={`dist-pill${nearbyDist === m ? ' active' : ''}`}
-                onClick={() => setNearbyDist(m)}>
-                {distLabel(m)}
-              </button>
-            ))}
-            <button className={`dist-pill${!isStdDist ? ' active' : ''}`}
-              onClick={() => {
-                const cur = DIST_STEPS.reduce((b, v, i) =>
-                  Math.abs(v - nearbyDist) < Math.abs(DIST_STEPS[b] - nearbyDist) ? i : b, 0);
-                setSliderIdx(cur); setShowSlider(true);
+  // ── 天氣地點 ──────────────────────────────────────────
+  if (drawerKey === 'weather-details') {
+    return (
+      <div>
+        <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 10 }}>
+          選擇天氣測站（目前：{selectedStn}）
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {RHRREAD_STNS.map(s => (
+            <div key={s.n}
+              onClick={() => { setSelectedStn(s.n); closeDrawer(); showToast(`已切換至 ${s.n}`); }}
+              style={{
+                background: s.n === selectedStn ? 'var(--amb-bg)' : 'var(--bg3)',
+                border: `1px solid ${s.n === selectedStn ? 'var(--amb-bdr)' : 'var(--bdr)'}`,
+                borderRadius: 10, padding: '10px 12px', cursor: 'pointer', transition: 'all .15s',
               }}>
-              {isStdDist ? '自訂' : distLabel(nearbyDist)}
-            </button>
-          </div>
-        )}
-
-        <div className="bus-list" style={{ display: mapView ? 'none' : undefined }}>
-          {isNearby ? renderNearbyContent() : (
-            favRows.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">🚌</div>
-                <div className="empty-text">未有路線</div>
-                <div className="empty-sub">點擊「加路線」搜尋巴士班次</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: s.n === selectedStn ? 'var(--amb2)' : 'var(--txt)' }}>
+                {s.n}
               </div>
-            ) : favRows.map((row, i) => (
-              <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
-                onRemove={removeFav}
-                onClick={() => openRouteDetail(row)}
-              />
-            ))
-          )}
+            </div>
+          ))}
         </div>
-
-        {isNearby && mapView && (
-          <div id="nearby-map" style={{ flex: 1, minHeight: 0, position: 'relative' }} />
-        )}
       </div>
+    );
+  }
 
-      {/* 自訂距離 slider */}
-      {showSlider && (
-        <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h) + 8px)', left: 0, right: 0, zIndex: 40, display: 'flex', justifyContent: 'center', padding: '0 12px' }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--bdr2)', borderRadius: 14, padding: '14px 16px 12px', width: '100%', maxWidth: 480, boxShadow: '0 6px 28px rgba(0,0,0,.6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 12, color: 'var(--mid)' }}>自訂距離</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, color: 'var(--amb2)' }}>{distLabel(DIST_STEPS[sliderIdx])}</span>
-            </div>
-            <input type="range" min={0} max={DIST_STEPS.length - 1} step={1} value={sliderIdx}
-              onChange={e => setSliderIdx(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--amb)', height: 4, cursor: 'pointer', marginBottom: 10 }} />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowSlider(false)}
-                style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', color: 'var(--mid)', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
-                取消
-              </button>
-              <button onClick={() => { setNearbyDist(DIST_STEPS[sliderIdx]); setShowSlider(false); }}
-                style={{ background: 'var(--amb)', color: '#000', border: 'none', borderRadius: 8, padding: '7px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                確定
-              </button>
-            </div>
+  // ── 自動跳轉版面 ──────────────────────────────────────
+  if (drawerKey === 'auto-tab') {
+    return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
+  }
+
+  // ── 資料管理 ──────────────────────────────────────────
+  if (drawerKey === 'data') {
+    const exportData = () => {
+      const data = { profiles, favsByProfile: {} };
+      profiles.forEach(p => { data.favsByProfile[p.id] = loadFavs(p.id); });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `swd-bus-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('✅ 已匯出巴士資料');
+    };
+    const importData = (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!data.profiles || !data.favsByProfile) throw new Error();
+          if (!confirm(`確定匯入？覆蓋現有 ${data.profiles.length} 個版面。`)) return;
+          updateProfiles(data.profiles);
+          Object.entries(data.favsByProfile).forEach(([pid, arr]) => saveFavs(pid, arr));
+          showToast('✅ 匯入成功');
+          closeDrawer();
+        } catch { showToast('❌ 檔案格式不正確'); }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    };
+    return (
+      <div className="sett-card">
+        <div className="sett-row" onClick={exportData}>
+          <div className="sett-ico">📤</div>
+          <div className="sett-lbl">
+            <div className="sett-lbl-main">匯出路線資料</div>
+            <div className="sett-lbl-sub">下載 JSON 備份</div>
+          </div>
+          <div className="sett-chev">›</div>
+        </div>
+        <div className="sett-row" onClick={() => document.getElementById('_import-file').click()}>
+          <div className="sett-ico">📥</div>
+          <div className="sett-lbl">
+            <div className="sett-lbl-main">匯入路線資料</div>
+            <div className="sett-lbl-sub">還原 JSON 備份</div>
+          </div>
+          <div className="sett-chev">›</div>
+        </div>
+        <input id="_import-file" type="file" accept=".json"
+          style={{ display: 'none' }} onChange={importData} />
+      </div>
+    );
+  }
+
+  // ── 天氣警告通知 ──────────────────────────────────────
+  if (drawerKey === 'notify') {
+    return <NotifyDrawer showToast={showToast} />;
+  }
+
+  // ── 新增版面 ──────────────────────────────────────────
+  if (drawerKey === 'add-profile') {
+    return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
+      closeDrawer={closeDrawer} showToast={showToast} />;
+  }
+
+  // ── 安裝到手機 ────────────────────────────────────────
+  if (drawerKey === 'install') {
+    return (
+      <div style={{ fontSize: 13, color: 'var(--txt)', lineHeight: 2 }}>
+        <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 11, padding: '14px 16px', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--amb2)', marginBottom: 8 }}>📱 iPhone / iPad（Safari）</div>
+          1. 用 <strong style={{ color: 'var(--bright)' }}>Safari</strong> 開啟此網頁<br />
+          2. 點底部 <strong style={{ color: 'var(--bright)' }}>「分享」⬆</strong> 按鈕<br />
+          3. 選「<strong style={{ color: 'var(--bright)' }}>加入主畫面</strong>」<br />
+          4. 按右上角「新增」確認
+        </div>
+        <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 11, padding: '14px 16px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--amb2)', marginBottom: 8 }}>🤖 Android（Chrome）</div>
+          1. 用 <strong style={{ color: 'var(--bright)' }}>Chrome</strong> 開啟此網頁<br />
+          2. 點右上角 <strong style={{ color: 'var(--bright)' }}>「⋮」</strong> 選單<br />
+          3. 選「<strong style={{ color: 'var(--bright)' }}>新增至主畫面</strong>」<br />
+          4. 按「新增」確認
+        </div>
+      </div>
+    );
+  }
+
+  // ── 關於生活日常 ──────────────────────────────────────
+  if (drawerKey === 'about') {
+    const sources = [
+      ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
+      ['🚌','九巴 KMB','data.gov.hk 九巴開放 API','https://data.gov.hk/tc-data/dataset/hk-td-tis_21-etakmb'],
+      ['🟢','城巴 CTB','rt.data.gov.hk citybus ETA','https://data.one.gov.hk/zh-hant/dataset/citybus-eta'],
+      ['🔴','港鐵 / 輕鐵','data.one.gov.hk MTR 列車資訊','https://data.one.gov.hk/zh-hant/dataset/mtr-nextrain-data'],
+      ['📰','新聞','香港電台 RTHK RSS','https://news.rthk.hk/rthk/ch/rss.htm'],
+      ['🚦','交通消息','運輸署特別交通消息 v2','https://data.gov.hk/tc-data/dataset/hk-td-tis_19-special-traffic-news-v2'],
+    ];
+    return (
+      <div>
+        <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🌿</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--amb2)', marginBottom: 3 }}>生活日常</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--dim)' }}>
+            v{APP_VERSION} · React + Vite · 2026
           </div>
         </div>
-      )}
+        <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 11, overflow: 'hidden' }}>
+          {sources.map(([ico, name, src, url], i) => (
+            <a key={i} href={url} target="_blank" rel="noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                borderBottom: i < sources.length - 1 ? '1px solid var(--bdr)' : 'none',
+                textDecoration: 'none', color: 'inherit' }}>
+              <div style={{ fontSize: 18, width: 26, textAlign: 'center' }}>{ico}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--bright)' }}>{name}</div>
+                <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 1 }}>{src}</div>
+              </div>
+              <div style={{ color: 'var(--dim)', fontSize: 14 }}>↗</div>
+            </a>
+          ))}
+        </div>
+        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--dim)', padding: '8px 0' }}>
+          © 2026 生活日常
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="msg">載入中…</div>;
+}
+
+// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
+function AutoTabDrawer({ profiles, showToast }) {
+  const [cfg, setCfg] = useState(() => loadAutoTabs());
+  const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
+
+  const update = (pid, patch) => {
+    const next = { ...cfg, [pid]: { ...DEF, ...(cfg[pid] || {}), ...patch } };
+    setCfg(next);
+    saveAutoTabs(next);
+  };
+
+  // 快捷選擇
+  const PRESETS = [
+    { label: '工作日', days: [false,true,true,true,true,true,false] },
+    { label: '週末',   days: [true,false,false,false,false,false,true] },
+    { label: '每天',   days: [true,true,true,true,true,true,true] },
+  ];
+
+  // 常用時段
+  const TIME_PRESETS = [
+    { label: '早上通勤', from: '07:30', to: '09:30' },
+    { label: '下午通勤', from: '17:00', to: '19:30' },
+    { label: '上午',     from: '08:00', to: '12:00' },
+    { label: '下午',     from: '12:00', to: '18:00' },
+  ];
+
+  return (
+    <div>
+      {profiles.map(p => {
+        const c = { ...DEF, ...(cfg[p.id] || {}) };
+        return (
+          <div key={p.id} className="auto-tab-card" style={{ marginBottom: 12 }}>
+            {/* 標題列 + 開關 */}
+            <div className="auto-tab-hdr">
+              <div className="auto-tab-name">{p.name}</div>
+              <label className="toggle">
+                <input type="checkbox" checked={!!c.enabled}
+                  onChange={e => update(p.id, { enabled: e.target.checked })} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
+
+              {/* 星期選擇 — 大按鈕，易點擊 */}
+              <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                {DAY.map((d, i) => (
+                  <button key={i}
+                    onClick={() => { const days = [...c.days]; days[i] = !days[i]; update(p.id, { days }); }}
+                    style={{
+                      flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600,
+                      background: c.days[i] ? 'var(--amb)' : 'var(--bg3)',
+                      color: c.days[i] ? '#000' : 'var(--mid)',
+                      transition: 'all .15s',
+                    }}>{d}</button>
+                ))}
+              </div>
+
+              {/* 快捷日子 */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                {PRESETS.map(ps => (
+                  <button key={ps.label}
+                    onClick={() => update(p.id, { days: ps.days })}
+                    style={{
+                      flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: 'var(--bg4)', border: '1px solid var(--bdr2)',
+                      color: 'var(--mid)',
+                    }}>{ps.label}</button>
+                ))}
+              </div>
+
+              {/* 時間選擇 */}
+              <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
+                  <input type="time" value={c.from || '07:00'}
+                    onChange={e => update(p.id, { from: e.target.value })}
+                    style={{
+                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
+                    }} />
+                </div>
+                <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
+                  <input type="time" value={c.to || '09:00'}
+                    onChange={e => update(p.id, { to: e.target.value })}
+                    style={{
+                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
+                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
+                    }} />
+                </div>
+              </div>
+
+              {/* 常用時段快捷 */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {TIME_PRESETS.map(tp => (
+                  <button key={tp.label}
+                    onClick={() => update(p.id, { from: tp.from, to: tp.to })}
+                    style={{
+                      padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)',
+                      border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
+                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)',
+                    }}>
+                    {tp.label}<br />
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)' }}>{tp.from}–{tp.to}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* 當前設定預覽 */}
+              {c.days.some(Boolean) && (
+                <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
+                  📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
+                  <span style={{ fontFamily: 'var(--mono)' }}>{c.from} – {c.to}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function NotifyDrawer({ showToast }) {
+  const [perm, setPerm] = useState(() => {
+    if (!('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+  });
+  if (perm === 'unsupported') return <div className="msg">此裝置不支援通知</div>;
+  if (perm === 'denied') return (
+    <div className="msg">
+      ❌ 通知已被封鎖<br />
+      <small style={{ color: 'var(--dim)' }}>請到瀏覽器設定允許通知，然後重新整理頁面</small>
+    </div>
+  );
+  const isOn = perm === 'granted';
+  const toggle = async () => {
+    if (isOn) { showToast('請到瀏覽器設定中關閉通知權限'); return; }
+    const result = await Notification.requestPermission();
+    setPerm(result);
+    if (result === 'granted') showToast('✅ 已啟用天氣警告通知');
+    else showToast('❌ 未獲得通知權限');
+  };
+  return (
+    <div>
+      <div style={{ background: 'rgba(240,165,0,.08)', border: '1px solid var(--amb-bdr)', borderRadius: 11, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--bright)', marginBottom: 6 }}>🔔 會通知的警告</div>
+        <div style={{ fontSize: 12, color: 'var(--mid)', lineHeight: 1.9 }}>
+          ⛈ 黑色 / 紅色 / 黃色暴雨警告<br />
+          🌀 熱帶氣旋警告信號（颱風）<br />
+          🥵 酷熱 / 🥶 寒冷天氣警告<br />
+          ⚡ 雷暴警告 · 🌊 山泥傾瀉警告
+        </div>
+      </div>
+      <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, padding: '11px 13px', marginBottom: 14, fontSize: 12, color: 'var(--dim)', lineHeight: 1.7 }}>
+        ℹ️ 每 5 分鐘查詢天文台，有新警告時本地觸發通知
+      </div>
+      <button onClick={toggle} style={{
+        width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600,
+        cursor: 'pointer', fontFamily: 'var(--sans)',
+        border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`,
+        background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)',
+        color: isOn ? '#ff8a96' : 'var(--amb2)',
+      }}>
+        {isOn ? '🔕 關閉天氣警告通知' : '🔔 啟用天氣警告通知'}
+      </button>
+    </div>
+  );
+}
+
+function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) {
+  const [name, setName] = useState('');
+  const doAdd = () => {
+    if (!name.trim()) return;
+    const id = 'p_' + Date.now();
+    updateProfiles([...profiles, { id, name: name.trim() }]);
+    closeDrawer();
+    showToast(`已新增「${name.trim()}」`);
+  };
+  return (
+    <div>
+      <div className="sec-lbl">版面名稱</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input className="d-input" value={name} placeholder="如：上班、週末…" maxLength={10}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doAdd()}
+          autoFocus />
+        <button className="d-btn" onClick={doAdd}>確定</button>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppInner />
+    </AppProvider>
   );
 }
