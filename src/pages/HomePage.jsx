@@ -16,7 +16,7 @@ const STD_DISTS = [100, 300, 500, 1000, 3000, 5000];
 
 function distLabel(m) { return m >= 1000 ? (m / 1000) + 'km' : m + 'm'; }
 
-export default function HomePage({ openDrawer, showToast }) {
+export default function HomePage({ openDrawer, showToast, isActive }) {
   const {
     activePid, setActivePid, profiles,
     nearbyDist, setNearbyDist,
@@ -103,6 +103,14 @@ export default function HomePage({ openDrawer, showToast }) {
       if (fare != null) setFavRows(prev => prev.map((row, j) => j === i ? { ...row, fare } : row));
     });
   }, [activePid]);
+  // Tab 切回主頁時刷新
+  useEffect(() => {
+    if (!isActive) return;
+    loadWeather();
+    if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
+    else _refreshFavs();
+  // eslint-disable-next-line
+  }, [isActive]);
 
   const removeFav = useCallback((idx) => {
     const favList = loadFavs(activePid);
