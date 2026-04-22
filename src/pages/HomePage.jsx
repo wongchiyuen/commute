@@ -32,6 +32,7 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
   const [showSlider, setShowSlider] = useState(false);
   const [sliderIdx, setSliderIdx] = useState(3);
   const [mapView, setMapView] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const { weatherData, loadWeather } = useWeather(selectedStn, gpsCoords);
   const { getCurrentPosition, checkPermission } = useGeolocation();
@@ -77,6 +78,10 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
     if (isNearby && gpsCoords) nearbyHook.load(gpsCoords.lat, gpsCoords.lng, nearbyDist);
   // eslint-disable-next-line
   }, [nearbyDist]);
+  // 附近站載入完成時記錄更新時間
+  useEffect(() => {
+    if (nearbyHook.status === 'ready') setLastUpdated(new Date());
+  }, [nearbyHook.status]);
 
   // ── Favs ──────────────────────────────────────────────────
   const _refreshFavs = useCallback(async () => {
@@ -96,6 +101,9 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
       }
     }));
     setFavRows(results);
+    setLastUpdated(new Date());
+    const allFailed = results.length > 0 && results.every(r => r.etasWithType.length === 0);
+    if (allFailed) showToast('⚠️ 網絡異常，班次資料或未能更新');
     // 車費背景更新
     results.forEach(async (r, i) => {
       if (r.companyType !== 'kmb' && r.companyType !== 'joint') return;
@@ -233,6 +241,11 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
         <div className="bus-hdr">
           <div className="bus-hdr-lbl">
             {isNearby ? `${nearbyDist}米內到站時間` : '到站時間'}
+            {lastUpdated && (
+              <span style={{ fontSize: 11, color: 'var(--dim)', marginLeft: 6 }}>
+                更新 {lastUpdated.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           {isNearby && (
             <button className={`map-toggle-btn${mapView ? ' active' : ''}`} onClick={() => setMapView(v => !v)}>
