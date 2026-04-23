@@ -200,7 +200,7 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
           <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
             onClick={row.companyType !== 'mtr' ? () => {
               incrementRouteUsage(row.route, row.companyType);
-              openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+              openDrawer(`${row.route} 路線詳情`, 'bus-detail', { co: row.companyType, route: row.route, bound: row.dir || 'O', service_type: row.serviceType || '1', dest_tc: row.dest });
             } : undefined}
           />
         ));
@@ -292,7 +292,7 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
                 onRemove={removeFav}
                 onClick={() => {
                   incrementRouteUsage(row.route, row.companyType);
-                  openDrawer(`${row.route} 路線詳情`, 'bus-detail');
+                  openDrawer(`${row.route} 路線詳情`, 'bus-detail', { co: row.companyType, route: row.route, bound: row.dir || 'O', service_type: row.serviceType || '1', dest_tc: row.dest });
                 }}
               />
             ))
