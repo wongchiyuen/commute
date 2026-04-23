@@ -167,8 +167,24 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
   const switchProfile = (pid) => {
     setActivePid(pid);
     reloadFavs(pid);
-    // 觸發重新抓 ETA
     setTimeout(() => _refreshFavs(), 0);
+  };
+
+  // ── Open route detail ─────────────────────────────────────
+  const openDetail = (row) => {
+    incrementRouteUsage(row.route, row.companyType);
+    openDrawer(
+      `${row.route} 路線詳情`,
+      'bus-detail',
+      {
+        co: row.companyType,
+        route: row.route,
+        bound: row.dir || 'O',
+        service_type: row.serviceType || '1',
+        dest_tc: row.dest,
+        currentStopId: row.stopId,
+      }
+    );
   };
 
   // ── Nearby content ────────────────────────────────────────
@@ -198,10 +214,9 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
         );
         return nearbyHook.rows.map((row, i) => (
           <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
-            onClick={row.companyType !== 'mtr' ? () => {
-              incrementRouteUsage(row.route, row.companyType);
-              openDrawer(`${row.route} 路線詳情`, 'bus-detail', { co: row.companyType, route: row.route, bound: row.dir || 'O', service_type: row.serviceType || '1', dest_tc: row.dest });
-            } : undefined}
+            onClick={row.companyType !== 'mtr' && row.companyType !== 'lrt'
+              ? () => openDetail(row)
+              : undefined}
           />
         ));
       default: return <Spinner />;
@@ -212,7 +227,6 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
 
   return (
     <div className="page active" id="page-home">
-      {/* 天氣面板 */}
       <WeatherPanel
         weatherData={weatherData}
         selectedStn={selectedStn}
@@ -221,7 +235,6 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
         onOpenDetails={() => openDrawer('天氣詳情', 'weather-details')}
       />
 
-      {/* Profiles bar — 天氣面板之下 */}
       <div className="profiles-bar">
         <button
           className={`profile-tab nearby-tab${isNearby ? ' active' : ''}`}
@@ -238,7 +251,6 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
         <button className="add-profile-btn" onClick={() => openDrawer('新增版面', 'add-profile')}>＋</button>
       </div>
 
-      {/* 巴士區域 */}
       <div className="bus-sec">
         <div className="bus-hdr">
           <div className="bus-hdr-lbl">
@@ -290,10 +302,7 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
             ) : favRows.map((row, i) => (
               <BusCard key={`${row.route}_${row.stopId}_${i}`} row={row} idx={i}
                 onRemove={removeFav}
-                onClick={() => {
-                  incrementRouteUsage(row.route, row.companyType);
-                  openDrawer(`${row.route} 路線詳情`, 'bus-detail', { co: row.companyType, route: row.route, bound: row.dir || 'O', service_type: row.serviceType || '1', dest_tc: row.dest });
-                }}
+                onClick={() => openDetail(row)}
               />
             ))
           )}
@@ -304,7 +313,6 @@ export default function HomePage({ openDrawer, showToast, isActive }) {
         )}
       </div>
 
-      {/* 自訂距離 slider */}
       {showSlider && (
         <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h) + 8px)', left: 0, right: 0, zIndex: 40, display: 'flex', justifyContent: 'center', padding: '0 12px' }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--bdr2)', borderRadius: 14, padding: '14px 16px 12px', width: '100%', maxWidth: 480, boxShadow: '0 6px 28px rgba(0,0,0,.6)' }}>

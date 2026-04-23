@@ -13,7 +13,6 @@ import BusRouteDetail from './components/BusRouteDetail.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import './styles/global.css';
 
-// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -49,7 +48,7 @@ function AppInner() {
         </div>
         <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
-        <SearchPage isActive={activePage === 'search'} />
+        <SearchPage isActive={activePage === 'search'} openDrawer={openDrawer} />
         <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
       </div>
 
@@ -72,24 +71,16 @@ function AppInner() {
   );
 }
 
-// ── Drawer 內容路由 ───────────────────────────────────────
 function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
 
-  // ── 路線詳情 ──────────────────────────────────────────
   if (drawerKey === 'bus-detail') {
     return <BusRouteDetail data={drawerData} showToast={showToast} />;
   }
 
-  // ── 搜尋加路線 ────────────────────────────────────────
-  if (drawerKey === 'search') {
-    return <SearchDrawer showToast={showToast} />;
-  }
-
-  // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
     const { ctb, mtr, lrt } = transportSettings;
     const Toggle = ({ checked, onChange, label, sub, disabled }) => (
@@ -117,7 +108,6 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
-  // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
     return (
       <div>
@@ -143,12 +133,10 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
-  // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
     return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
   }
 
-  // ── 資料管理 ──────────────────────────────────────────
   if (drawerKey === 'data') {
     const exportData = () => {
       const data = { profiles, favsByProfile: {} };
@@ -203,18 +191,15 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
-  // ── 天氣警告通知 ──────────────────────────────────────
   if (drawerKey === 'notify') {
     return <NotifyDrawer showToast={showToast} />;
   }
 
-  // ── 新增版面 ──────────────────────────────────────────
   if (drawerKey === 'add-profile') {
     return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
       closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
-  // ── 安裝到手機 ────────────────────────────────────────
   if (drawerKey === 'install') {
     return (
       <div style={{ fontSize: 13, color: 'var(--txt)', lineHeight: 2 }}>
@@ -236,7 +221,6 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
-  // ── 關於生活日常 ──────────────────────────────────────
   if (drawerKey === 'about') {
     const sources = [
       ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
@@ -280,67 +264,6 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
-// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
-function SearchDrawer({ showToast }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState(null);
-
-  const doSearch = async () => {
-    const q = query.trim().toUpperCase();
-    if (!q) return;
-    setLoading(true); setResults(null);
-    try {
-      const [kmbData, ctbData] = await Promise.all([
-        fetch('https://data.etabus.gov.hk/v1/transport/kmb/route/').then(r => r.json()).catch(() => ({ data: [] })),
-        fetch('https://rt.data.gov.hk/v2/transport/citybus/route/CTB').then(r => r.json()).catch(() => ({ data: [] })),
-      ]);
-      const kmbMatches = (kmbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: 'kmb' }));
-      const ctbMatches = (ctbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: 'ctb', bound: r.bound || 'O', service_type: '1' }));
-      setResults([...kmbMatches, ...ctbMatches]);
-    } catch { setResults([]); }
-    setLoading(false);
-  };
-
-  if (detail) return (
-    <div>
-      <button onClick={() => setDetail(null)}
-        style={{ background: 'none', border: 'none', color: 'var(--amb2)', fontSize: 13, cursor: 'pointer', marginBottom: 12, padding: 0 }}>
-        ← 返回搜尋
-      </button>
-      <BusRouteDetail data={detail} showToast={showToast} />
-    </div>
-  );
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input className="d-input" value={query} placeholder="路線號碼 / 地名" autoFocus
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && doSearch()} />
-        <button className="d-btn" onClick={doSearch}>搜尋</button>
-      </div>
-      {loading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--mid)' }}>搜尋中…</div>}
-      {results?.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--mid)' }}>找不到結果</div>}
-      {results?.map((r, i) => (
-        <div key={i} className="result-item" onClick={() => setDetail(r)}>
-          <div className="rn">{r.route}</div>
-          <div className="ri">
-            <div className="ri-dest">往 {r.dest_tc}</div>
-            <div className="ri-orig">由 {r.orig_tc}</div>
-          </div>
-          <div className="chev">›</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -378,7 +301,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 <span className="toggle-slider" />
               </label>
             </div>
-
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -394,7 +316,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{d}</button>
                 ))}
               </div>
-
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
                   <button key={ps.label}
@@ -407,7 +328,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{ps.label}</button>
                 ))}
               </div>
-
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -432,7 +352,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }} />
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
                   <button key={tp.label}
@@ -449,7 +368,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                   </button>
                 ))}
               </div>
-
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />

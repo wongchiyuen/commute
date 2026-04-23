@@ -1,32 +1,41 @@
 import { useState } from 'react';
+import { KMB, CTB } from '../constants/transport.js';
 import { Spinner } from '../components/Overlay.jsx';
-
-const ROUTES_URL = 'https://wongchiyuen.github.io/commute/data/routes.json';
 
 export default function SearchPage({ isActive, openDrawer }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null); // null=idle, []|[...]
+  const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const doSearch = async () => {
-    const q = query.trim();
+    const q = query.trim().toUpperCase();
     if (!q) return;
     setLoading(true); setResults(null);
     try {
-      const data = await fetch(ROUTES_URL).then(r => r.json());
-      const qUp = q.toUpperCase();
-      const seen = new Set();
-      const matches = (data.routes || []).filter(r => {
-        if (!(r.route === qUp || r.route.startsWith(qUp) ||
-              r.dest_tc?.includes(q) || r.orig_tc?.includes(q) ||
-              r.stops_tc?.some(s => s.includes(q)))) return false;
-        const key = `${r.co}|${r.route}|${r.bound}`;
-        if (seen.has(key)) return false;
-        seen.add(key); return true;
-      });
-      setResults(matches);
+      const [kmbData, ctbData] = await Promise.all([
+        fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
+      ]);
+      const kmbMatches = (kmbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) ||
+          r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: 'kmb' }));
+      const ctbMatches = (ctbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) ||
+          r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: 'ctb', bound: r.bound || 'O', service_type: '1' }));
+      setResults([...kmbMatches, ...ctbMatches]);
     } catch { setResults([]); }
     setLoading(false);
+  };
+
+  const openDetail = (r) => {
+    if (!openDrawer) return;
+    openDrawer(
+      `${r.route} 路線詳情`,
+      'bus-detail',
+      { co: r.co || 'kmb', route: r.route, bound: r.bound || 'O', service_type: r.service_type || '1', dest_tc: r.dest_tc }
+    );
   };
 
   return (
@@ -61,7 +70,8 @@ export default function SearchPage({ isActive, openDrawer }) {
             <>
               <div className="sec-lbl">找到 {results.length} 個結果</div>
               {results.map((r, i) => (
-                <div key={i} className="result-item" onClick={() => openDrawer(`${r.route} 路線詳情`, 'bus-detail', { co: r.co, route: r.route, bound: r.bound, service_type: r.service_type, orig_tc: r.orig_tc, dest_tc: r.dest_tc, stops_tc: r.stops_tc })}>
+                <div key={i} className="result-item" onClick={() => openDetail(r)}
+                  style={{ cursor: 'pointer' }}>
                   <div className="rn">{r.route}</div>
                   <div className="ri">
                     <div className="ri-dest">往 {r.dest_tc}</div>
