@@ -3,7 +3,7 @@ import { AppProvider, useApp, NEARBY_PID,
   loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
 import { useNews } from './hooks/useNews.js';
 import { useTraffic } from './hooks/useTraffic.js';
-import { Drawer, Toast } from './components/Overlay.jsx';
+import { Drawer, Toast, Spinner } from './components/Overlay.jsx';
 import HomePage from './pages/HomePage.jsx';
 import NewsPage from './pages/NewsPage.jsx';
 import TrafficPage from './pages/TrafficPage.jsx';
@@ -261,6 +261,11 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
+  // ── 加路線搜尋 ────────────────────────────────────────
+  if (drawerKey === 'search') {
+    return <SearchDrawer closeDrawer={closeDrawer} showToast={showToast} />;
+  }
+
   return <div className="msg">載入中…</div>;
 }
 
@@ -448,6 +453,119 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
           autoFocus />
         <button className="d-btn" onClick={doAdd}>確定</button>
       </div>
+    </div>
+  );
+}
+
+// ── 加路線 Drawer ─────────────────────────────────────
+function SearchDrawer({ closeDrawer, showToast }) {
+  const { activePid } = useApp();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [stops, setStops] = useState(null);
+  const [stopsLoading, setStopsLoading] = useState(false);
+
+  const KMB_BASE = 'https://data.etbus.gov.hk/v1/transport/kmb';
+
+  const doSearch = async () => {
+    const q = query.trim().toUpperCase();
+    if (!q) return;
+    setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
+    try {
+      const data = await fetch(`${KMB_BASE}/route/`).then(r => r.json());
+      const matches = (data.data || []).filter(r =>
+        r.route === q || r.route.startsWith(q) ||
+        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
+      ).slice(0, 40);
+      setResults(matches);
+    } catch { setResults([]); }
+    setLoading(false);
+  };
+
+  const selectRoute = async (r) => {
+    setSelectedRoute(r); setStopsLoading(true); setStops(null);
+    try {
+      const bound = r.bound === 'O' ? 'outbound' : 'inbound';
+      const d = await fetch(`${KMB_BASE}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
+      const stopIds = (d.data || []).map(s => s.stop);
+      const details = await Promise.all(
+        stopIds.slice(0, 25).map(id => fetch(`${KMB_BASE}/stop/${id}`).then(x => x.json()).catch(() => null))
+      );
+      setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+    } catch { setStops([]); }
+    setStopsLoading(false);
+  };
+
+  const addStop = (stop) => {
+    const favList = loadFavs(activePid);
+    if (favList.some(f => f.stopId === stop.stop && f.route === selectedRoute.route)) {
+      showToast('⚠️ 此站已加入'); return;
+    }
+    favList.push({
+      route: selectedRoute.route,
+      dest: selectedRoute.dest_tc,
+      stopId: stop.stop,
+      stopName: stop.name_tc,
+      serviceType: selectedRoute.service_type || '1',
+      type: 'kmb',
+    });
+    saveFavs(activePid, favList);
+    showToast(`✅ 已加入 ${selectedRoute.route} ${stop.name_tc}`);
+    closeDrawer();
+  };
+
+  if (selectedRoute) return (
+    <div>
+      <button onClick={() => { setSelectedRoute(null); setStops(null); }}
+        style={{ background: 'none', border: 'none', color: 'var(--amb2)', fontSize: 13, cursor: 'pointer', padding: '0 0 12px', fontFamily: 'var(--sans)' }}>
+        ← 返回結果
+      </button>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--bright)', marginBottom: 3 }}>
+        {selectedRoute.route} 往 {selectedRoute.dest_tc}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12 }}>由 {selectedRoute.orig_tc} — 選擇站點加入</div>
+      {stopsLoading ? <Spinner /> : (stops || []).map((stop, i) => (
+        <div key={i} onClick={() => addStop(stop)}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+            background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
+          <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)',
+            border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
+            {stop.seq}
+          </div>
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--txt)' }}>{stop.name_tc}</div>
+          <div style={{ fontSize: 18, color: 'var(--amb2)' }}>＋</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input className="d-input" value={query} placeholder="路線號碼 / 地名（如 40X、荃灣）" autoFocus
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doSearch()} />
+        <button className="d-btn" onClick={doSearch}>搜尋</button>
+      </div>
+      {loading && <Spinner />}
+      {results !== null && !loading && (results.length === 0
+        ? <div className="msg">找不到「{query}」</div>
+        : results.map((r, i) => (
+          <div key={i} onClick={() => selectRoute(r)}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+              background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: 'var(--amb2)', minWidth: 44 }}>{r.route}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: 'var(--bright)' }}>往 {r.dest_tc}</div>
+              <div style={{ fontSize: 11, color: 'var(--dim)' }}>由 {r.orig_tc}</div>
+            </div>
+            <div style={{ color: 'var(--mid)' }}>›</div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
