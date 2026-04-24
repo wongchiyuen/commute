@@ -122,7 +122,10 @@ export default function WeatherPanel({ weatherData, selectedStn, refreshing, onR
             ) : (
               forecast.slice(0, 9).map((f, i) => {
                 const ds = String(f.forecastDate);
-                const dateLbl = i === 0 ? '今日' : i === 1 ? '明日' : i === 2 ? '後日' : `${ds.slice(4, 6)}/${ds.slice(6, 8)}`;
+                const fcDate = new Date(parseInt(ds.slice(0,4)), parseInt(ds.slice(4,6))-1, parseInt(ds.slice(6,8)));
+                const todayMid = new Date(); todayMid.setHours(0,0,0,0); fcDate.setHours(0,0,0,0);
+                const diff = Math.round((fcDate - todayMid) / 86400000);
+                const dateLbl = diff === 0 ? '今日' : diff === 1 ? '明日' : diff === 2 ? '後日' : `${ds.slice(4, 6)}/${ds.slice(6, 8)}`;
                 const weekLbl = f.week || '';
                 const hl = i <= 2;
                 const maxT = f.forecastMaxtemp?.value ?? f.forecastMaxtemp ?? '--';
