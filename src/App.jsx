@@ -581,7 +581,12 @@ function SearchDrawer({ closeDrawer, showToast }) {
               <div style={{ fontSize: 13, color: 'var(--bright)' }}>往 {r.dest_tc}</div>
               <div style={{ fontSize: 11, color: 'var(--dim)' }}>由 {r.orig_tc}</div>
             </div>
-            <div style={{ color: 'var(--mid)' }}>›</div>
+            <div style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, fontWeight: 600, flexShrink: 0,
+              color: r.co === 'ctb' ? '#2ed573' : r.co === 'lwb' ? '#00c896' : 'var(--amb2)',
+              background: r.co === 'ctb' ? 'rgba(46,213,115,.1)' : r.co === 'lwb' ? 'rgba(0,168,132,.1)' : 'var(--amb-bg)',
+              border: `1px solid ${r.co === 'ctb' ? 'rgba(46,213,115,.3)' : r.co === 'lwb' ? 'rgba(0,168,132,.3)' : 'var(--amb-bdr)'}` }}>
+              {r.co === 'ctb' ? '城巴' : r.co === 'lwb' ? '龍運' : '九巴'}
+            </div>
           </div>
         ))
       )}
