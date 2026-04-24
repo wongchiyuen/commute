@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KMB } from '../constants/transport.js';
+import { KMB, CTB } from '../constants/transport.js';
 import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
 import { Spinner } from '../components/Overlay.jsx';
 
@@ -20,12 +20,17 @@ export default function SearchPage({ isActive }) {
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const data = await fetch(`${KMB}/route/`).then(r => r.json());
-      const matches = (data.data || []).filter(r =>
-        r.route === q || r.route.startsWith(q) ||
-        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
-      );
-      setResults(matches);
+      const [kmbData, ctbData] = await Promise.all([
+        fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
+      ]);
+      const kmbMatches = (kmbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: r.co === 'LWB' ? 'lwb' : 'kmb' }));
+      const ctbMatches = (ctbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: 'ctb' }));
+      setResults([...kmbMatches, ...ctbMatches]);
     } catch { setResults([]); }
     setLoading(false);
   };
@@ -34,16 +39,25 @@ export default function SearchPage({ isActive }) {
     setSelectedRoute(r); setStopsLoading(true); setStops(null);
     try {
       const bound = r.bound === 'O' ? 'outbound' : 'inbound';
-      const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
-      const stopIds = (d.data || []).map(s => s.stop);
-      const details = await Promise.all(
-        stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
-      );
-      setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      if (r.co === 'ctb') {
+        const d = await fetch(`${CTB}/route-stop/CTB/${r.route}/${bound}`).then(x => x.json());
+        const stopIds = (d.data || []).map(s => s.stop);
+        const details = await Promise.all(
+          stopIds.slice(0, 25).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
+        );
+        setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      } else {
+        const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
+        const stopIds = (d.data || []).map(s => s.stop);
+        const details = await Promise.all(
+          stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
+        );
+        setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      }
     } catch { setStops([]); }
     setStopsLoading(false);
   };
-
+  
   const addStop = (stop) => {
     const needPicker = activePid === NEARBY_PID;
     const pid = needPicker ? targetPid : activePid;
@@ -58,7 +72,7 @@ export default function SearchPage({ isActive }) {
       stopId: stop.stop,
       stopName: stop.name_tc,
       serviceType: selectedRoute.service_type || '1',
-      type: 'kmb',
+      type: selectedRoute.co,
     });
     saveFavs(pid, favList);
     const profName = profiles.find(p => p.id === pid)?.name || pid;
@@ -155,7 +169,13 @@ export default function SearchPage({ isActive }) {
                     <div className="ri-dest">往 {r.dest_tc}</div>
                     <div className="ri-orig">由 {r.orig_tc}</div>
                   </div>
-                  <div className="chev">›</div>
+                  <div style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, fontWeight: 600,
+                    color: r.co === 'ctb' ? '#2ed573' : r.co === 'lwb' ? '#00c896' : 'var(--amb2)',
+                    background: r.co === 'ctb' ? 'rgba(46,213,115,.1)' : r.co === 'lwb' ? 'rgba(0,168,132,.1)' : 'var(--amb-bg)',
+                    border: `1px solid ${r.co === 'ctb' ? 'rgba(46,213,115,.3)' : r.co === 'lwb' ? 'rgba(0,168,132,.3)' : 'var(--amb-bdr)'}`,
+                    alignSelf: 'center', flexShrink: 0 }}>
+                    {r.co === 'ctb' ? '城巴' : r.co === 'lwb' ? '龍運' : '九巴'}
+                  </div>
                 </div>
               ))}
             </>
