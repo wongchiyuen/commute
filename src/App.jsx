@@ -12,6 +12,11 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import BusRouteDetail from './components/BusRouteDetail.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB } from './constants/transport.js';
+import { LWB } from './constants/transport.js';
+import { JOINT } from './constants/transport.js';
+import { NLB } from './constants/transport.js';
+import { MTR } from './constants/transport.js';
+import { LRT } from './constants/transport.js';
 import './styles/global.css';
 
 const APP_VERSION = __APP_VERSION__;
