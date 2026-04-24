@@ -94,15 +94,13 @@ async function fetchKMBLWBEtas(nearby, now) {
       const co = (e.co || 'KMB').toUpperCase() === 'LWB' ? 'lwb' : 'kmb';
       const key = `${e.route}_${e.dir}_${co}`;
       if (!routeMap.has(key)) {
-        routeMap.set(key, {
-          route: e.route, dest: e.dest_tc || '',
-          stopName: stop.n, stopId: stop.id,
-          stopLat: stop.lat, stopLng: stop.lng,
-          dist: Math.round(stop.dist),
-          serviceType: e.service_type || '1', dir: e.dir,
-          companyType: co,
-          etasWithType: [{ ts, type: co }], fare: null,
-        });
+        const co = e.co === 'LWB' ? 'lwb' : 'kmb';
+              routeMap.set(key, {
+                route: e.route, dest: e.dest_tc || '', stopName: stop.name_tc,
+                stopId: stop.stop, dist: Math.round(stop.dist),
+                serviceType: e.service_type || '1', dir: e.dir,
+                companyType: co, etasWithType: [{ ts, type: co }], fare: null,
+              });
       } else {
         const ex = routeMap.get(key);
         if (ex.etasWithType.length < 3 && !ex.etasWithType.find(x => x.ts === ts))
@@ -377,7 +375,7 @@ async function buildFinalRows(kmbMap, ctbRows, mtrRows, lrtRows, nlbRows = []) {
   });
 
   const renderRows = allRows.slice(0, 25);
-  const fareRows = renderRows.filter(r => ['kmb', 'lwb', 'joint'].includes(r.companyType));
+  const fareRows = renderRows.filter(r => r.companyType === 'kmb' || r.companyType === 'lwb' || r.companyType === 'joint');
   await Promise.race([
     Promise.all(fareRows.map(r =>
       fetchKMBFare(r.route, r.dir, r.serviceType).then(f => { r.fare = f; }).catch(() => {})
