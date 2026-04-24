@@ -11,7 +11,9 @@ export default function SearchPage({ isActive }) {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [stops, setStops] = useState(null);
   const [stopsLoading, setStopsLoading] = useState(false);
-  const [targetPid, setTargetPid] = useState(null);
+  const [targetPid, setTargetPid] = useState(() =>
+    activePid !== NEARBY_PID ? activePid : null
+  );
 
   const doSearch = async () => {
     const q = query.trim().toUpperCase();
@@ -65,7 +67,6 @@ export default function SearchPage({ isActive }) {
 
   // ── 站點選擇畫面 ──────────────────────────────────────
   if (selectedRoute) {
-    const needPicker = activePid === NEARBY_PID;
     return (
       <div className="page" id="page-search" style={isActive ? { display: 'flex' } : {}}>
         <div style={{ flexShrink: 0, padding: '12px 12px 10px', background: 'var(--bg2)', borderBottom: '1px solid var(--bdr)' }}>
@@ -77,7 +78,7 @@ export default function SearchPage({ isActive }) {
             {selectedRoute.route} 往 {selectedRoute.dest_tc}
           </div>
           <div style={{ fontSize: 12, color: 'var(--dim)', marginTop: 2 }}>由 {selectedRoute.orig_tc} — 選擇站點加入</div>
-          {needPicker && profiles.length > 0 && (
+          {profiles.length > 0 && (
             <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--mid)' }}>加入版面：</span>
               {profiles.map(p => (
