@@ -11,6 +11,7 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import BusRouteDetail from './components/BusRouteDetail.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
+import { KMB } from './constants/transport.js';
 import './styles/global.css';
 
 const APP_VERSION = __APP_VERSION__;
@@ -459,7 +460,7 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
 
 // ── 加路線 Drawer ─────────────────────────────────────
 function SearchDrawer({ closeDrawer, showToast }) {
-  const { activePid } = useApp();
+  const { activePid, profiles } = useApp();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -467,14 +468,14 @@ function SearchDrawer({ closeDrawer, showToast }) {
   const [stops, setStops] = useState(null);
   const [stopsLoading, setStopsLoading] = useState(false);
 
-  const KMB_BASE = 'https://data.etbus.gov.hk/v1/transport/kmb';
+  const profName = profiles.find(p => p.id === activePid)?.name || '';
 
   const doSearch = async () => {
     const q = query.trim().toUpperCase();
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const data = await fetch(`${KMB_BASE}/route/`).then(r => r.json());
+      const data = await fetch(`${KMB}/route/`).then(r => r.json());
       const matches = (data.data || []).filter(r =>
         r.route === q || r.route.startsWith(q) ||
         r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
@@ -488,10 +489,10 @@ function SearchDrawer({ closeDrawer, showToast }) {
     setSelectedRoute(r); setStopsLoading(true); setStops(null);
     try {
       const bound = r.bound === 'O' ? 'outbound' : 'inbound';
-      const d = await fetch(`${KMB_BASE}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
+      const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
       const stopIds = (d.data || []).map(s => s.stop);
       const details = await Promise.all(
-        stopIds.slice(0, 25).map(id => fetch(`${KMB_BASE}/stop/${id}`).then(x => x.json()).catch(() => null))
+        stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
       );
       setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
     } catch { setStops([]); }
@@ -525,8 +526,12 @@ function SearchDrawer({ closeDrawer, showToast }) {
       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--bright)', marginBottom: 3 }}>
         {selectedRoute.route} 往 {selectedRoute.dest_tc}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12 }}>由 {selectedRoute.orig_tc} — 選擇站點加入</div>
-      {stopsLoading ? <Spinner /> : (stops || []).map((stop, i) => (
+      <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 6 }}>由 {selectedRoute.orig_tc} — 選擇站點加入</div>
+      {profName && (
+        <div style={{ fontSize: 12, background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', borderRadius: 8, padding: '6px 10px', marginBottom: 12, color: 'var(--amb2)' }}>
+          ＋ 加入版面：<strong>{profName}</strong>
+        </div>
+      )}      {stopsLoading ? <Spinner /> : (stops || []).map((stop, i) => (
         <div key={i} onClick={() => addStop(stop)}
           style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
             background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
