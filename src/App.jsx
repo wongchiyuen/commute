@@ -11,12 +11,7 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import BusRouteDetail from './components/BusRouteDetail.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
-import { KMB } from './constants/transport.js';
-import { LWB } from './constants/transport.js';
-import { JOINT } from './constants/transport.js';
-import { NLB } from './constants/transport.js';
-import { MTR } from './constants/transport.js';
-import { LRT } from './constants/transport.js';
+import { KMB, CTB } from './constants/transport.js';
 import './styles/global.css';
 
 const APP_VERSION = __APP_VERSION__;
@@ -480,12 +475,17 @@ function SearchDrawer({ closeDrawer, showToast }) {
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const data = await fetch(`${KMB}/route/`).then(r => r.json());
-      const matches = (data.data || []).filter(r =>
-        r.route === q || r.route.startsWith(q) ||
-        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
-      ).slice(0, 40);
-      setResults(matches);
+      const [kmbData, ctbData] = await Promise.all([
+        fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
+      ]);
+      const kmbMatches = (kmbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: r.co === 'LWB' ? 'lwb' : 'kmb' }));
+      const ctbMatches = (ctbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: 'ctb' }));
+      setResults([...kmbMatches, ...ctbMatches].slice(0, 40));
     } catch { setResults([]); }
     setLoading(false);
   };
@@ -494,12 +494,21 @@ function SearchDrawer({ closeDrawer, showToast }) {
     setSelectedRoute(r); setStopsLoading(true); setStops(null);
     try {
       const bound = r.bound === 'O' ? 'outbound' : 'inbound';
-      const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
-      const stopIds = (d.data || []).map(s => s.stop);
-      const details = await Promise.all(
-        stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
-      );
-      setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      if (r.co === 'ctb') {
+        const d = await fetch(`${CTB}/route-stop/CTB/${r.route}/${bound}`).then(x => x.json());
+        const stopIds = (d.data || []).map(s => s.stop);
+        const details = await Promise.all(
+          stopIds.slice(0, 25).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
+        );
+        setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      } else {
+        const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
+        const stopIds = (d.data || []).map(s => s.stop);
+        const details = await Promise.all(
+          stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
+        );
+        setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
+      }
     } catch { setStops([]); }
     setStopsLoading(false);
   };
@@ -515,7 +524,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
       stopId: stop.stop,
       stopName: stop.name_tc,
       serviceType: selectedRoute.service_type || '1',
-      type: 'kmb',
+      type: selectedRoute.co,
     });
     saveFavs(activePid, favList);
     showToast(`✅ 已加入 ${selectedRoute.route} ${stop.name_tc}`);
