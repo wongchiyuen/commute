@@ -14,9 +14,9 @@ export default function BusCard({ row, idx, onRemove, onDragStart, onClick }) {
   const isJoint = companyType === 'joint';
 
   const coLabel = isJoint ? '九巴+城巴' : isCTB ? '城巴' : isLWB ? '龍運' : isLRT ? '輕鐵' : isMTR ? '港鐵' : '九巴';
-  const badgeBg = isCTB ? 'rgba(46,213,115,.1)' : isLWB ? 'rgba(181,130,42,.12)' : isLRT ? 'rgba(255,165,0,.1)' : isMTR ? 'rgba(255,71,87,.12)' : 'var(--amb-bg)';
-  const badgeBdr = isCTB ? 'rgba(46,213,115,.3)' : isLWB ? 'rgba(181,130,42,.4)' : isLRT ? 'rgba(255,165,0,.35)' : isMTR ? 'rgba(255,71,87,.35)' : 'var(--amb-bdr)';
-  const routeCol = isCTB ? '#2ed573' : isLWB ? '#c8972a' : isLRT ? '#ffaa33' : isMTR ? '#ff8a96' : 'var(--amb2)';
+  const badgeBg = isCTB ? 'rgba(46,213,115,.1)' : isLWB ? 'rgba(0,168,132,.1)' : isLRT ? 'rgba(255,165,0,.1)' : isMTR ? 'rgba(255,71,87,.12)' : 'var(--amb-bg)';
+  const badgeBdr = isCTB ? 'rgba(46,213,115,.3)' : isLWB ? 'rgba(0,168,132,.3)' : isLRT ? 'rgba(255,165,0,.35)' : isMTR ? 'rgba(255,71,87,.35)' : 'var(--amb-bdr)';
+  const routeCol = isCTB ? '#2ed573' : isLWB ? '#00c896' : isLRT ? '#ffaa33' : isMTR ? '#ff8a96' : 'var(--amb2)';
   const routeFontSize = route.length <= 3 ? '24px' : route.length === 4 ? '19px' : '15px';
 
   const distStr = dist ? `${dist}m` : '';
