@@ -24,7 +24,7 @@ export default function SearchPage({ isActive }) {
         fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
       ]);
-      const LWB_PREFIX = /^(A|B|E|R)\d|^N(11|21|29|30|31|35|42)/;
+      const LWB_PREFIX = /^(A|E|R)\d|^NA\d|^N(11|21|29|30|31|35|42)/;
       const kmbMatches = (kmbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: LWB_PREFIX.test(r.route) ? 'lwb' : 'kmb' }));
