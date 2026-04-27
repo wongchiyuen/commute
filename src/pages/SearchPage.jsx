@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
 import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
 import { Spinner } from '../components/Overlay.jsx';
+import { getRouteCoPool } from '../hooks/useNearby.js';
 
 export default function SearchPage({ isActive }) {
   const { activePid, profiles, showToast } = useApp();
@@ -20,14 +21,14 @@ export default function SearchPage({ isActive }) {
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const [kmbData, ctbData] = await Promise.all([
+      const [kmbData, ctbData, coPool] = await Promise.all([
         fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
+        getRouteCoPool(),
       ]);
-      const LWB_PREFIX = /^(A|E|R)\d|^NA\d|^N(11|21|29|30|31|35|42)/;
       const kmbMatches = (kmbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: LWB_PREFIX.test(r.route) ? 'lwb' : 'kmb' }));
+        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
@@ -44,24 +45,23 @@ export default function SearchPage({ isActive }) {
         const d = await fetch(`${CTB}/route-stop/CTB/${r.route}/${bound}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
         const details = await Promise.all(
-          stopIds.slice(0, 25).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
+          stopIds.slice(0, 30).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
         );
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       } else {
         const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
         const details = await Promise.all(
-          stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
+          stopIds.slice(0, 30).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
         );
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       }
     } catch { setStops([]); }
     setStopsLoading(false);
   };
-  
+
   const addStop = (stop) => {
-    const needPicker = activePid === NEARBY_PID;
-    const pid = needPicker ? targetPid : activePid;
+    const pid = activePid !== NEARBY_PID ? activePid : targetPid;
     if (!pid) { showToast('請先選擇要加入的版面'); return; }
     const favList = loadFavs(pid);
     if (favList.some(f => f.stopId === stop.stop && f.route === selectedRoute.route)) {
@@ -82,6 +82,7 @@ export default function SearchPage({ isActive }) {
 
   // ── 站點選擇畫面 ──────────────────────────────────────
   if (selectedRoute) {
+    const needPicker = activePid === NEARBY_PID;
     return (
       <div className="page" id="page-search" style={isActive ? { display: 'flex' } : {}}>
         <div style={{ flexShrink: 0, padding: '12px 12px 10px', background: 'var(--bg2)', borderBottom: '1px solid var(--bdr)' }}>
@@ -96,15 +97,20 @@ export default function SearchPage({ isActive }) {
           {profiles.length > 0 && (
             <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--mid)' }}>加入版面：</span>
-              {profiles.map(p => (
-                <button key={p.id} onClick={() => setTargetPid(p.id)}
-                  style={{
-                    padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--sans)',
-                    background: targetPid === p.id ? 'var(--amb-bg)' : 'var(--bg3)',
-                    border: `1px solid ${targetPid === p.id ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
-                    color: targetPid === p.id ? 'var(--amb2)' : 'var(--mid)',
-                  }}>{p.name}</button>
-              ))}
+              {needPicker
+                ? profiles.map(p => (
+                  <button key={p.id} onClick={() => setTargetPid(p.id)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--sans)',
+                      background: targetPid === p.id ? 'var(--amb-bg)' : 'var(--bg3)',
+                      border: `1px solid ${targetPid === p.id ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
+                      color: targetPid === p.id ? 'var(--amb2)' : 'var(--mid)',
+                    }}>{p.name}</button>
+                ))
+                : <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amb2)' }}>
+                    {profiles.find(p => p.id === activePid)?.name}
+                  </span>
+              }
             </div>
           )}
         </div>
@@ -170,11 +176,10 @@ export default function SearchPage({ isActive }) {
                     <div className="ri-dest">往 {r.dest_tc}</div>
                     <div className="ri-orig">由 {r.orig_tc}</div>
                   </div>
-                  <div style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, fontWeight: 600,
+                  <div style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, fontWeight: 600, flexShrink: 0,
                     color: r.co === 'ctb' ? '#2ed573' : r.co === 'lwb' ? '#00c896' : 'var(--amb2)',
                     background: r.co === 'ctb' ? 'rgba(46,213,115,.1)' : r.co === 'lwb' ? 'rgba(0,168,132,.1)' : 'var(--amb-bg)',
-                    border: `1px solid ${r.co === 'ctb' ? 'rgba(46,213,115,.3)' : r.co === 'lwb' ? 'rgba(0,168,132,.3)' : 'var(--amb-bdr)'}`,
-                    alignSelf: 'center', flexShrink: 0 }}>
+                    border: `1px solid ${r.co === 'ctb' ? 'rgba(46,213,115,.3)' : r.co === 'lwb' ? 'rgba(0,168,132,.3)' : 'var(--amb-bdr)'}` }}>
                     {r.co === 'ctb' ? '城巴' : r.co === 'lwb' ? '龍運' : '九巴'}
                   </div>
                 </div>

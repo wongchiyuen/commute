@@ -11,9 +11,9 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB, CTB } from './constants/transport.js';
+import { getRouteCoPool } from './hooks/useNearby.js';
 import './styles/global.css';
 
-// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -79,7 +79,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
 
   if (!drawerKey) return null;
 
-  // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
     const { ctb, mtr, lrt } = transportSettings;
     const Toggle = ({ checked, onChange, label, sub, disabled }) => (
@@ -107,7 +106,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
     return (
       <div>
@@ -133,12 +131,10 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
     return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
   }
 
-  // ── 資料管理 ──────────────────────────────────────────
   if (drawerKey === 'data') {
     const exportData = () => {
       const data = { profiles, favsByProfile: {} };
@@ -193,18 +189,15 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 天氣警告通知 ──────────────────────────────────────
   if (drawerKey === 'notify') {
     return <NotifyDrawer showToast={showToast} />;
   }
 
-  // ── 新增版面 ──────────────────────────────────────────
   if (drawerKey === 'add-profile') {
     return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
       closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
-  // ── 安裝到手機 ────────────────────────────────────────
   if (drawerKey === 'install') {
     return (
       <div style={{ fontSize: 13, color: 'var(--txt)', lineHeight: 2 }}>
@@ -226,7 +219,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 關於生活日常 ──────────────────────────────────────
   if (drawerKey === 'about') {
     const sources = [
       ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
@@ -267,7 +259,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 加路線搜尋 ────────────────────────────────────────
   if (drawerKey === 'search') {
     return <SearchDrawer closeDrawer={closeDrawer} showToast={showToast} />;
   }
@@ -275,7 +266,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
-// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
+// ── AutoTabDrawer ─────────────────────────────────────────
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -313,7 +304,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                 <span className="toggle-slider" />
               </label>
             </div>
-
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -329,7 +319,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{d}</button>
                 ))}
               </div>
-
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
                   <button key={ps.label}
@@ -342,7 +331,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{ps.label}</button>
                 ))}
               </div>
-
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -367,7 +355,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }} />
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
                   <button key={tp.label}
@@ -384,7 +371,6 @@ function AutoTabDrawer({ profiles, showToast }) {
                   </button>
                 ))}
               </div>
-
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
@@ -399,6 +385,7 @@ function AutoTabDrawer({ profiles, showToast }) {
   );
 }
 
+// ── NotifyDrawer ──────────────────────────────────────────
 function NotifyDrawer({ showToast }) {
   const [perm, setPerm] = useState(() => {
     if (!('Notification' in window)) return 'unsupported';
@@ -446,6 +433,7 @@ function NotifyDrawer({ showToast }) {
   );
 }
 
+// ── AddProfileDrawer ──────────────────────────────────────
 function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) {
   const [name, setName] = useState('');
   const doAdd = () => {
@@ -469,7 +457,7 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
   );
 }
 
-// ── 加路線 Drawer ─────────────────────────────────────────
+// ── SearchDrawer ──────────────────────────────────────────
 function SearchDrawer({ closeDrawer, showToast }) {
   const { activePid, profiles } = useApp();
   const [query, setQuery] = useState('');
@@ -486,14 +474,14 @@ function SearchDrawer({ closeDrawer, showToast }) {
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const [kmbData, ctbData] = await Promise.all([
+      const [kmbData, ctbData, coPool] = await Promise.all([
         fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
+        getRouteCoPool(),
       ]);
-      const LWB_PREFIX = /^(A|E|R)\d|^NA\d|^N(11|21|29|30|31|35|42)/;
       const kmbMatches = (kmbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: LWB_PREFIX.test(r.route) ? 'lwb' : 'kmb' }));
+        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
@@ -510,14 +498,14 @@ function SearchDrawer({ closeDrawer, showToast }) {
         const d = await fetch(`${CTB}/route-stop/CTB/${r.route}/${bound}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
         const details = await Promise.all(
-          stopIds.slice(0, 25).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
+          stopIds.slice(0, 30).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
         );
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       } else {
         const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
         const details = await Promise.all(
-          stopIds.slice(0, 25).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
+          stopIds.slice(0, 30).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
         );
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       }
