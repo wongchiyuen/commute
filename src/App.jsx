@@ -3,17 +3,17 @@ import { AppProvider, useApp, NEARBY_PID,
   loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
 import { useNews } from './hooks/useNews.js';
 import { useTraffic } from './hooks/useTraffic.js';
-import { Drawer, Toast, Spinner } from './components/Overlay.jsx';
+import { Drawer, Toast } from './components/Overlay.jsx';
 import HomePage from './pages/HomePage.jsx';
 import NewsPage from './pages/NewsPage.jsx';
 import TrafficPage from './pages/TrafficPage.jsx';
 import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
-import BusRouteDetail from './components/BusRouteDetail.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB, CTB } from './constants/transport.js';
 import './styles/global.css';
 
+// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -26,12 +26,12 @@ const NAV = [
 
 function AppInner() {
   const { activePage, setActivePage, toast, showToast } = useApp();
-  const [drawer, setDrawer] = useState({ open: false, title: '', key: null, data: null });
+  const [drawer, setDrawer] = useState({ open: false, title: '', key: null });
   const newsHook = useNews();
   const trafficHook = useTraffic();
 
-  const openDrawer = useCallback((title, key, data = null) =>
-    setDrawer({ open: true, title, key, data }), []);
+  const openDrawer = useCallback((title, key) =>
+    setDrawer({ open: true, title, key }), []);
   const closeDrawer = useCallback(() =>
     setDrawer(d => ({ ...d, open: false })), []);
 
@@ -45,11 +45,11 @@ function AppInner() {
     <>
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: activePage === 'home' ? 'contents' : 'none' }}>
-          <HomePage openDrawer={openDrawer} showToast={showToast} isActive={activePage === 'home'} />
+          <HomePage openDrawer={openDrawer} showToast={showToast} />
         </div>
         <NewsPage newsHook={newsHook} isActive={activePage === 'news'} />
         <TrafficPage trafficHook={trafficHook} isActive={activePage === 'traffic'} />
-        <SearchPage isActive={activePage === 'search'} openDrawer={openDrawer} />
+        <SearchPage isActive={activePage === 'search'} />
         <SettingsPage isActive={activePage === 'settings'} openDrawer={openDrawer} showToast={showToast} />
       </div>
 
@@ -64,7 +64,7 @@ function AppInner() {
       </nav>
 
       <Drawer open={drawer.open} title={drawer.title} onClose={closeDrawer}>
-        <DrawerContent drawerKey={drawer.key} drawerData={drawer.data} closeDrawer={closeDrawer} showToast={showToast} />
+        <DrawerContent drawerKey={drawer.key} closeDrawer={closeDrawer} showToast={showToast} />
       </Drawer>
 
       <Toast msg={toast.msg} visible={toast.visible} />
@@ -72,16 +72,14 @@ function AppInner() {
   );
 }
 
-function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
+// ── Drawer 內容路由 ───────────────────────────────────────
+function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
 
-  if (drawerKey === 'bus-detail') {
-    return <BusRouteDetail data={drawerData} showToast={showToast} />;
-  }
-
+  // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
     const { ctb, mtr, lrt } = transportSettings;
     const Toggle = ({ checked, onChange, label, sub, disabled }) => (
@@ -109,6 +107,7 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
+  // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
     return (
       <div>
@@ -134,10 +133,12 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
+  // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
     return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
   }
 
+  // ── 資料管理 ──────────────────────────────────────────
   if (drawerKey === 'data') {
     const exportData = () => {
       const data = { profiles, favsByProfile: {} };
@@ -192,15 +193,18 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
+  // ── 天氣警告通知 ──────────────────────────────────────
   if (drawerKey === 'notify') {
     return <NotifyDrawer showToast={showToast} />;
   }
 
+  // ── 新增版面 ──────────────────────────────────────────
   if (drawerKey === 'add-profile') {
     return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
       closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
+  // ── 安裝到手機 ────────────────────────────────────────
   if (drawerKey === 'install') {
     return (
       <div style={{ fontSize: 13, color: 'var(--txt)', lineHeight: 2 }}>
@@ -222,6 +226,7 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
     );
   }
 
+  // ── 關於生活日常 ──────────────────────────────────────
   if (drawerKey === 'about') {
     const sources = [
       ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
@@ -270,6 +275,7 @@ function DrawerContent({ drawerKey, drawerData, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
+// ── 獨立 sub-components（避免 hooks-in-conditional 問題）──
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -307,6 +313,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                 <span className="toggle-slider" />
               </label>
             </div>
+
             <div style={{ padding: '10px 14px 14px', opacity: c.enabled ? 1 : 0.4, pointerEvents: c.enabled ? 'auto' : 'none' }}>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>啟用日子</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -322,6 +329,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{d}</button>
                 ))}
               </div>
+
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
                   <button key={ps.label}
@@ -334,6 +342,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }}>{ps.label}</button>
                 ))}
               </div>
+
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -358,6 +367,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                     }} />
                 </div>
               </div>
+
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
                   <button key={tp.label}
@@ -374,6 +384,7 @@ function AutoTabDrawer({ profiles, showToast }) {
                   </button>
                 ))}
               </div>
+
               {c.days.some(Boolean) && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(91,143,255,.08)', border: '1px solid rgba(91,143,255,.2)', borderRadius: 8, fontSize: 12, color: '#7ba8ff' }}>
                   📋 {['日','一','二','三','四','五','六'].filter((_, i) => c.days[i]).map(d => '星期' + d).join('、')}<br />
@@ -458,7 +469,7 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
   );
 }
 
-// ── 加路線 Drawer ─────────────────────────────────────
+// ── 加路線 Drawer ─────────────────────────────────────────
 function SearchDrawer({ closeDrawer, showToast }) {
   const { activePid, profiles } = useApp();
   const [query, setQuery] = useState('');
@@ -545,19 +556,23 @@ function SearchDrawer({ closeDrawer, showToast }) {
         <div style={{ fontSize: 12, background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', borderRadius: 8, padding: '6px 10px', marginBottom: 12, color: 'var(--amb2)' }}>
           ＋ 加入版面：<strong>{profName}</strong>
         </div>
-      )}      {stopsLoading ? <Spinner /> : (stops || []).map((stop, i) => (
-        <div key={i} onClick={() => addStop(stop)}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-            background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)',
-            border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
-            {stop.seq}
+      )}
+      {stopsLoading
+        ? <div className="msg">載入站點…</div>
+        : (stops || []).map((stop, i) => (
+          <div key={i} onClick={() => addStop(stop)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+              background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)',
+              border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
+              {stop.seq}
+            </div>
+            <div style={{ flex: 1, fontSize: 13, color: 'var(--txt)' }}>{stop.name_tc}</div>
+            <div style={{ fontSize: 18, color: 'var(--amb2)' }}>＋</div>
           </div>
-          <div style={{ flex: 1, fontSize: 13, color: 'var(--txt)' }}>{stop.name_tc}</div>
-          <div style={{ fontSize: 18, color: 'var(--amb2)' }}>＋</div>
-        </div>
-      ))}
+        ))
+      }
     </div>
   );
 
@@ -569,7 +584,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
           onKeyDown={e => e.key === 'Enter' && doSearch()} />
         <button className="d-btn" onClick={doSearch}>搜尋</button>
       </div>
-      {loading && <Spinner />}
+      {loading && <div className="msg">搜尋中…</div>}
       {results !== null && !loading && (results.length === 0
         ? <div className="msg">找不到「{query}」</div>
         : results.map((r, i) => (
