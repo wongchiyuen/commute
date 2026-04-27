@@ -28,7 +28,7 @@ export default function SearchPage({ isActive }) {
       ]);
       const kmbMatches = (kmbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
+        .map(r => ({ ...r, co: coPool[r.route] || (/^(A|E|R)\d|^NA/.test(r.route) ? 'lwb' : 'kmb') }));
       const ctbMatches = (ctbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
