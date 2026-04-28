@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { AppProvider, useApp, NEARBY_PID,
   loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
 import { useNews } from './hooks/useNews.js';
@@ -11,10 +11,9 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB, CTB } from './constants/transport.js';
-import { getRouteCoPool, updateRouteCoPool, fetchAllKMBStops } from './hooks/useNearby.js';
+import { getRouteCoPool, updateRouteCoPool } from './hooks/useNearby.js';
 import './styles/global.css';
 
-// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -41,39 +40,6 @@ function AppInner() {
     if (id === 'news') newsHook.ensureLoaded(newsHook.currentFeed);
     if (id === 'traffic' && !trafficHook.v2Data.length) trafficHook.load();
   };
-
-  // ── 啟動時靜默預填 route company pool ────────────────
-  useEffect(() => {
-    getRouteCoPool().then(async pool => {
-      if (Object.keys(pool).length > 0) return; // pool 已有資料，跳過
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        async ({ coords: { latitude: lat, longitude: lng } }) => {
-          try {
-            const stops = await fetchAllKMBStops();
-            const nearby = stops
-              .map(s => ({ ...s, dist: Math.hypot(parseFloat(s.lat) - lat, parseFloat(s.long) - lng) }))
-              .sort((a, b) => a.dist - b.dist)
-              .slice(0, 10);
-            const results = await Promise.all(
-              nearby.map(s =>
-                fetch(`${KMB}/stop-eta/${s.stop}`).then(r => r.json()).catch(() => ({ data: [] }))
-              )
-            );
-            const entries = [];
-            results.forEach(res => {
-              (res.data || []).forEach(e => {
-                if (e.route && e.co) entries.push({ route: e.route, co: e.co === 'LWB' ? 'lwb' : 'kmb' });
-              });
-            });
-            if (entries.length) updateRouteCoPool(entries);
-          } catch {}
-        },
-        () => {}, // 拒絕位置權限，靜默失敗
-        { timeout: 5000, maximumAge: 60000 }
-      );
-    });
-  }, []);
 
   return (
     <>
@@ -106,7 +72,6 @@ function AppInner() {
   );
 }
 
-// ── Drawer 內容路由 ───────────────────────────────────────
 function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
@@ -293,6 +258,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 加路線搜尋 ────────────────────────────────────────
   if (drawerKey === 'search') {
     return <SearchDrawer closeDrawer={closeDrawer} showToast={showToast} />;
   }
@@ -300,7 +266,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
-// ── AutoTabDrawer ─────────────────────────────────────────
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -371,22 +336,14 @@ function AutoTabDrawer({ profiles, showToast }) {
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
                   <input type="time" value={c.from || '07:00'}
                     onChange={e => update(p.id, { from: e.target.value })}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
-                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
-                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
-                    }} />
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
                 <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
                   <input type="time" value={c.to || '09:00'}
                     onChange={e => update(p.id, { to: e.target.value })}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
-                      borderRadius: 10, padding: '10px 12px', color: 'var(--txt)',
-                      fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none',
-                    }} />
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -419,7 +376,6 @@ function AutoTabDrawer({ profiles, showToast }) {
   );
 }
 
-// ── NotifyDrawer ──────────────────────────────────────────
 function NotifyDrawer({ showToast }) {
   const [perm, setPerm] = useState(() => {
     if (!('Notification' in window)) return 'unsupported';
@@ -467,7 +423,6 @@ function NotifyDrawer({ showToast }) {
   );
 }
 
-// ── AddProfileDrawer ──────────────────────────────────────
 function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) {
   const [name, setName] = useState('');
   const doAdd = () => {
@@ -513,11 +468,32 @@ function SearchDrawer({ closeDrawer, showToast }) {
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
         getRouteCoPool(),
       ]);
-      const kmbMatches = (kmbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
+
+      const kmbFiltered = (kmbData.data || []).filter(r =>
+        r.route === q || r.route.startsWith(q) ||
+        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
+      );
+
+      // 對 pool 中未有記錄的路線，即時查詢 KMB route API 取得 co 欄位
+      const unknownRoutes = kmbFiltered.filter(r => !coPool[r.route]);
+      if (unknownRoutes.length > 0) {
+        const fetched = await Promise.all(
+          unknownRoutes.map(r => {
+            const bound = r.bound === 'O' ? 'outbound' : 'inbound';
+            return fetch(`${KMB}/route/${r.route}/${bound}/${r.service_type}`)
+              .then(x => x.json())
+              .then(d => ({ route: r.route, co: d.data?.co === 'LWB' ? 'lwb' : 'kmb' }))
+              .catch(() => ({ route: r.route, co: 'kmb' }));
+          })
+        );
+        fetched.forEach(({ route, co }) => { coPool[route] = co; });
+        updateRouteCoPool(fetched);
+      }
+
+      const kmbMatches = kmbFiltered.map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .filter(r => r.route === q || r.route.startsWith(q) ||
+          r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
       setResults([...kmbMatches, ...ctbMatches].slice(0, 40));
     } catch { setResults([]); }
@@ -531,16 +507,12 @@ function SearchDrawer({ closeDrawer, showToast }) {
       if (r.co === 'ctb') {
         const d = await fetch(`${CTB}/route-stop/CTB/${r.route}/${bound}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
-        const details = await Promise.all(
-          stopIds.slice(0, 30).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null))
-        );
+        const details = await Promise.all(stopIds.slice(0, 30).map(id => fetch(`${CTB}/stop/${id}`).then(x => x.json()).catch(() => null)));
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       } else {
         const d = await fetch(`${KMB}/route-stop/${r.route}/${bound}/${r.service_type}`).then(x => x.json());
         const stopIds = (d.data || []).map(s => s.stop);
-        const details = await Promise.all(
-          stopIds.slice(0, 30).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null))
-        );
+        const details = await Promise.all(stopIds.slice(0, 30).map(id => fetch(`${KMB}/stop/${id}`).then(x => x.json()).catch(() => null)));
         setStops(details.filter(s => s?.data).map((s, i) => ({ ...s.data, seq: i + 1 })));
       }
     } catch { setStops([]); }
@@ -553,12 +525,9 @@ function SearchDrawer({ closeDrawer, showToast }) {
       showToast('⚠️ 此站已加入'); return;
     }
     favList.push({
-      route: selectedRoute.route,
-      dest: selectedRoute.dest_tc,
-      stopId: stop.stop,
-      stopName: stop.name_tc,
-      serviceType: selectedRoute.service_type || '1',
-      type: selectedRoute.co,
+      route: selectedRoute.route, dest: selectedRoute.dest_tc,
+      stopId: stop.stop, stopName: stop.name_tc,
+      serviceType: selectedRoute.service_type || '1', type: selectedRoute.co,
     });
     saveFavs(activePid, favList);
     showToast(`✅ 已加入 ${selectedRoute.route} ${stop.name_tc}`);
@@ -584,11 +553,8 @@ function SearchDrawer({ closeDrawer, showToast }) {
         ? <div className="msg">載入站點…</div>
         : (stops || []).map((stop, i) => (
           <div key={i} onClick={() => addStop(stop)}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)',
-              border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
               {stop.seq}
             </div>
             <div style={{ flex: 1, fontSize: 13, color: 'var(--txt)' }}>{stop.name_tc}</div>
@@ -612,8 +578,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
         ? <div className="msg">找不到「{query}」</div>
         : results.map((r, i) => (
           <div key={i} onClick={() => selectRoute(r)}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-              background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: 'var(--amb2)', minWidth: 44 }}>{r.route}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, color: 'var(--bright)' }}>往 {r.dest_tc}</div>

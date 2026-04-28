@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KMB, CTB } from '../constants/transport.js';
 import { useApp, loadFavs, saveFavs, NEARBY_PID } from '../context/AppContext.jsx';
 import { Spinner } from '../components/Overlay.jsx';
-import { getRouteCoPool } from '../hooks/useNearby.js';
+import { getRouteCoPool, updateRouteCoPool } from '../hooks/useNearby.js';
 
 export default function SearchPage({ isActive }) {
   const { activePid, profiles, showToast } = useApp();
@@ -24,11 +24,32 @@ export default function SearchPage({ isActive }) {
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
         getRouteCoPool(),
       ]);
-      const kmbMatches = (kmbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
+
+      const kmbFiltered = (kmbData.data || []).filter(r =>
+        r.route === q || r.route.startsWith(q) ||
+        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
+      );
+
+      // 對 pool 中未有記錄的路線，即時查詢 KMB route API 取得 co 欄位
+      const unknownRoutes = kmbFiltered.filter(r => !coPool[r.route]);
+      if (unknownRoutes.length > 0) {
+        const fetched = await Promise.all(
+          unknownRoutes.map(r => {
+            const bound = r.bound === 'O' ? 'outbound' : 'inbound';
+            return fetch(`${KMB}/route/${r.route}/${bound}/${r.service_type}`)
+              .then(x => x.json())
+              .then(d => ({ route: r.route, co: d.data?.co === 'LWB' ? 'lwb' : 'kmb' }))
+              .catch(() => ({ route: r.route, co: 'kmb' }));
+          })
+        );
+        fetched.forEach(({ route, co }) => { coPool[route] = co; });
+        updateRouteCoPool(fetched);
+      }
+
+      const kmbMatches = kmbFiltered.map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .filter(r => r.route === q || r.route.startsWith(q) ||
+          r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
       setResults([...kmbMatches, ...ctbMatches]);
     } catch { setResults([]); }
