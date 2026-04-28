@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AppProvider, useApp, NEARBY_PID,
   loadAutoTabs, saveAutoTabs, loadFavs, saveFavs } from './context/AppContext.jsx';
 import { useNews } from './hooks/useNews.js';
@@ -11,9 +11,10 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB, CTB } from './constants/transport.js';
-import { getRouteCoPool } from './hooks/useNearby.js';
+import { getRouteCoPool, updateRouteCoPool, fetchAllKMBStops } from './hooks/useNearby.js';
 import './styles/global.css';
 
+// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -40,6 +41,39 @@ function AppInner() {
     if (id === 'news') newsHook.ensureLoaded(newsHook.currentFeed);
     if (id === 'traffic' && !trafficHook.v2Data.length) trafficHook.load();
   };
+
+  // ── 啟動時靜默預填 route company pool ────────────────
+  useEffect(() => {
+    getRouteCoPool().then(async pool => {
+      if (Object.keys(pool).length > 0) return; // pool 已有資料，跳過
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords: { latitude: lat, longitude: lng } }) => {
+          try {
+            const stops = await fetchAllKMBStops();
+            const nearby = stops
+              .map(s => ({ ...s, dist: Math.hypot(parseFloat(s.lat) - lat, parseFloat(s.long) - lng) }))
+              .sort((a, b) => a.dist - b.dist)
+              .slice(0, 10);
+            const results = await Promise.all(
+              nearby.map(s =>
+                fetch(`${KMB}/stop-eta/${s.stop}`).then(r => r.json()).catch(() => ({ data: [] }))
+              )
+            );
+            const entries = [];
+            results.forEach(res => {
+              (res.data || []).forEach(e => {
+                if (e.route && e.co) entries.push({ route: e.route, co: e.co === 'LWB' ? 'lwb' : 'kmb' });
+              });
+            });
+            if (entries.length) updateRouteCoPool(entries);
+          } catch {}
+        },
+        () => {}, // 拒絕位置權限，靜默失敗
+        { timeout: 5000, maximumAge: 60000 }
+      );
+    });
+  }, []);
 
   return (
     <>
@@ -481,7 +515,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
       ]);
       const kmbMatches = (kmbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
-        .map(r => ({ ...r, co: coPool[r.route] || (/^(A|E|R)\d|^NA/.test(r.route) ? 'lwb' : 'kmb') }));
+        .map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
         .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
