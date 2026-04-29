@@ -35,8 +35,10 @@ export async function getRouteCoMap() {
     const map = {};
     Object.entries(data.routeList || {}).forEach(([key, val]) => {
       const routeNo = key.split('+')[0];
-      const co = val.co?.[0]; // 'kmb', 'lwb', 'ctb', 'nlb' 等
-      if (routeNo && co && !map[routeNo]) map[routeNo] = co;
+      const co = val.co?.[0];
+      if (!routeNo || !co) return;
+      // lwb 優先：同一路線號有 lwb 記錄時永遠覆蓋 kmb
+      if (!map[routeNo] || co === 'lwb') map[routeNo] = co;
     });
     if (Object.keys(map).length > 0) {
       _idb.set('route_co_map', map, ROUTE_CO_MAP_TTL);
