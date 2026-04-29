@@ -63,6 +63,34 @@ export async function updateRouteCoPool(entries) {
   } catch {}
 }
 
+// ── Route company map（來自 hkbus daily crawl）────────────
+const ROUTE_CO_MAP_TTL = 24 * 60 * 60 * 1000;
+const HKBUS_ROUTE_URL = 'https://data.hkbus.app/routeFareList.min.json';
+
+export async function getRouteCoMap() {
+  try {
+    const cached = await _idb.fresh('route_co_map');
+    if (cached && Object.keys(cached).length > 0) return cached;
+  } catch {}
+  try {
+    const data = await fetch(HKBUS_ROUTE_URL).then(r => r.json());
+    const map = {};
+    Object.entries(data.routeList || {}).forEach(([key, val]) => {
+      const routeNo = key.split('+')[0];
+      const co = val.co?.[0];
+      if (!routeNo || !co) return;
+      // lwb 優先：同一路線號有 lwb 記錄時永遠覆蓋 kmb
+      if (!map[routeNo] || co === 'lwb') map[routeNo] = co;
+    });
+    if (Object.keys(map).length > 0) {
+      _idb.set('route_co_map', map, ROUTE_CO_MAP_TTL);
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 // ── KMB stops cache ───────────────────────────────────────
 let _kmbStopsCache = null;
 async function fetchAllKMBStops() {
