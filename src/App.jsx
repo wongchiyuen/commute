@@ -11,7 +11,7 @@ import SearchPage from './pages/SearchPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import { RHRREAD_STNS, DAY } from './constants/weather.js';
 import { KMB, CTB } from './constants/transport.js';
-import { getRouteCoPool, updateRouteCoPool } from './hooks/useNearby.js';
+import { getRouteCoMap } from './hooks/useNearby.js';
 import './styles/global.css';
 
 const APP_VERSION = __APP_VERSION__;
@@ -258,7 +258,6 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
-  // ── 加路線搜尋 ────────────────────────────────────────
   if (drawerKey === 'search') {
     return <SearchDrawer closeDrawer={closeDrawer} showToast={showToast} />;
   }
@@ -309,54 +308,33 @@ function AutoTabDrawer({ profiles, showToast }) {
                 {DAY.map((d, i) => (
                   <button key={i}
                     onClick={() => { const days = [...c.days]; days[i] = !days[i]; update(p.id, { days }); }}
-                    style={{
-                      flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600,
-                      background: c.days[i] ? 'var(--amb)' : 'var(--bg3)',
-                      color: c.days[i] ? '#000' : 'var(--mid)',
-                      transition: 'all .15s',
-                    }}>{d}</button>
+                    style={{ flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600, background: c.days[i] ? 'var(--amb)' : 'var(--bg3)', color: c.days[i] ? '#000' : 'var(--mid)', transition: 'all .15s' }}>{d}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
-                  <button key={ps.label}
-                    onClick={() => update(p.id, { days: ps.days })}
-                    style={{
-                      flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
-                      fontFamily: 'var(--sans)', fontSize: 11,
-                      background: 'var(--bg4)', border: '1px solid var(--bdr2)',
-                      color: 'var(--mid)',
-                    }}>{ps.label}</button>
+                  <button key={ps.label} onClick={() => update(p.id, { days: ps.days })}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 11, background: 'var(--bg4)', border: '1px solid var(--bdr2)', color: 'var(--mid)' }}>{ps.label}</button>
                 ))}
               </div>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
-                  <input type="time" value={c.from || '07:00'}
-                    onChange={e => update(p.id, { from: e.target.value })}
+                  <input type="time" value={c.from || '07:00'} onChange={e => update(p.id, { from: e.target.value })}
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
                 <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
-                  <input type="time" value={c.to || '09:00'}
-                    onChange={e => update(p.id, { to: e.target.value })}
+                  <input type="time" value={c.to || '09:00'} onChange={e => update(p.id, { to: e.target.value })}
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
-                  <button key={tp.label}
-                    onClick={() => update(p.id, { from: tp.from, to: tp.to })}
-                    style={{
-                      padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
-                      fontFamily: 'var(--sans)', fontSize: 11,
-                      background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)',
-                      border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
-                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)',
-                    }}>
+                  <button key={tp.label} onClick={() => update(p.id, { from: tp.from, to: tp.to })}
+                    style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 11, background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)', border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`, color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)' }}>
                     {tp.label}<br />
                     <span style={{ fontSize: 10, fontFamily: 'var(--mono)' }}>{tp.from}–{tp.to}</span>
                   </button>
@@ -410,13 +388,7 @@ function NotifyDrawer({ showToast }) {
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, padding: '11px 13px', marginBottom: 14, fontSize: 12, color: 'var(--dim)', lineHeight: 1.7 }}>
         ℹ️ 每 5 分鐘查詢天文台，有新警告時本地觸發通知
       </div>
-      <button onClick={toggle} style={{
-        width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600,
-        cursor: 'pointer', fontFamily: 'var(--sans)',
-        border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`,
-        background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)',
-        color: isOn ? '#ff8a96' : 'var(--amb2)',
-      }}>
+      <button onClick={toggle} style={{ width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--sans)', border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`, background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)', color: isOn ? '#ff8a96' : 'var(--amb2)' }}>
         {isOn ? '🔕 關閉天氣警告通知' : '🔔 啟用天氣警告通知'}
       </button>
     </div>
@@ -437,9 +409,7 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
       <div className="sec-lbl">版面名稱</div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="d-input" value={name} placeholder="如：上班、週末…" maxLength={10}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && doAdd()}
-          autoFocus />
+          onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && doAdd()} autoFocus />
         <button className="d-btn" onClick={doAdd}>確定</button>
       </div>
     </div>
@@ -463,37 +433,16 @@ function SearchDrawer({ closeDrawer, showToast }) {
     if (!q) return;
     setLoading(true); setResults(null); setSelectedRoute(null); setStops(null);
     try {
-      const [kmbData, ctbData, coPool] = await Promise.all([
+      const [kmbData, ctbData, coMap] = await Promise.all([
         fetch(`${KMB}/route/`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch(`${CTB}/route/CTB`).then(r => r.json()).catch(() => ({ data: [] })),
-        getRouteCoPool(),
+        getRouteCoMap(),
       ]);
-
-      const kmbFiltered = (kmbData.data || []).filter(r =>
-        r.route === q || r.route.startsWith(q) ||
-        r.dest_tc?.includes(query) || r.orig_tc?.includes(query)
-      );
-
-      // 對 pool 中未有記錄的路線，即時查詢 KMB route API 取得 co 欄位
-      const unknownRoutes = kmbFiltered.filter(r => !coPool[r.route]);
-      if (unknownRoutes.length > 0) {
-        const fetched = await Promise.all(
-          unknownRoutes.map(r => {
-            const bound = r.bound === 'O' ? 'outbound' : 'inbound';
-            return fetch(`${KMB}/route/${r.route}/${bound}/${r.service_type}`)
-              .then(x => x.json())
-              .then(d => ({ route: r.route, co: d.data?.co === 'LWB' ? 'lwb' : 'kmb' }))
-              .catch(() => ({ route: r.route, co: 'kmb' }));
-          })
-        );
-        fetched.forEach(({ route, co }) => { coPool[route] = co; });
-        updateRouteCoPool(fetched);
-      }
-
-      const kmbMatches = kmbFiltered.map(r => ({ ...r, co: coPool[r.route] || 'kmb' }));
+      const kmbMatches = (kmbData.data || [])
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .map(r => ({ ...r, co: coMap[r.route] || 'kmb' }));
       const ctbMatches = (ctbData.data || [])
-        .filter(r => r.route === q || r.route.startsWith(q) ||
-          r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
+        .filter(r => r.route === q || r.route.startsWith(q) || r.dest_tc?.includes(query) || r.orig_tc?.includes(query))
         .map(r => ({ ...r, co: 'ctb' }));
       setResults([...kmbMatches, ...ctbMatches].slice(0, 40));
     } catch { setResults([]); }
@@ -524,11 +473,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
     if (favList.some(f => f.stopId === stop.stop && f.route === selectedRoute.route)) {
       showToast('⚠️ 此站已加入'); return;
     }
-    favList.push({
-      route: selectedRoute.route, dest: selectedRoute.dest_tc,
-      stopId: stop.stop, stopName: stop.name_tc,
-      serviceType: selectedRoute.service_type || '1', type: selectedRoute.co,
-    });
+    favList.push({ route: selectedRoute.route, dest: selectedRoute.dest_tc, stopId: stop.stop, stopName: stop.name_tc, serviceType: selectedRoute.service_type || '1', type: selectedRoute.co });
     saveFavs(activePid, favList);
     showToast(`✅ 已加入 ${selectedRoute.route} ${stop.name_tc}`);
     closeDrawer();
@@ -540,9 +485,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
         style={{ background: 'none', border: 'none', color: 'var(--amb2)', fontSize: 13, cursor: 'pointer', padding: '0 0 12px', fontFamily: 'var(--sans)' }}>
         ← 返回結果
       </button>
-      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--bright)', marginBottom: 3 }}>
-        {selectedRoute.route} 往 {selectedRoute.dest_tc}
-      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--bright)', marginBottom: 3 }}>{selectedRoute.route} 往 {selectedRoute.dest_tc}</div>
       <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 6 }}>由 {selectedRoute.orig_tc} — 選擇站點加入</div>
       {profName && (
         <div style={{ fontSize: 12, background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', borderRadius: 8, padding: '6px 10px', marginBottom: 12, color: 'var(--amb2)' }}>
@@ -554,9 +497,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
         : (stops || []).map((stop, i) => (
           <div key={i} onClick={() => addStop(stop)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, marginBottom: 6, cursor: 'pointer' }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>
-              {stop.seq}
-            </div>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--amb-bg)', border: '1px solid var(--amb-bdr)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--amb2)', fontWeight: 700, flexShrink: 0 }}>{stop.seq}</div>
             <div style={{ flex: 1, fontSize: 13, color: 'var(--txt)' }}>{stop.name_tc}</div>
             <div style={{ fontSize: 18, color: 'var(--amb2)' }}>＋</div>
           </div>
@@ -569,8 +510,7 @@ function SearchDrawer({ closeDrawer, showToast }) {
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input className="d-input" value={query} placeholder="路線號碼 / 地名（如 40X、荃灣）" autoFocus
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && doSearch()} />
+          onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} />
         <button className="d-btn" onClick={doSearch}>搜尋</button>
       </div>
       {loading && <div className="msg">搜尋中…</div>}
