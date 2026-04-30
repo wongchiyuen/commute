@@ -14,6 +14,7 @@ import { KMB, CTB } from './constants/transport.js';
 import { getRouteCoMap } from './hooks/useNearby.js';
 import './styles/global.css';
 
+// 自動從 package.json 讀取版本號（Vite build 時注入）
 const APP_VERSION = __APP_VERSION__;
 
 const NAV = [
@@ -72,12 +73,14 @@ function AppInner() {
   );
 }
 
+// ── Drawer 內容路由 ───────────────────────────────────────
 function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   const { transportSettings, saveTransport, profiles, updateProfiles,
     setActivePid, reloadFavs, selectedStn, setSelectedStn } = useApp();
 
   if (!drawerKey) return null;
 
+  // ── 交通服務設定 ──────────────────────────────────────
   if (drawerKey === 'transport') {
     const { ctb, mtr, lrt } = transportSettings;
     const Toggle = ({ checked, onChange, label, sub, disabled }) => (
@@ -105,6 +108,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 天氣地點 ──────────────────────────────────────────
   if (drawerKey === 'weather-details') {
     return (
       <div>
@@ -130,10 +134,12 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 自動跳轉版面 ──────────────────────────────────────
   if (drawerKey === 'auto-tab') {
     return <AutoTabDrawer profiles={profiles} showToast={showToast} />;
   }
 
+  // ── 資料管理 ──────────────────────────────────────────
   if (drawerKey === 'data') {
     const exportData = () => {
       const data = { profiles, favsByProfile: {} };
@@ -188,15 +194,18 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 天氣警告通知 ──────────────────────────────────────
   if (drawerKey === 'notify') {
     return <NotifyDrawer showToast={showToast} />;
   }
 
+  // ── 新增版面 ──────────────────────────────────────────
   if (drawerKey === 'add-profile') {
     return <AddProfileDrawer profiles={profiles} updateProfiles={updateProfiles}
       closeDrawer={closeDrawer} showToast={showToast} />;
   }
 
+  // ── 安裝到手機 ────────────────────────────────────────
   if (drawerKey === 'install') {
     return (
       <div style={{ fontSize: 13, color: 'var(--txt)', lineHeight: 2 }}>
@@ -218,6 +227,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 關於生活日常 ──────────────────────────────────────
   if (drawerKey === 'about') {
     const sources = [
       ['🌤','天氣','香港天文台開放數據','https://www.hko.gov.hk/tc/abouthko/opendata_intro.htm'],
@@ -258,6 +268,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
     );
   }
 
+  // ── 加路線搜尋 ────────────────────────────────────────
   if (drawerKey === 'search') {
     return <SearchDrawer closeDrawer={closeDrawer} showToast={showToast} />;
   }
@@ -265,6 +276,7 @@ function DrawerContent({ drawerKey, closeDrawer, showToast }) {
   return <div className="msg">載入中…</div>;
 }
 
+// ── 獨立 sub-components ───────────────────────────────────
 function AutoTabDrawer({ profiles, showToast }) {
   const [cfg, setCfg] = useState(() => loadAutoTabs());
   const DEF = { enabled: false, days: [false,false,false,false,false,false,false], from: '07:00', to: '09:00' };
@@ -308,33 +320,54 @@ function AutoTabDrawer({ profiles, showToast }) {
                 {DAY.map((d, i) => (
                   <button key={i}
                     onClick={() => { const days = [...c.days]; days[i] = !days[i]; update(p.id, { days }); }}
-                    style={{ flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600, background: c.days[i] ? 'var(--amb)' : 'var(--bg3)', color: c.days[i] ? '#000' : 'var(--mid)', transition: 'all .15s' }}>{d}</button>
+                    style={{
+                      flex: 1, height: 44, borderRadius: 10, border: 'none', cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600,
+                      background: c.days[i] ? 'var(--amb)' : 'var(--bg3)',
+                      color: c.days[i] ? '#000' : 'var(--mid)',
+                      transition: 'all .15s',
+                    }}>{d}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
                 {PRESETS.map(ps => (
-                  <button key={ps.label} onClick={() => update(p.id, { days: ps.days })}
-                    style={{ flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 11, background: 'var(--bg4)', border: '1px solid var(--bdr2)', color: 'var(--mid)' }}>{ps.label}</button>
+                  <button key={ps.label}
+                    onClick={() => update(p.id, { days: ps.days })}
+                    style={{
+                      flex: 1, padding: '6px 0', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: 'var(--bg4)', border: '1px solid var(--bdr2)',
+                      color: 'var(--mid)',
+                    }}>{ps.label}</button>
                 ))}
               </div>
               <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8, fontWeight: 600 }}>時間段</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>開始</div>
-                  <input type="time" value={c.from || '07:00'} onChange={e => update(p.id, { from: e.target.value })}
+                  <input type="time" value={c.from || '07:00'}
+                    onChange={e => update(p.id, { from: e.target.value })}
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
                 <div style={{ color: 'var(--dim)', fontSize: 18, paddingTop: 20 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>結束</div>
-                  <input type="time" value={c.to || '09:00'} onChange={e => update(p.id, { to: e.target.value })}
+                  <input type="time" value={c.to || '09:00'}
+                    onChange={e => update(p.id, { to: e.target.value })}
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 10, padding: '10px 12px', color: 'var(--txt)', fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 700, outline: 'none' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {TIME_PRESETS.map(tp => (
-                  <button key={tp.label} onClick={() => update(p.id, { from: tp.from, to: tp.to })}
-                    style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 11, background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)', border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`, color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)' }}>
+                  <button key={tp.label}
+                    onClick={() => update(p.id, { from: tp.from, to: tp.to })}
+                    style={{
+                      padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                      fontFamily: 'var(--sans)', fontSize: 11,
+                      background: (c.from === tp.from && c.to === tp.to) ? 'var(--amb-bg)' : 'var(--bg4)',
+                      border: `1px solid ${(c.from === tp.from && c.to === tp.to) ? 'var(--amb-bdr)' : 'var(--bdr2)'}`,
+                      color: (c.from === tp.from && c.to === tp.to) ? 'var(--amb2)' : 'var(--mid)',
+                    }}>
                     {tp.label}<br />
                     <span style={{ fontSize: 10, fontFamily: 'var(--mono)' }}>{tp.from}–{tp.to}</span>
                   </button>
@@ -388,7 +421,13 @@ function NotifyDrawer({ showToast }) {
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 10, padding: '11px 13px', marginBottom: 14, fontSize: 12, color: 'var(--dim)', lineHeight: 1.7 }}>
         ℹ️ 每 5 分鐘查詢天文台，有新警告時本地觸發通知
       </div>
-      <button onClick={toggle} style={{ width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--sans)', border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`, background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)', color: isOn ? '#ff8a96' : 'var(--amb2)' }}>
+      <button onClick={toggle} style={{
+        width: '100%', padding: 13, borderRadius: 11, fontSize: 14, fontWeight: 600,
+        cursor: 'pointer', fontFamily: 'var(--sans)',
+        border: `1px solid ${isOn ? 'rgba(255,71,87,.3)' : 'var(--amb-bdr)'}`,
+        background: isOn ? 'rgba(255,71,87,.15)' : 'var(--amb-bg)',
+        color: isOn ? '#ff8a96' : 'var(--amb2)',
+      }}>
         {isOn ? '🔕 關閉天氣警告通知' : '🔔 啟用天氣警告通知'}
       </button>
     </div>
@@ -409,7 +448,9 @@ function AddProfileDrawer({ profiles, updateProfiles, closeDrawer, showToast }) 
       <div className="sec-lbl">版面名稱</div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="d-input" value={name} placeholder="如：上班、週末…" maxLength={10}
-          onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && doAdd()} autoFocus />
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doAdd()}
+          autoFocus />
         <button className="d-btn" onClick={doAdd}>確定</button>
       </div>
     </div>
